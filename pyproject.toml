@@ -1,0 +1,20 @@
+[project]
+name = "academic-management-app"
+version = "0.1.0"
+description = "An academic management application with an AI assistant."
+authors = [
+    {name = "Jules"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = "^3.9"
+dependencies = [
+    "customtkinter (>=5.2.2,<6.0.0)",
+    "sqlalchemy (>=2.0.44,<3.0.0)",
+    "python-dotenv (>=1.2.1,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
