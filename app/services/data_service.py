@@ -48,6 +48,10 @@ class DataService:
     def get_course_count(self) -> int:
         return self.db_session.query(Course).count()
 
+    def get_grades_for_course(self, course_id: int) -> list[Grade]:
+        """Returns a list of all grades for a specific course."""
+        return self.db_session.query(Grade).filter(Grade.course_id == course_id).all()
+
     # --- Update ---
     def update_student(self, student_id: int, first_name: str, last_name: str):
         student = self.student_repo.get(student_id)
