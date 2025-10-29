@@ -35,14 +35,30 @@ class AssistantView(ctk.CTkFrame):
     def send_message(self):
         user_text = self.user_input.get()
         if not user_text.strip():
-            return  # Don't send empty messages
+            return
 
         self.add_message("You", user_text)
         self.user_input.delete(0, "end")
 
+        # Disable input while the assistant is thinking
+        self.user_input.configure(state="disabled")
+        self.send_button.configure(state="disabled")
+
         # Get response from the service
+        # This will now handle the full agentic loop
         response = self.assistant_service.get_response(user_text)
-        self.add_message("Assistant", response.content)
+
+        # The final response content will be displayed
+        if response.content:
+            self.add_message("Assistant", response.content)
+        else:
+            # Handle cases where a tool is called but no final content is returned
+             self.add_message("System", "An action was performed, but no verbal response was generated.")
+
+        # Re-enable input
+        self.user_input.configure(state="normal")
+        self.send_button.configure(state="normal")
+
 
     def add_message(self, sender: str, message: str):
         self.chat_history.configure(state="normal")
