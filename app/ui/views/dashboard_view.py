@@ -8,7 +8,7 @@ class DashboardView(ctk.CTkFrame):
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=1) # Allow extra space at the bottom
+        self.grid_rowconfigure(2, weight=1)
 
         # --- Title ---
         self.title_label = ctk.CTkLabel(self, text="Dashboard", font=ctk.CTkFont(size=20, weight="bold"))
@@ -64,7 +64,9 @@ class DashboardView(ctk.CTkFrame):
         self.feedback_label = ctk.CTkLabel(self, text="")
         self.feedback_label.grid(row=3, column=0, columnspan=2, padx=20, pady=10, sticky="ew")
 
-        # Initial data load
+        self.bind("<Visibility>", self.on_show)
+
+    def on_show(self, event):
         self.update_stats()
 
     def update_stats(self):
@@ -73,6 +75,7 @@ class DashboardView(ctk.CTkFrame):
         course_count = self.data_service.get_course_count()
         self.total_students_label.configure(text=f"Total Students: {student_count}")
         self.total_courses_label.configure(text=f"Total Courses: {course_count}")
+        self.feedback_label.configure(text="") # Clear feedback
 
     def add_student(self):
         """Handles the add student button click."""
