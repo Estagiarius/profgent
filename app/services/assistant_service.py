@@ -25,7 +25,6 @@ class AssistantService:
         self._initialize_provider()
 
     def _register_tools(self):
-        """Registers all available tools."""
         self.tool_registry.register(get_student_grade)
         self.tool_registry.register(list_courses_for_student)
         self.tool_registry.register(get_class_average)
@@ -35,7 +34,6 @@ class AssistantService:
         self.tool_registry.register(add_new_grade)
 
     def _initialize_provider(self):
-        """Initializes the active LLM provider based on saved settings."""
         active_provider_name = load_setting("active_provider", "OpenAI")
 
         if active_provider_name == "Ollama":
@@ -44,8 +42,7 @@ class AssistantService:
         else:
             api_key = get_api_key(active_provider_name)
             if not api_key:
-                self.provider = None
-                return
+                self.provider = None; return
 
             if active_provider_name == "OpenAI":
                 self.provider = OpenAIProvider(api_key=api_key)
@@ -57,20 +54,19 @@ class AssistantService:
                 self.provider = None
 
         if self.provider:
-            self.messages = [{"role": "system", "content": "You are a helpful academic assistant. You have access to tools to read, write, and update academic data, as well as to search the internet."}]
+            self.messages = [{"role": "system", "content": "You are a helpful academic assistant..."}]
 
-    def get_response(self, user_input: str) -> AssistantResponse:
+    async def get_response(self, user_input: str) -> AssistantResponse:
         self._initialize_provider()
         if not self.provider:
-            return AssistantResponse(content="AI provider not configured. Please check your settings.")
+            return AssistantResponse(content="AI provider not configured...")
 
         self.messages.append({"role": "user", "content": user_input})
 
         while True:
-            # Send tools to providers that support them (OpenAI, OpenRouter, Ollama)
             tool_schemas = self.tool_registry.get_all_schemas() if self.provider.name in ["OpenAI", "OpenRouter", "Ollama"] else None
 
-            response = self.provider.get_chat_response(self.messages, tools=tool_schemas)
+            response = await self.provider.get_chat_response(self.messages, tools=tool_schemas)
 
             if not response.tool_calls:
                 if response.content:

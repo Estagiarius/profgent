@@ -11,3 +11,6 @@ __pycache__/
 
 # Poetry
 .venv/
+
+# Database
+*.db

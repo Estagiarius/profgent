@@ -1,14 +1,14 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from app.core.llm.base import LLMProvider, AssistantResponse
 
 class MaritacaProvider(LLMProvider):
     """
     An implementation of the LLMProvider for Maritaca's API,
-    leveraging the OpenAI compatibility layer.
+    leveraging the async OpenAI compatibility layer.
     """
 
     def __init__(self, api_key: str, model: str = "sabia-3"):
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(
             api_key=api_key,
             base_url="https://chat.maritaca.ai/api",
         )
@@ -18,11 +18,9 @@ class MaritacaProvider(LLMProvider):
     def name(self) -> str:
         return "Maritaca"
 
-    def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
-        # NOTE: The Maritaca documentation does not mention tool/function calling support.
-        # Therefore, we are not passing the 'tools' parameter to the client.
+    async def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
         try:
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 temperature=0.7,
@@ -31,8 +29,6 @@ class MaritacaProvider(LLMProvider):
 
             message = response.choices[0].message
             content = message.content or ""
-
-            # Since we are not expecting tool calls, this will be None.
             tool_calls = message.tool_calls
 
             return AssistantResponse(content=content, tool_calls=tool_calls)

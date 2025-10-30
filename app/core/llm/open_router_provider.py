@@ -1,15 +1,14 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 from app.core.llm.base import LLMProvider, AssistantResponse
 
 class OpenRouterProvider(LLMProvider):
     """
     An implementation of the LLMProvider for OpenRouter's API,
-    which provides access to a wide variety of models through an
-    OpenAI-compatible endpoint.
+    using an async client.
     """
 
     def __init__(self, api_key: str, model: str = "mistralai/mistral-7b-instruct:free"):
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
         )
@@ -19,14 +18,9 @@ class OpenRouterProvider(LLMProvider):
     def name(self) -> str:
         return "OpenRouter"
 
-    def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
-        """
-        Gets a chat response from the selected OpenRouter model.
-        It supports tool calling, similar to OpenAI.
-        """
+    async def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
         try:
-            # OpenRouter is compatible with OpenAI's tool calling, so we pass the tools.
-            response = self.client.chat.completions.create(
+            response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 tools=tools,

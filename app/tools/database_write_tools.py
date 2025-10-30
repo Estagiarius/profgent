@@ -1,8 +1,5 @@
 from app.core.tools.tool_decorator import tool
-from app.services.data_service import DataService
-
-# Initialize the service once to be used by all tool functions
-data_service = DataService()
+from app.services import data_service
 
 @tool
 def add_new_student(first_name: str, last_name: str) -> str:
@@ -43,7 +40,6 @@ def add_new_grade(student_name: str, course_name: str, assignment_name: str, sco
     Use this to record a score for an assignment, test, or exam.
     Returns a confirmation message.
     """
-    # Find the student and course by name to get their IDs
     student = data_service.get_student_by_name(student_name)
     if not student:
         return f"Error: Student '{student_name}' not found."
@@ -52,7 +48,6 @@ def add_new_grade(student_name: str, course_name: str, assignment_name: str, sco
     if not course:
         return f"Error: Course '{course_name}' not found."
 
-    # Add the grade using the retrieved IDs
     grade = data_service.add_grade(student.id, course.id, assignment_name, score)
     if grade:
         return f"Successfully added grade for {student_name} in {course_name}: {assignment_name} - Score {score}."

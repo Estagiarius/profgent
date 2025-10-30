@@ -24,9 +24,9 @@ class LLMProvider(ABC):
         pass
 
     @abstractmethod
-    def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
+    async def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
         """
-        Obtains a chat response from the model.
+        Asynchronously obtains a chat response from the model.
 
         Args:
             messages: A list representing the conversation history.
