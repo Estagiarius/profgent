@@ -1,4 +1,5 @@
 from datetime import date
+from sqlalchemy import func
 from app.data.database import SessionLocal
 from app.data.student_repository import StudentRepository
 from app.data.course_repository import CourseRepository
@@ -49,8 +50,15 @@ class DataService:
         return self.db_session.query(Course).count()
 
     def get_grades_for_course(self, course_id: int) -> list[Grade]:
-        """Returns a list of all grades for a specific course."""
         return self.db_session.query(Grade).filter(Grade.course_id == course_id).all()
+
+    def get_student_by_name(self, name: str) -> Student | None:
+        """Finds a student by their full name (case-insensitive)."""
+        return self.db_session.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == name.lower()).first()
+
+    def get_course_by_name(self, name: str) -> Course | None:
+        """Finds a course by its name (case-insensitive)."""
+        return self.db_session.query(Course).filter(func.lower(Course.course_name) == name.lower()).first()
 
     # --- Update ---
     def update_student(self, student_id: int, first_name: str, last_name: str):
