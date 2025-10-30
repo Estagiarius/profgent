@@ -1,30 +1,30 @@
 from openai import AsyncOpenAI
 from app.core.llm.base import LLMProvider, AssistantResponse
 
-class MaritacaProvider(LLMProvider):
+class OpenRouterProvider(LLMProvider):
     """
-    An implementation of the LLMProvider for Maritaca's API,
-    leveraging the async OpenAI compatibility layer.
+    An implementation of the LLMProvider for OpenRouter's API,
+    using an async client.
     """
 
-    def __init__(self, api_key: str, model: str = "sabia-3"):
+    def __init__(self, api_key: str, model: str = "mistralai/mistral-7b-instruct:free"):
         self.client = AsyncOpenAI(
             api_key=api_key,
-            base_url="https://chat.maritaca.ai/api",
+            base_url="https://openrouter.ai/api/v1",
         )
         self.model = model
 
     @property
     def name(self) -> str:
-        return "Maritaca"
+        return "OpenRouter"
 
     async def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
         try:
             response = await self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
-                temperature=0.7,
-                max_tokens=512,
+                tools=tools,
+                tool_choice="auto" if tools else None,
             )
 
             message = response.choices[0].message
@@ -34,5 +34,5 @@ class MaritacaProvider(LLMProvider):
             return AssistantResponse(content=content, tool_calls=tool_calls)
 
         except Exception as e:
-            print(f"An error occurred with the Maritaca API: {e}")
+            print(f"An error occurred with the OpenRouter API: {e}")
             return AssistantResponse(content=f"Error: {e}")
