@@ -10,7 +10,7 @@ class Repository(Generic[ModelType]):
         self.model = model
 
     def get(self, id: int) -> ModelType | None:
-        return self.session.query(self.model).get(id)
+        return self.session.get(self.model, id)
 
     def get_all(self) -> list[ModelType]:
         return self.session.query(self.model).all()
