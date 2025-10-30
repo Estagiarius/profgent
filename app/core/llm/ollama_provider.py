@@ -1,5 +1,6 @@
 from openai import AsyncOpenAI
 from app.core.llm.base import LLMProvider, AssistantResponse
+from typing import List
 
 class OllamaProvider(LLMProvider):
     """
@@ -37,3 +38,12 @@ class OllamaProvider(LLMProvider):
             error_message = f"Could not connect to Ollama server at {self.client.base_url}. Is Ollama running? Error: {e}"
             print(error_message)
             return AssistantResponse(content=error_message)
+
+    async def list_models(self) -> List[str]:
+        try:
+            models = await self.client.models.list()
+            # The ollama API returns model names in the 'id' field
+            return sorted([model.id for model in models])
+        except Exception as e:
+            print(f"Error listing Ollama models: {e}")
+            return ["Could not connect to Ollama"]

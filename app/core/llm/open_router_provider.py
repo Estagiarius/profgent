@@ -1,5 +1,6 @@
 from openai import AsyncOpenAI
 from app.core.llm.base import LLMProvider, AssistantResponse
+from typing import List
 
 class OpenRouterProvider(LLMProvider):
     """
@@ -36,3 +37,11 @@ class OpenRouterProvider(LLMProvider):
         except Exception as e:
             print(f"An error occurred with the OpenRouter API: {e}")
             return AssistantResponse(content=f"Error: {e}")
+
+    async def list_models(self) -> List[str]:
+        try:
+            models = await self.client.models.list()
+            return sorted([model.id for model in models])
+        except Exception as e:
+            print(f"Error listing OpenRouter models: {e}")
+            return []

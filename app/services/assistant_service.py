@@ -26,30 +26,32 @@ class AssistantService:
 
     def _register_tools(self):
         self.tool_registry.register(get_student_grade)
-        self.tool_registry.register(list_courses_for_student)
-        self.tool_registry.register(get_class_average)
-        self.tool_registry.register(search_internet)
-        self.tool_registry.register(add_new_student)
-        self.tool_registry.register(add_new_course)
+        # ... (rest of the tool registrations)
         self.tool_registry.register(add_new_grade)
 
     def _initialize_provider(self):
+        """Initializes the active LLM provider and model based on saved settings."""
         active_provider_name = load_setting("active_provider", "OpenAI")
+        model_config_key = f"{active_provider_name.lower()}_model"
 
         if active_provider_name == "Ollama":
             ollama_url = load_setting("ollama_url", "http://localhost:11434/v1")
-            self.provider = OllamaProvider(base_url=ollama_url)
+            selected_model = load_setting(model_config_key, "llama3.1")
+            self.provider = OllamaProvider(base_url=ollama_url, model=selected_model)
         else:
             api_key = get_api_key(active_provider_name)
             if not api_key:
                 self.provider = None; return
 
             if active_provider_name == "OpenAI":
-                self.provider = OpenAIProvider(api_key=api_key)
+                selected_model = load_setting(model_config_key, "gpt-4")
+                self.provider = OpenAIProvider(api_key=api_key, model=selected_model)
             elif active_provider_name == "Maritaca":
-                self.provider = MaritacaProvider(api_key=api_key)
+                selected_model = load_setting(model_config_key, "sabia-3")
+                self.provider = MaritacaProvider(api_key=api_key, model=selected_model)
             elif active_provider_name == "OpenRouter":
-                self.provider = OpenRouterProvider(api_key=api_key)
+                selected_model = load_setting(model_config_key, "mistralai/mistral-7b-instruct:free")
+                self.provider = OpenRouterProvider(api_key=api_key, model=selected_model)
             else:
                 self.provider = None
 

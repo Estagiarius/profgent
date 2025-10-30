@@ -1,5 +1,6 @@
 from openai import AsyncOpenAI
 from app.core.llm.base import LLMProvider, AssistantResponse
+from typing import List
 
 class MaritacaProvider(LLMProvider):
     """
@@ -36,3 +37,8 @@ class MaritacaProvider(LLMProvider):
         except Exception as e:
             print(f"An error occurred with the Maritaca API: {e}")
             return AssistantResponse(content=f"Error: {e}")
+
+    async def list_models(self) -> List[str]:
+        # Maritaca's OpenAI-compatible endpoint does not seem to support listing models.
+        # We will return the known models manually.
+        return ["sabia-3", "sabia-2-small"]

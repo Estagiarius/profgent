@@ -27,12 +27,12 @@ class LLMProvider(ABC):
     async def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
         """
         Asynchronously obtains a chat response from the model.
+        """
+        pass
 
-        Args:
-            messages: A list representing the conversation history.
-            tools: An optional list of tools the model can use.
-
-        Returns:
-            An AssistantResponse object containing the model's reply.
+    @abstractmethod
+    async def list_models(self) -> List[str]:
+        """
+        Asynchronously retrieves a list of available model names from the provider.
         """
         pass
