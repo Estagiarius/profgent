@@ -4,8 +4,6 @@ from app.utils.charts import create_grade_distribution_chart
 from PIL import Image
 import os
 
-CHART_FILE = "grade_distribution.png"
-
 class DashboardView(ctk.CTkFrame):
     def __init__(self, parent):
         super().__init__(parent)
@@ -36,7 +34,7 @@ class DashboardView(ctk.CTkFrame):
 
         self.chart_label = ctk.CTkLabel(self.chart_frame, text="Select a course to see the grade distribution.")
         self.chart_label.pack(expand=True)
-        self.chart_image = None # To hold the PhotoImage object
+        self.chart_image = None
 
         self.bind("<Visibility>", self.on_show)
 
@@ -70,7 +68,7 @@ class DashboardView(ctk.CTkFrame):
     def update_chart(self):
         """Generates and displays the chart for the selected course."""
         if self.selected_course_id is None:
-            self.chart_label.configure(text="No course selected or no courses available.")
+            self.chart_label.configure(text="No course selected or no courses available.", image=None)
             return
 
         selected_course = next((c for c in self.courses if c.id == self.selected_course_id), None)
@@ -78,27 +76,12 @@ class DashboardView(ctk.CTkFrame):
 
         grades = self.data_service.get_grades_for_course(self.selected_course_id)
 
-        # Define the output path for the chart image
-        # Using a temporary directory could be a good improvement here
-        chart_path = os.path.join("app", "temp_charts", CHART_FILE)
+        # Generate the chart and get the path to the temporary file
+        chart_path = create_grade_distribution_chart(grades, selected_course.course_name)
 
-        create_grade_distribution_chart(grades, selected_course.course_name, chart_path)
-
-        # --- Display the chart ---
         if os.path.exists(chart_path):
             img = Image.open(chart_path)
-            # Resize image to fit the frame while maintaining aspect ratio
-            img_width, img_height = img.size
-            frame_width = self.chart_frame.winfo_width()
-            frame_height = self.chart_frame.winfo_height()
-
-            # Avoid division by zero and ensure the frame is rendered
-            if frame_width > 1 and frame_height > 1 and img_width > 1 and img_height > 1:
-                scale = min(frame_width / img_width, frame_height / img_height)
-                new_size = (int(img_width * scale), int(img_height * scale))
-                img = img.resize(new_size, Image.Resampling.LANCZOS)
-
             self.chart_image = ctk.CTkImage(light_image=img, size=img.size)
-            self.chart_label.configure(image=self.chart_image, text="") # Show image, hide text
+            self.chart_label.configure(image=self.chart_image, text="")
         else:
             self.chart_label.configure(image=None, text="Could not generate chart.")
