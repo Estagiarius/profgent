@@ -1,5 +1,6 @@
 from openai import AsyncOpenAI
 from app.core.llm.base import LLMProvider, AssistantResponse
+from typing import List
 
 class OpenAIProvider(LLMProvider):
     """
@@ -32,3 +33,11 @@ class OpenAIProvider(LLMProvider):
         except Exception as e:
             print(f"An error occurred with the OpenAI API: {e}")
             return AssistantResponse(content=f"Error: {e}")
+
+    async def list_models(self) -> List[str]:
+        try:
+            models = await self.client.models.list()
+            return sorted([model.id for model in models if "gpt" in model.id])
+        except Exception as e:
+            print(f"Error listing OpenAI models: {e}")
+            return []
