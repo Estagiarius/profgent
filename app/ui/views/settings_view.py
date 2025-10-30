@@ -35,26 +35,36 @@ class SettingsView(ctk.CTkFrame):
         self.refresh_button = ctk.CTkButton(self.model_frame, text="Refresh List", command=self.refresh_models)
         self.refresh_button.grid(row=0, column=2, padx=10, pady=10)
 
-        # Other settings frames...
+        # --- Config Sections ---
+        self.ollama_frame = ctk.CTkFrame(self)
+        self.ollama_frame.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
+        ctk.CTkLabel(self.ollama_frame, text="Ollama Server URL").pack(side="left", padx=10, pady=10)
+        self.ollama_entry = ctk.CTkEntry(self.ollama_frame, width=300)
+        self.ollama_entry.insert(0, load_setting("ollama_url", "http://localhost:11434/v1"))
+        self.ollama_entry.pack(side="right", fill="x", expand=True, padx=10, pady=10)
+
+        self.keys_frame = ctk.CTkFrame(self); self.keys_frame.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
+        self.keys_frame.grid_columnconfigure(1, weight=1)
+        ctk.CTkLabel(self.keys_frame, text="OpenAI Key").grid(row=0, column=0, padx=10, pady=5, sticky="w"); self.openai_entry = ctk.CTkEntry(self.keys_frame); self.openai_entry.grid(row=0, column=1, padx=10, sticky="ew")
+        ctk.CTkLabel(self.keys_frame, text="Maritaca Key").grid(row=1, column=0, padx=10, pady=5, sticky="w"); self.maritaca_entry = ctk.CTkEntry(self.keys_frame); self.maritaca_entry.grid(row=1, column=1, padx=10, sticky="ew")
+        ctk.CTkLabel(self.keys_frame, text="OpenRouter Key").grid(row=2, column=0, padx=10, pady=5, sticky="w"); self.openrouter_entry = ctk.CTkEntry(self.keys_frame); self.openrouter_entry.grid(row=2, column=1, padx=10, sticky="ew")
+
+        # --- Controls ---
+        self.save_button = ctk.CTkButton(self, text="Save Settings", command=self.save_settings); self.save_button.grid(row=5, column=0, padx=20, pady=20, sticky="e")
+        self.feedback_label = ctk.CTkLabel(self, text=""); self.feedback_label.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
 
         self.bind("<Visibility>", lambda event: self.refresh_models())
-        self.provider_changed(self.provider_var.get()) # Initial setup
+        self.provider_changed(self.provider_var.get())
 
     def provider_changed(self, choice):
         save_setting("active_provider", choice)
         self.feedback_label.configure(text=f"{choice} is now active.")
-
-        # Show/hide Ollama-specific manual entry
         is_ollama = choice == "Ollama"
-        if is_ollama:
-            self.model_entry.grid()
-        else:
-            self.model_entry.grid_remove()
-
+        if is_ollama: self.model_entry.grid()
+        else: self.model_entry.grid_remove()
         self.refresh_models()
 
     def model_changed(self, choice):
-        # When a model is selected from the dropdown, also update the manual entry field
         if self.provider_var.get() == "Ollama":
             self.model_entry.delete(0, "end")
             self.model_entry.insert(0, choice)
@@ -62,7 +72,6 @@ class SettingsView(ctk.CTkFrame):
 
     def save_model_setting(self):
         provider = self.provider_var.get().lower()
-        # For Ollama, prioritize the manual entry. For others, use the dropdown.
         model_to_save = self.model_entry.get() if provider == "ollama" and self.model_entry.get() else self.model_var.get()
         if "(No models" not in model_to_save and "Loading..." not in model_to_save:
             save_setting(f"{provider}_model", model_to_save)
@@ -70,13 +79,31 @@ class SettingsView(ctk.CTkFrame):
 
     def save_settings(self):
         self.save_model_setting()
-        # ... (rest of the save_settings logic)
+        save_setting("ollama_url", self.ollama_entry.get())
+        for service, entry in [("OpenAI", self.openai_entry), ("Maritaca", self.maritaca_entry), ("OpenRouter", self.openrouter_entry)]:
+            if entry.get(): save_api_key(service, entry.get())
+        self.feedback_label.configure(text="Settings saved!", text_color="green")
 
     def refresh_models(self):
-        # ... (rest of the refresh_models logic)
+        self.model_menu.configure(values=["Loading..."]); self.model_var.set("Loading...")
+        self.refresh_button.configure(state="disabled")
+        provider_name = self.provider_var.get()
+        coro = self._get_models_coro(provider_name)
+        if coro:
+            run_async_task(coro, lambda result: self.parent.after(0, self._update_models_ui, result))
+        else:
+            self.parent.after(0, self._update_models_ui, [])
 
-    def _load_models_thread(self):
-        # ... (rest of _load_models_thread logic)
+    async def _get_models_coro(self, provider_name):
+        provider = None
+        if provider_name == "Ollama": provider = OllamaProvider(base_url=self.ollama_entry.get())
+        else:
+            api_key = get_api_key(provider_name)
+            if api_key:
+                if provider_name == "OpenAI": provider = OpenAIProvider(api_key)
+                elif provider_name == "Maritaca": provider = MaritacaProvider(api_key)
+                elif provider_name == "OpenRouter": provider = OpenRouterProvider(api_key)
+        return await provider.list_models() if provider else []
 
     def _update_models_ui(self, models):
         provider = self.provider_var.get().lower()
@@ -86,10 +113,7 @@ class SettingsView(ctk.CTkFrame):
             self.model_var.set(saved_model if saved_model in models else models[0])
         else:
             self.model_menu.configure(values=["(List failed)"]); self.model_var.set("(List failed)")
-
-        # For Ollama, also set the entry field
         if provider == "ollama":
             self.model_entry.delete(0, "end")
             self.model_entry.insert(0, load_setting(f"{provider}_model", "llama3.1"))
-
         self.refresh_button.configure(state="normal")
