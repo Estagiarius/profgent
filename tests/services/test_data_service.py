@@ -38,8 +38,8 @@ def test_get_all_students(data_service: DataService):
 
 def test_update_student(data_service: DataService):
     """Test updating a student's information."""
-    student = data_service.add_student("Jon", "Doe")
-    data_service.update_student(student.id, "John", "Doe")
+    student = data_service.add_student("Jon", "Doe", status="Inactive")
+    data_service.update_student(student.id, "John", "Doe", "Active")
 
     updated_student = data_service.get_student_by_name("John Doe")
     assert updated_student is not None
@@ -70,3 +70,44 @@ def test_get_student_by_name(data_service: DataService):
 
     not_found_student = data_service.get_student_by_name("Jane Doe")
     assert not_found_student is None
+
+# --- Class and Enrollment Tests ---
+
+def test_create_class(data_service: DataService):
+    """Test creating a new class."""
+    course = data_service.add_course("Biology 101", "BIO101")
+    class_ = data_service.create_class("1A", course.id)
+    assert class_ is not None
+    assert class_.name == "1A"
+    assert class_.course_id == course.id
+
+    all_classes = data_service.get_all_classes()
+    assert len(all_classes) == 1
+
+def test_add_student_to_class(data_service: DataService):
+    """Test enrolling a student in a class."""
+    student = data_service.add_student("Alice", "Wonderland")
+    course = data_service.add_course("Literature", "LIT101")
+    class_ = data_service.create_class("2B", course.id)
+
+    enrollment = data_service.add_student_to_class(student.id, class_.id, 1)
+    assert enrollment is not None
+    assert enrollment.student_id == student.id
+    assert enrollment.class_id == class_.id
+    assert enrollment.call_number == 1
+
+def test_get_students_in_class(data_service: DataService):
+    """Test retrieving all students enrolled in a class."""
+    student1 = data_service.add_student("Student", "One")
+    student2 = data_service.add_student("Student", "Two")
+    course = data_service.add_course("Gym", "GYM101")
+    class_ = data_service.create_class("3C", course.id)
+
+    data_service.add_student_to_class(student1.id, class_.id, 1)
+    data_service.add_student_to_class(student2.id, class_.id, 2)
+
+    enrolled_students = data_service.get_enrollments_for_class(class_.id)
+    assert len(enrolled_students) == 2
+    student_names = [f"{e.student.first_name} {e.student.last_name}" for e in enrolled_students]
+    assert "Student One" in student_names
+    assert "Student Two" in student_names

@@ -5,6 +5,8 @@ from app.ui.views.grade_entry_view import GradeEntryView
 from app.ui.views.assistant_view import AssistantView
 from app.ui.views.settings_view import SettingsView
 from app.ui.views.management_view import ManagementView
+from app.ui.views.class_management_view import ClassManagementView
+from app.ui.views.class_detail_view import ClassDetailView
 
 class MainApp(ctk.CTk):
     def __init__(self):
@@ -24,31 +26,31 @@ class MainApp(ctk.CTk):
         # Create navigation frame
         self.navigation_frame = ctk.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew")
-        self.navigation_frame.grid_rowconfigure(6, weight=1)
+        self.navigation_frame.grid_rowconfigure(7, weight=1) # Adjusted for the new button
 
         self.navigation_frame_label = ctk.CTkLabel(self.navigation_frame, text="Navigation",
                                                   font=ctk.CTkFont(size=20, weight="bold"))
         self.navigation_frame_label.grid(row=0, column=0, padx=20, pady=20)
 
-        self.dashboard_button = ctk.CTkButton(self.navigation_frame, text="Dashboard",
-                                               command=self.dashboard_button_event)
+        # Add navigation buttons
+        self.dashboard_button = ctk.CTkButton(self.navigation_frame, text="Dashboard", command=lambda: self.show_view("dashboard"))
         self.dashboard_button.grid(row=1, column=0, padx=20, pady=10)
 
-        self.grade_entry_button = ctk.CTkButton(self.navigation_frame, text="Grade Entry",
-                                                 command=self.grade_entry_button_event)
-        self.grade_entry_button.grid(row=2, column=0, padx=20, pady=10)
+        self.management_button = ctk.CTkButton(self.navigation_frame, text="Data Management", command=lambda: self.show_view("management"))
+        self.management_button.grid(row=2, column=0, padx=20, pady=10)
 
-        self.management_button = ctk.CTkButton(self.navigation_frame, text="Management",
-                                               command=self.management_button_event)
-        self.management_button.grid(row=3, column=0, padx=20, pady=10)
+        self.class_management_button = ctk.CTkButton(self.navigation_frame, text="Class Management", command=lambda: self.show_view("class_management"))
+        self.class_management_button.grid(row=3, column=0, padx=20, pady=10)
 
-        self.assistant_button = ctk.CTkButton(self.navigation_frame, text="AI Assistant",
-                                               command=self.assistant_button_event)
-        self.assistant_button.grid(row=4, column=0, padx=20, pady=10)
+        self.grade_entry_button = ctk.CTkButton(self.navigation_frame, text="Grade Entry", command=lambda: self.show_view("grade_entry"))
+        self.grade_entry_button.grid(row=4, column=0, padx=20, pady=10)
 
-        self.settings_button = ctk.CTkButton(self.navigation_frame, text="Settings",
-                                              command=self.settings_button_event)
-        self.settings_button.grid(row=5, column=0, padx=20, pady=10)
+        self.assistant_button = ctk.CTkButton(self.navigation_frame, text="AI Assistant", command=lambda: self.show_view("assistant"))
+        self.assistant_button.grid(row=5, column=0, padx=20, pady=10)
+
+        self.settings_button = ctk.CTkButton(self.navigation_frame, text="Settings", command=lambda: self.show_view("settings"))
+        self.settings_button.grid(row=6, column=0, padx=20, pady=10)
+
 
         # Create main content frame
         self.main_frame = ctk.CTkFrame(self, corner_radius=0)
@@ -56,12 +58,13 @@ class MainApp(ctk.CTk):
         self.main_frame.grid_rowconfigure(0, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
 
-
         # Create views and store them in a dictionary
         self.views = {
             "dashboard": DashboardView(self.main_frame),
             "grade_entry": GradeEntryView(self.main_frame),
             "management": ManagementView(self.main_frame),
+            "class_management": ClassManagementView(self.main_frame, self),
+            "class_detail": ClassDetailView(self.main_frame, self),
             "assistant": AssistantView(self.main_frame),
             "settings": SettingsView(self.main_frame)
         }
@@ -70,7 +73,7 @@ class MainApp(ctk.CTk):
         self.show_view("dashboard")
 
 
-    def show_view(self, view_name):
+    def show_view(self, view_name, **kwargs):
         # Hide all views
         for view in self.views.values():
             view.grid_forget()
@@ -81,52 +84,22 @@ class MainApp(ctk.CTk):
 
         # Trigger the 'on_show' event if the view has one
         if hasattr(selected_view, 'on_show'):
-            selected_view.on_show(None)
-
-
-    def dashboard_button_event(self):
-        self.show_view("dashboard")
-
-    def grade_entry_button_event(self):
-        self.show_view("grade_entry")
-
-    def management_button_event(self):
-        self.show_view("management")
-
-    def assistant_button_event(self):
-        self.show_view("assistant")
-
-    def settings_button_event(self):
-        self.show_view("settings")
+            selected_view.on_show(**kwargs)
 
     def update_asyncio(self):
-        """
-        Runs a single iteration of the asyncio event loop and reschedules itself.
-        """
         self.loop.call_soon(self.loop.stop)
         self.loop.run_forever()
         self.after(1, self.update_asyncio)
 
     def on_closing(self):
-        """
-        Handles the window closing event to shut down asyncio tasks gracefully.
-        """
-        print("Closing application...")
-        # Get all running asyncio tasks
         tasks = asyncio.all_tasks(loop=self.loop)
-
-        # Cancel all tasks
         for task in tasks:
             task.cancel()
 
-        # Create a task to gather all cancelled tasks
         async def gather_tasks():
             await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Run the gathering task until it's complete
         self.loop.run_until_complete(gather_tasks())
-
-        # Close the loop and destroy the Tkinter window
         self.loop.close()
         self.destroy()
 
