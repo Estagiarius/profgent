@@ -1,3 +1,4 @@
+import asyncio
 import customtkinter as ctk
 from app.ui.views.dashboard_view import DashboardView
 from app.ui.views.grade_entry_view import GradeEntryView
@@ -11,6 +12,10 @@ class MainApp(ctk.CTk):
 
         self.title("Academic Management")
         self.geometry("1100x800")
+
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.loop = asyncio.get_event_loop()
+        self.update_asyncio()
 
         # Set grid layout 1x2
         self.grid_rowconfigure(0, weight=1)
@@ -93,6 +98,37 @@ class MainApp(ctk.CTk):
 
     def settings_button_event(self):
         self.show_view("settings")
+
+    def update_asyncio(self):
+        """
+        Runs a single iteration of the asyncio event loop and reschedules itself.
+        """
+        self.loop.call_soon(self.loop.stop)
+        self.loop.run_forever()
+        self.after(1, self.update_asyncio)
+
+    def on_closing(self):
+        """
+        Handles the window closing event to shut down asyncio tasks gracefully.
+        """
+        print("Closing application...")
+        # Get all running asyncio tasks
+        tasks = asyncio.all_tasks(loop=self.loop)
+
+        # Cancel all tasks
+        for task in tasks:
+            task.cancel()
+
+        # Create a task to gather all cancelled tasks
+        async def gather_tasks():
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Run the gathering task until it's complete
+        self.loop.run_until_complete(gather_tasks())
+
+        # Close the loop and destroy the Tkinter window
+        self.loop.close()
+        self.destroy()
 
 if __name__ == "__main__":
     app = MainApp()
