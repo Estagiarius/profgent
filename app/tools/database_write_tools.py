@@ -25,14 +25,31 @@ def add_new_student(first_name: str, last_name: str) -> str:
         return f"Error: An unexpected error occurred: {e}"
 
 @tool
-def add_new_course(course_name: str, course_code: str) -> str:
+def add_new_course(course_name: str, course_code: str = None) -> str:
     """
-    Adds a new course to the database.
-    Use this tool when a user explicitly asks to add or create a new course.
+    Adds a new course to the database. If the course_code is not provided,
+    it will be automatically generated from the course name.
+    Use this tool when a user asks to add or create a new course.
     Returns a confirmation message.
     """
-    if not course_name or not course_code:
-        return "Error: Both course_name and course_code are required."
+    if not course_name:
+        return "Error: The course_name is required."
+
+    if not course_code:
+        # Generate a base code from the initials of the course name
+        words = course_name.split()
+        if len(words) > 1:
+            base_code = "".join(word[0] for word in words).upper()
+        else:
+            base_code = course_name[:3].upper() # Use the first 3 letters for a single word
+
+        # Ensure the generated code is unique
+        unique_code = base_code
+        counter = 1
+        while data_service.get_course_by_code(unique_code):
+            unique_code = f"{base_code}{counter}"
+            counter += 1
+        course_code = unique_code
 
     try:
         course = data_service.add_course(course_name, course_code)
