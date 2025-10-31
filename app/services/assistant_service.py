@@ -63,7 +63,20 @@ class AssistantService:
                 self.provider = None
 
         if self.provider:
-            self.messages = [{"role": "system", "content": "You are a helpful academic assistant..."}]
+            system_prompt = (
+                "You are a specialized academic management assistant integrated into a desktop application. "
+                "Your primary function is to help users manage student, course, and grade data by using a "
+                "predefined set of tools. You must adhere to the following rules strictly:\n"
+                "1.  **Use Tools Exclusively**: You MUST use the provided tools to answer questions and perform actions. "
+                "Do not offer to perform actions that are not supported by the tools.\n"
+                "2.  **No Code Generation**: You MUST NOT generate, write, or suggest any code (e.g., Python, SQL). "
+                "Your role is to use the tools, not to be a programmer.\n"
+                "3.  **Admit Limitations**: If you cannot perform a request with the available tools, clearly state that you "
+                "cannot do it and explain the limitation. Do not invent tools or functionality.\n"
+                "4.  **Clarity and Confirmation**: After executing a tool that modifies data (e.g., adding a student), "
+                "always confirm the success of the action in a clear and friendly message based on the tool's output."
+            )
+            self.messages = [{"role": "system", "content": system_prompt}]
 
     async def get_response(self, user_input: str) -> AssistantResponse:
         self._initialize_provider()
