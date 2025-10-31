@@ -36,9 +36,7 @@ class DashboardView(ctk.CTkFrame):
         self.chart_label.pack(expand=True)
         self.chart_image = None
 
-        self.bind("<Visibility>", self.on_show)
-
-    def on_show(self, event):
+    def on_show(self, **kwargs):
         self.load_courses()
         self.update_chart()
 
