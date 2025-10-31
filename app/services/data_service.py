@@ -74,6 +74,28 @@ class DataService:
         with get_db_session() as db:
             return db.query(Course).filter(func.lower(Course.course_code) == code.lower()).first()
 
+    def get_student_by_id(self, student_id: int) -> Student | None:
+        with get_db_session() as db:
+            return db.query(Student).filter(Student.id == student_id).first()
+
+    def get_course_by_id(self, course_id: int) -> Course | None:
+        with get_db_session() as db:
+            return db.query(Course).filter(Course.id == course_id).first()
+
+    def get_grade_by_id(self, grade_id: int) -> Grade | None:
+        with get_db_session() as db:
+            return db.query(Grade).filter(Grade.id == grade_id).first()
+
+
+    # --- Update ---
+    def update_student(self, student_id: int, first_name: str, last_name: str):
+        with get_db_session() as db:
+            student = db.query(Student).filter(Student.id == student_id).first()
+            if student:
+                student.first_name = first_name
+                student.last_name = last_name
+                db.commit()
+
     def update_course(self, course_id: int, course_name: str, course_code: str):
         with get_db_session() as db:
             course = db.query(Course).filter(Course.id == course_id).first()

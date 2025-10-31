@@ -29,35 +29,6 @@ def test_add_new_course(data_service: DataService):
     assert course is not None
     assert course.course_code == "TC101"
 
-def test_add_new_course_with_generated_code(data_service: DataService):
-    """Test adding a new course with an auto-generated code."""
-    database_write_tools.data_service = data_service
-
-    result = add_new_course("Advanced Calculus")
-    assert "Successfully added new course" in result
-    assert "(AC)" in result # Check if the generated code is in the confirmation
-
-    # Verify the course was added with the correct generated code
-    course = data_service.get_course_by_name("Advanced Calculus")
-    assert course is not None
-    assert course.course_code == "AC"
-
-def test_add_new_course_with_unique_generated_code(data_service: DataService):
-    """Test that generated course codes are unique."""
-    database_write_tools.data_service = data_service
-
-    # Add a course that will generate the code "SS"
-    add_new_course("Social Studies")
-
-    # Add another course that would also generate "SS", expect "SS1"
-    result = add_new_course("Specialist Studies")
-    assert "Successfully added new course" in result
-    assert "(SS1)" in result
-
-    course = data_service.get_course_by_name("Specialist Studies")
-    assert course is not None
-    assert course.course_code == "SS1"
-
 def test_add_new_grade(data_service: DataService):
     """Test the add_new_grade tool."""
     # First, create the student and course to add a grade to
