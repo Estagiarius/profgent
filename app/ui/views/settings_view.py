@@ -87,16 +87,19 @@ class SettingsView(ctk.CTkFrame):
     def refresh_models(self):
         self.model_menu.configure(values=["Loading..."]); self.model_var.set("Loading...")
         self.refresh_button.configure(state="disabled")
-        provider_name = self.provider_var.get()
-        coro = self._get_models_coro(provider_name)
-        if coro:
-            run_async_task(coro, lambda result: self.parent.after(0, self._update_models_ui, result))
-        else:
-            self.parent.after(0, self._update_models_ui, [])
 
-    async def _get_models_coro(self, provider_name):
+        provider_name = self.provider_var.get()
+        # Read UI values in the main thread
+        ollama_base_url = self.ollama_entry.get()
+
+        coro = self._get_models_coro(provider_name, ollama_base_url)
+
+        run_async_task(coro, lambda result: self.parent.after(0, self._update_models_ui, result))
+
+    async def _get_models_coro(self, provider_name, ollama_base_url=None):
         provider = None
-        if provider_name == "Ollama": provider = OllamaProvider(base_url=self.ollama_entry.get())
+        if provider_name == "Ollama":
+            provider = OllamaProvider(base_url=ollama_base_url)
         else:
             api_key = get_api_key(provider_name)
             if api_key:

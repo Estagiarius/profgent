@@ -54,9 +54,7 @@ class ManagementView(ctk.CTkFrame):
         self.grades_frame = ctk.CTkScrollableFrame(grades_tab)
         self.grades_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.bind("<Visibility>", self.on_show)
-
-    def on_show(self, event=None): self.populate_data()
+    def on_show(self, **kwargs): self.populate_data()
     def populate_data(self): self._populate_students(); self._populate_courses(); self._populate_grades()
     def _clear_frame(self, frame): [w.destroy() for w in frame.winfo_children()]
 
