@@ -25,8 +25,15 @@ class AssistantService:
         self._initialize_provider()
 
     def _register_tools(self):
+        # Read tools
         self.tool_registry.register(get_student_grade)
-        # ... (rest of the tool registrations)
+        self.tool_registry.register(list_courses_for_student)
+        self.tool_registry.register(get_class_average)
+        # Internet tools
+        self.tool_registry.register(search_internet)
+        # Write tools
+        self.tool_registry.register(add_new_student)
+        self.tool_registry.register(add_new_course)
         self.tool_registry.register(add_new_grade)
 
     def _initialize_provider(self):
