@@ -19,7 +19,7 @@ def test_get_student_grade_not_found(data_service: DataService):
     """Test get_student_grade when the student or course is not found."""
     database_tools.data_service = data_service
     result = get_student_grade("Jane Doe", "Nonexistent Course")
-    assert "Could not find a grade" in result
+    assert "Student 'Jane Doe' not found." in result
 
 def test_list_courses_for_student(data_service: DataService):
     """Test listing courses for a student."""
