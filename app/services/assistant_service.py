@@ -72,22 +72,30 @@ class AssistantService:
 
         self.messages.append({"role": "user", "content": user_input})
 
-        while True:
-            tool_schemas = self.tool_registry.get_all_schemas() if self.provider.name in ["OpenAI", "OpenRouter", "Ollama"] else None
+        # Step 1: Get the initial response from the model
+        tool_schemas = self.tool_registry.get_all_schemas() if self.provider.name in ["OpenAI", "OpenRouter", "Ollama"] else None
+        response = await self.provider.get_chat_response(self.messages, tools=tool_schemas)
 
-            response = await self.provider.get_chat_response(self.messages, tools=tool_schemas)
+        # Step 2: Check if the model wants to call a tool
+        if not response.tool_calls:
+            # No tool calls, we have our final answer.
+            if response.content:
+                self.messages.append({"role": "assistant", "content": response.content})
+            return response
 
-            if not response.tool_calls:
-                if response.content:
-                    self.messages.append({"role": "assistant", "content": response.content})
-                return response
+        # Step 3: Execute the tool and get the result
+        tool_calls_list = response.tool_calls if isinstance(response.tool_calls, list) else [response.tool_calls]
+        self.messages.append({"role": "assistant", "tool_calls": tool_calls_list})
 
-            tool_calls_list = response.tool_calls if isinstance(response.tool_calls, list) else [response.tool_calls]
-            self.messages.append({"role": "assistant", "tool_calls": tool_calls_list})
+        tool_results = []
+        for tool_call in tool_calls_list:
+            result = self.tool_executor.execute_tool_call(tool_call)
+            tool_results.append(result)
 
-            tool_results = []
-            for tool_call in tool_calls_list:
-                result = self.tool_executor.execute_tool_call(tool_call)
-                tool_results.append(result)
+        # Step 4: Append the tool results and get the final natural language response
+        self.messages.extend(tool_results)
 
-            self.messages.extend(tool_results)
+        final_response = await self.provider.get_chat_response(self.messages, tools=tool_schemas)
+        if final_response.content:
+            self.messages.append({"role": "assistant", "content": final_response.content})
+        return final_response

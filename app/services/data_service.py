@@ -20,18 +20,24 @@ class DataService:
         if not first_name or not last_name: return None
         today = date.today().isoformat()
         new_student = Student(first_name=first_name, last_name=last_name, enrollment_date=today)
-        return self.student_repo.add(new_student)
+        self.student_repo.add(new_student)
+        self.db_session.commit()
+        return new_student
 
     def add_course(self, course_name: str, course_code: str) -> Course | None:
         if not course_name or not course_code: return None
         new_course = Course(course_name=course_name, course_code=course_code)
-        return self.course_repo.add(new_course)
+        self.course_repo.add(new_course)
+        self.db_session.commit()
+        return new_course
 
     def add_grade(self, student_id: int, course_id: int, assignment_name: str, score: float) -> Grade | None:
         if not all([student_id, course_id, assignment_name, score is not None]): return None
         today = date.today().isoformat()
         new_grade = Grade(student_id=student_id, course_id=course_id, assignment_name=assignment_name, score=score, date_recorded=today)
-        return self.grade_repo.add(new_grade)
+        self.grade_repo.add(new_grade)
+        self.db_session.commit()
+        return new_grade
 
     # --- Read ---
     def get_all_students(self) -> list[Student]:
