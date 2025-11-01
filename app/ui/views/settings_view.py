@@ -94,7 +94,8 @@ class SettingsView(ctk.CTkFrame):
 
         coro = self._get_models_coro(provider_name, ollama_base_url)
 
-        run_async_task(coro, lambda result: self.parent.after(0, self._update_models_ui, result))
+        # Pass the parent's `after` method directly to avoid issues with thread context
+        run_async_task(coro, self._update_models_ui, self.parent.after)
 
     async def _get_models_coro(self, provider_name, ollama_base_url=None):
         provider = None
