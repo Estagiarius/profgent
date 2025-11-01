@@ -72,10 +72,14 @@ class DashboardView(ctk.CTkFrame):
         selected_course = next((c for c in self.courses if c.id == self.selected_course_id), None)
         if not selected_course: return
 
-        grades = self.data_service.get_grades_for_course(self.selected_course_id)
+        # Aggregate grades from all classes within the selected course
+        all_grades = []
+        for class_ in selected_course.classes:
+            grades_in_class = self.data_service.get_grades_for_class(class_.id)
+            all_grades.extend(grades_in_class)
 
         # Generate the chart and get the path to the temporary file
-        chart_path = create_grade_distribution_chart(grades, selected_course.course_name)
+        chart_path = create_grade_distribution_chart(all_grades, selected_course.course_name)
 
         if os.path.exists(chart_path):
             img = Image.open(chart_path)
