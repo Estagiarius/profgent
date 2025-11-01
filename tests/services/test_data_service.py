@@ -15,17 +15,30 @@ def test_add_course(data_service: DataService):
     assert course.course_name == "Math 101"
     assert data_service.get_course_count() == 1
 
+def test_add_assessment(data_service: DataService):
+    """Test adding a new assessment."""
+    course = data_service.add_course("Science 101", "SCI101")
+    class_ = data_service.create_class("1A", course.id)
+    assessment = data_service.add_assessment(class_.id, "Midterm", 1.0)
+
+    assert assessment is not None
+    assert assessment.name == "Midterm"
+    assert assessment.weight == 1.0
+    assert assessment.class_id == class_.id
+
 def test_add_grade(data_service: DataService):
     """Test adding a new grade."""
     student = data_service.add_student("Jane", "Doe")
     course = data_service.add_course("Science 101", "SCI101")
-    grade = data_service.add_grade(student.id, course.id, "Midterm", 85.5)
+    class_ = data_service.create_class("1A", course.id)
+    assessment = data_service.add_assessment(class_.id, "Midterm", 1.0)
+    grade = data_service.add_grade(student.id, assessment.id, 85.5)
 
     assert grade is not None
     assert grade.score == 85.5
 
     # Verify the grade is associated correctly
-    grades = data_service.get_grades_for_course(course.id)
+    grades = data_service.get_grades_for_class(class_.id)
     assert len(grades) == 1
     assert grades[0].student_id == student.id
 
@@ -49,7 +62,9 @@ def test_delete_student(data_service: DataService):
     """Test deleting a student and their associated grades."""
     student = data_service.add_student("John", "Doe")
     course = data_service.add_course("History 101", "HIST101")
-    data_service.add_grade(student.id, course.id, "Final Exam", 92.0)
+    class_ = data_service.create_class("1A", course.id)
+    assessment = data_service.add_assessment(class_.id, "Final Exam", 1.0)
+    data_service.add_grade(student.id, assessment.id, 92.0)
 
     assert data_service.get_student_count() == 1
     assert len(data_service.get_all_grades()) == 1
@@ -57,7 +72,7 @@ def test_delete_student(data_service: DataService):
     data_service.delete_student(student.id)
 
     assert data_service.get_student_count() == 0
-    # The associated grade should also be deleted
+    # The associated grade should also be deleted due to cascade
     assert len(data_service.get_all_grades()) == 0
 
 def test_get_student_by_name(data_service: DataService):

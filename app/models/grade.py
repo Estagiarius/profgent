@@ -7,17 +7,16 @@ class Grade(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     student_id = Column(Integer, ForeignKey('students.id'), nullable=False)
-    course_id = Column(Integer, ForeignKey('courses.id'), nullable=False)
-    assignment_name = Column(String, nullable=False)
+    assessment_id = Column(Integer, ForeignKey('assessments.id'), nullable=False)
     score = Column(Float, nullable=False)
-    date_recorded = Column(String, nullable=False)
+    date_recorded = Column(String, nullable=False) # Should be a DateTime in a real app
 
-    student = relationship("Student")
-    course = relationship("Course")
+    student = relationship("Student", back_populates="grades")
+    assessment = relationship("Assessment")
 
     __table_args__ = (
         CheckConstraint('score >= 0', name='check_score_positive'),
     )
 
     def __repr__(self):
-        return f"<Grade(id={self.id}, student_id={self.student_id}, course_id={self.course_id}, score={self.score})>"
+        return f"<Grade(id={self.id}, student_id={self.student_id}, assessment_id={self.assessment_id}, score={self.score})>"
