@@ -28,6 +28,7 @@ from app.models.course import Course
 from app.models.grade import Grade
 from app.models.class_ import Class
 from app.models.class_enrollment import ClassEnrollment
+from app.models.assessment import Assessment
 
 target_metadata = Base.metadata
 

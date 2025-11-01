@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import relationship
 from app.models.base import Base
 
 class Course(Base):
@@ -7,6 +8,8 @@ class Course(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     course_name = Column(String, nullable=False, unique=True)
     course_code = Column(String, unique=True)
+
+    classes = relationship("Class", back_populates="course")
 
     def __repr__(self):
         return f"<Course(id={self.id}, course_name='{self.course_name}')>"

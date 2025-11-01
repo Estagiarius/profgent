@@ -5,6 +5,13 @@ from pytest_mock import MockerFixture
 from contextlib import contextmanager
 from app.models.base import Base
 from app.services.data_service import DataService
+# Import all models to ensure they are registered with Base.metadata
+from app.models.student import Student
+from app.models.course import Course
+from app.models.grade import Grade
+from app.models.class_ import Class
+from app.models.class_enrollment import ClassEnrollment
+from app.models.assessment import Assessment
 
 @pytest.fixture(scope="function")
 def db_session() -> Session:

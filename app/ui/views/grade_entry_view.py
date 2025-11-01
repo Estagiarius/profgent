@@ -1,7 +1,8 @@
 import customtkinter as ctk
 from app.services.data_service import DataService
 from app.models.student import Student
-from app.models.course import Course
+from app.models.class_ import Class
+from app.models.assessment import Assessment
 
 class GradeEntryView(ctk.CTkFrame):
     def __init__(self, parent):
@@ -10,9 +11,11 @@ class GradeEntryView(ctk.CTkFrame):
 
         # Data storage
         self.students: list[Student] = []
-        self.courses: list[Course] = []
+        self.classes: list[Class] = []
+        self.assessments: list[Assessment] = []
         self.selected_student_id: int | None = None
-        self.selected_course_id: int | None = None
+        self.selected_class_id: int | None = None
+        self.selected_assessment_id: int | None = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(5, weight=1)
@@ -32,17 +35,17 @@ class GradeEntryView(ctk.CTkFrame):
         self.student_menu = ctk.CTkOptionMenu(self.form_frame, values=[], command=self.on_student_select)
         self.student_menu.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
-        # Course Dropdown
-        self.course_label = ctk.CTkLabel(self.form_frame, text="Select Course")
-        self.course_label.grid(row=1, column=0, padx=10, pady=10, sticky="w")
-        self.course_menu = ctk.CTkOptionMenu(self.form_frame, values=[], command=self.on_course_select)
-        self.course_menu.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+        # Class Dropdown
+        self.class_label = ctk.CTkLabel(self.form_frame, text="Select Class")
+        self.class_label.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+        self.class_menu = ctk.CTkOptionMenu(self.form_frame, values=[], command=self.on_class_select)
+        self.class_menu.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
 
-        # Assignment Name Entry
-        self.assignment_label = ctk.CTkLabel(self.form_frame, text="Assignment Name")
-        self.assignment_label.grid(row=2, column=0, padx=10, pady=10, sticky="w")
-        self.assignment_entry = ctk.CTkEntry(self.form_frame, placeholder_text="e.g., Midterm Exam")
-        self.assignment_entry.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
+        # Assessment Dropdown
+        self.assessment_label = ctk.CTkLabel(self.form_frame, text="Select Assessment")
+        self.assessment_label.grid(row=2, column=0, padx=10, pady=10, sticky="w")
+        self.assessment_menu = ctk.CTkOptionMenu(self.form_frame, values=[], command=self.on_assessment_select)
+        self.assessment_menu.grid(row=2, column=1, padx=10, pady=10, sticky="ew")
 
         # Score Entry
         self.score_label = ctk.CTkLabel(self.form_frame, text="Score")
@@ -65,48 +68,71 @@ class GradeEntryView(ctk.CTkFrame):
     def on_show(self, event):
         self.load_data()
 
-
     def load_data(self):
-        """Loads students and courses into the dropdowns."""
+        """Loads students and classes into the dropdowns."""
         self.students = self.data_service.get_all_students()
-        self.courses = self.data_service.get_all_courses()
+        self.classes = self.data_service.get_all_classes()
 
         student_names = [f"{s.first_name} {s.last_name}" for s in self.students]
-        course_names = [c.course_name for c in self.courses]
+        class_names = [f"{c.course.course_code} - {c.name}" for c in self.classes]
 
-        self.student_menu.configure(values=student_names if student_names else ["No students available"])
-        self.course_menu.configure(values=course_names if course_names else ["No courses available"])
+        self.student_menu.configure(values=student_names if student_names else ["No students"])
+        self.class_menu.configure(values=class_names if class_names else ["No classes"])
 
         # Reset selections
-        self.student_menu.set(student_names[0] if student_names else "No students available")
-        self.course_menu.set(course_names[0] if course_names else "No courses available")
-        self.on_student_select(student_names[0] if student_names else None)
-        self.on_course_select(course_names[0] if course_names else None)
+        if student_names:
+            self.student_menu.set(student_names[0])
+            self.on_student_select(student_names[0])
+        if class_names:
+            self.class_menu.set(class_names[0])
+            self.on_class_select(class_names[0])
+        else: # If no classes, clear assessment menu
+            self.on_class_select(None)
 
     def on_student_select(self, selected_name: str):
-        self.selected_student_id = None
-        for student in self.students:
-            if f"{student.first_name} {student.last_name}" == selected_name:
-                self.selected_student_id = student.id
-                break
+        self.selected_student_id = next((s.id for s in self.students if f"{s.first_name} {s.last_name}" == selected_name), None)
 
-    def on_course_select(self, selected_name: str):
-        self.selected_course_id = None
-        for course in self.courses:
-            if course.course_name == selected_name:
-                self.selected_course_id = course.id
-                break
+    def on_class_select(self, selected_name: str | None):
+        if selected_name is None:
+            self.selected_class_id = None
+            self.assessments = []
+            self.assessment_menu.configure(values=["Select class first"])
+            self.assessment_menu.set("Select class first")
+            return
+
+        self.selected_class_id = next((c.id for c in self.classes if f"{c.course.course_code} - {c.name}" == selected_name), None)
+
+        if self.selected_class_id:
+            # SQLAlchemy relationships make this easy
+            selected_class = self.data_service.get_class_by_id(self.selected_class_id)
+            self.assessments = selected_class.assessments if selected_class else []
+            assessment_names = [a.name for a in self.assessments]
+            self.assessment_menu.configure(values=assessment_names if assessment_names else ["No assessments"])
+            if assessment_names:
+                self.assessment_menu.set(assessment_names[0])
+                self.on_assessment_select(assessment_names[0])
+            else:
+                self.assessment_menu.set("No assessments")
+                self.selected_assessment_id = None
+
+    def on_assessment_select(self, selected_name: str):
+        self.selected_assessment_id = next((a.id for a in self.assessments if a.name == selected_name), None)
 
     def submit_grade(self):
-        assignment = self.assignment_entry.get()
         score_str = self.score_entry.get()
 
         # --- Validation ---
-        if self.selected_student_id is None or self.selected_course_id is None:
-            self.feedback_label.configure(text="Please ensure a student and course are selected.", text_color="red")
+        if self.selected_student_id is None:
+            self.feedback_label.configure(text="Please select a student.", text_color="red")
             return
-        if not assignment:
-            self.feedback_label.configure(text="Please enter an assignment name.", text_color="red")
+        if self.selected_class_id is None:
+            self.feedback_label.configure(text="Please select a class.", text_color="red")
+            return
+        if self.selected_assessment_id is None:
+            self.feedback_label.configure(text="Please select an assessment.", text_color="red")
+            return
+        if not score_str:
+            self.feedback_label.configure(text="Please enter a score.", text_color="red")
             return
         try:
             score = float(score_str)
@@ -115,9 +141,8 @@ class GradeEntryView(ctk.CTkFrame):
             return
 
         # --- Submission ---
-        self.data_service.add_grade(self.selected_student_id, self.selected_course_id, assignment, score)
-        self.feedback_label.configure(text=f"Grade for assignment '{assignment}' added successfully!", text_color="green")
+        self.data_service.add_grade(self.selected_student_id, self.selected_assessment_id, score)
+        self.feedback_label.configure(text=f"Grade added successfully!", text_color="green")
 
-        # Clear inputs
-        self.assignment_entry.delete(0, "end")
+        # Clear score
         self.score_entry.delete(0, "end")

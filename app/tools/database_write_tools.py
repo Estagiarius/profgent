@@ -63,27 +63,30 @@ def add_new_course(course_name: str, course_code: str = None) -> str:
         return f"Error: An unexpected error occurred: {e}"
 
 @tool
-def add_new_grade(student_name: str, course_name: str, assignment_name: str, score: float) -> str:
+def add_new_grade(student_name: str, class_name: str, assessment_name: str, score: float) -> str:
     """
-    Adds a new grade for a student in a specific course.
-    Use this to record a score for an assignment, test, or exam.
-    Returns a confirmation message.
+    Adds a new grade for a student for a specific assessment in a class.
     """
     try:
         student = data_service.get_student_by_name(student_name)
         if not student:
             return f"Error: Student '{student_name}' not found."
 
-        course = data_service.get_course_by_name(course_name)
-        if not course:
-            return f"Error: Course '{course_name}' not found."
+        # This is a simplification. A real app might need a more robust way to find classes
+        all_classes = data_service.get_all_classes()
+        target_class = next((c for c in all_classes if c.name.lower() == class_name.lower()), None)
+        if not target_class:
+            return f"Error: Class '{class_name}' not found."
 
-        grade = data_service.add_grade(student.id, course.id, assignment_name, score)
+        assessment = next((a for a in target_class.assessments if a.name.lower() == assessment_name.lower()), None)
+        if not assessment:
+            return f"Error: Assessment '{assessment_name}' not found in class '{class_name}'."
+
+        grade = data_service.add_grade(student.id, assessment.id, score)
         if grade:
-            return f"Successfully added grade for {student_name} in {course_name}: {assignment_name} - Score {score}."
+            return f"Successfully added grade for {student_name} in {target_class.course.course_name}."
         else:
-            return "Error: An unknown error occurred while adding the grade."
-    except SQLAlchemyError as e:
-        return f"Error: A database error occurred while adding the grade: {e}"
+            return "Error: Could not add grade."
     except Exception as e:
+        # Log the error e
         return f"Error: An unexpected error occurred: {e}"

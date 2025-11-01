@@ -6,6 +6,7 @@ from app.models.course import Course
 from app.models.grade import Grade
 from app.models.class_ import Class
 from app.models.class_enrollment import ClassEnrollment
+from app.models.assessment import Assessment
 
 class DataService:
     # --- Student Methods ---
@@ -83,10 +84,15 @@ class DataService:
                 db.commit()
 
     def delete_course(self, course_id: int):
+        # This is more complex now. A course can have multiple classes.
+        # The UI should probably handle this by deleting classes first.
+        # For now, we'll just delete the course if it has no classes.
         with get_db_session() as db:
-            db.query(Grade).filter(Grade.course_id == course_id).delete()
             course = db.query(Course).filter(Course.id == course_id).first()
             if course:
+                if course.classes:
+                    # Or raise an exception to be caught by the UI
+                    return
                 db.delete(course)
                 db.commit()
 
@@ -95,9 +101,9 @@ class DataService:
             return db.query(Course).count()
 
     # --- Class (Turma) Methods ---
-    def create_class(self, name: str, course_id: int) -> Class | None:
+    def create_class(self, name: str, course_id: int, calculation_method: str = 'arithmetic') -> Class | None:
         if not name or not course_id: return None
-        new_class = Class(name=name, course_id=course_id)
+        new_class = Class(name=name, course_id=course_id, calculation_method=calculation_method)
         with get_db_session() as db:
             db.add(new_class)
             db.commit()
@@ -130,11 +136,21 @@ class DataService:
         with get_db_session() as db:
             return db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).order_by(ClassEnrollment.call_number).all()
 
+    # --- Assessment Methods ---
+    def add_assessment(self, class_id: int, name: str, weight: float) -> Assessment | None:
+        if not all([class_id, name, weight is not None]): return None
+        assessment = Assessment(class_id=class_id, name=name, weight=weight)
+        with get_db_session() as db:
+            db.add(assessment)
+            db.commit()
+            db.refresh(assessment)
+            return assessment
+
     # --- Grade Methods ---
-    def add_grade(self, student_id: int, course_id: int, assignment_name: str, score: float) -> Grade | None:
-        if not all([student_id, course_id, assignment_name, score is not None]): return None
+    def add_grade(self, student_id: int, assessment_id: int, score: float) -> Grade | None:
+        if not all([student_id, assessment_id, score is not None]): return None
         today = date.today().isoformat()
-        new_grade = Grade(student_id=student_id, course_id=course_id, assignment_name=assignment_name, score=score, date_recorded=today)
+        new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today)
         with get_db_session() as db:
             db.add(new_grade)
             db.commit()
@@ -145,17 +161,9 @@ class DataService:
         with get_db_session() as db:
             return db.query(Grade).all()
 
-    def get_grades_for_course(self, course_id: int) -> list[Grade]:
+    def get_grades_for_class(self, class_id: int) -> list[Grade]:
         with get_db_session() as db:
-            return db.query(Grade).filter(Grade.course_id == course_id).all()
-
-    def update_grade(self, grade_id: int, assignment_name: str, score: float):
-        with get_db_session() as db:
-            grade = db.query(Grade).filter(Grade.id == grade_id).first()
-            if grade:
-                grade.assignment_name = assignment_name
-                grade.score = score
-                db.commit()
+            return db.query(Grade).join(Assessment).filter(Assessment.class_id == class_id).all()
 
     def delete_grade(self, grade_id: int):
         with get_db_session() as db:

@@ -61,15 +61,16 @@ def test_add_new_course_with_unique_generated_code(data_service: DataService):
 def test_add_new_grade(data_service: DataService):
     """Test the add_new_grade tool."""
     # First, create the student and course to add a grade to
-    data_service.add_student("Grade", "Student")
-    data_service.add_course("Grading", "G101")
+    student = data_service.add_student("Grade", "Student")
+    course = data_service.add_course("Grading", "G101")
+    class_ = data_service.create_class("1A", course.id)
+    assessment = data_service.add_assessment(class_.id, "Final Project", 1.0)
 
-    result = add_new_grade("Grade Student", "Grading", "Final Project", 99.9)
+    result = add_new_grade("Grade Student", "1A", "Final Project", 99.9)
     assert "Successfully added grade" in result
 
     # Verify the grade was created
-    course = data_service.get_course_by_name("Grading")
-    grades = data_service.get_grades_for_course(course.id)
+    grades = data_service.get_grades_for_class(class_.id)
     assert len(grades) == 1
     assert grades[0].score == 99.9
-    assert grades[0].assignment_name == "Final Project"
+    assert grades[0].assessment.name == "Final Project"

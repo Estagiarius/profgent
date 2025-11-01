@@ -7,6 +7,7 @@ from app.ui.views.settings_view import SettingsView
 from app.ui.views.management_view import ManagementView
 from app.ui.views.class_management_view import ClassManagementView
 from app.ui.views.class_detail_view import ClassDetailView
+from app.ui.views.grade_grid_view import GradeGridView
 
 class MainApp(ctk.CTk):
     def __init__(self):
@@ -26,7 +27,7 @@ class MainApp(ctk.CTk):
         # Create navigation frame
         self.navigation_frame = ctk.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew")
-        self.navigation_frame.grid_rowconfigure(7, weight=1) # Adjusted for the new button
+        self.navigation_frame.grid_rowconfigure(8, weight=1) # Adjusted for the new button
 
         self.navigation_frame_label = ctk.CTkLabel(self.navigation_frame, text="Navigation",
                                                   font=ctk.CTkFont(size=20, weight="bold"))
@@ -45,8 +46,11 @@ class MainApp(ctk.CTk):
         self.grade_entry_button = ctk.CTkButton(self.navigation_frame, text="Grade Entry", command=lambda: self.show_view("grade_entry"))
         self.grade_entry_button.grid(row=4, column=0, padx=20, pady=10)
 
+        self.grade_grid_button = ctk.CTkButton(self.navigation_frame, text="Grade Grid", command=lambda: self.show_view("grade_grid"))
+        self.grade_grid_button.grid(row=5, column=0, padx=20, pady=10)
+
         self.assistant_button = ctk.CTkButton(self.navigation_frame, text="AI Assistant", command=lambda: self.show_view("assistant"))
-        self.assistant_button.grid(row=5, column=0, padx=20, pady=10)
+        self.assistant_button.grid(row=6, column=0, padx=20, pady=10)
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Settings", command=lambda: self.show_view("settings"))
         self.settings_button.grid(row=6, column=0, padx=20, pady=10)
@@ -62,6 +66,7 @@ class MainApp(ctk.CTk):
         self.views = {
             "dashboard": DashboardView(self.main_frame),
             "grade_entry": GradeEntryView(self.main_frame),
+            "grade_grid": GradeGridView(self.main_frame),
             "management": ManagementView(self.main_frame),
             "class_management": ClassManagementView(self.main_frame, self),
             "class_detail": ClassDetailView(self.main_frame, self),
