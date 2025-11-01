@@ -1,5 +1,6 @@
 import asyncio
 import customtkinter as ctk
+from queue import Queue, Empty
 from app.ui.views.dashboard_view import DashboardView
 from app.ui.views.grade_entry_view import GradeEntryView
 from app.ui.views.assistant_view import AssistantView
@@ -18,6 +19,10 @@ class MainApp(ctk.CTk):
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.loop = asyncio.get_event_loop()
+
+        self.async_queue = Queue()
+        self._process_queue()
+
         self.update_asyncio()
 
         # Set grid layout 1x2
@@ -77,6 +82,16 @@ class MainApp(ctk.CTk):
         # Show the dashboard view by default
         self.show_view("dashboard")
 
+    def _process_queue(self):
+        try:
+            # Get a task from the queue without blocking
+            callable, args = self.async_queue.get_nowait()
+            callable(*args)
+        except Empty:
+            pass  # Do nothing if the queue is empty
+        finally:
+            # Schedule the next check
+            self.after(100, self._process_queue)
 
     def show_view(self, view_name, **kwargs):
         # Hide all views

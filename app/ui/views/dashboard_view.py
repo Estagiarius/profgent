@@ -69,8 +69,11 @@ class DashboardView(ctk.CTkFrame):
             self.chart_label.configure(text="No course selected or no courses available.", image=None)
             return
 
-        selected_course = next((c for c in self.courses if c.id == self.selected_course_id), None)
-        if not selected_course: return
+        # Fetch a fresh, session-bound course object to prevent DetachedInstanceError
+        selected_course = self.data_service.get_course_by_id(self.selected_course_id)
+        if not selected_course:
+            self.chart_label.configure(text=f"Could not find course with ID: {self.selected_course_id}", image=None)
+            return
 
         # Aggregate grades from all classes within the selected course
         all_grades = []
