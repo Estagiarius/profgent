@@ -1,5 +1,6 @@
 from datetime import date
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload, Session
 from app.data.database import get_db_session
 from app.models.student import Student
 from app.models.course import Course
@@ -65,19 +66,19 @@ class DataService:
 
     def get_all_courses(self) -> list[Course]:
         with get_db_session() as db:
-            return db.query(Course).order_by(Course.course_name).all()
+            return db.query(Course).options(joinedload(Course.classes)).order_by(Course.course_name).all()
 
     def get_course_by_name(self, name: str) -> Course | None:
         with get_db_session() as db:
-            return db.query(Course).filter(func.lower(Course.course_name) == name.lower()).first()
+            return db.query(Course).options(joinedload(Course.classes)).filter(func.lower(Course.course_name) == name.lower()).first()
 
     def get_course_by_code(self, code: str) -> Course | None:
         with get_db_session() as db:
-            return db.query(Course).filter(func.lower(Course.course_code) == code.lower()).first()
+            return db.query(Course).options(joinedload(Course.classes)).filter(func.lower(Course.course_code) == code.lower()).first()
 
     def get_course_by_id(self, course_id: int) -> Course | None:
         with get_db_session() as db:
-            return db.query(Course).filter(Course.id == course_id).first()
+            return db.query(Course).options(joinedload(Course.classes)).filter(Course.id == course_id).first()
 
     def update_course(self, course_id: int, course_name: str, course_code: str):
         with get_db_session() as db:
