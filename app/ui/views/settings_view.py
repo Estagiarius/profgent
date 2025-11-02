@@ -8,9 +8,9 @@ from app.core.llm.ollama_provider import OllamaProvider
 from app.utils.async_utils import run_async_task
 
 class SettingsView(ctk.CTkFrame):
-    def __init__(self, parent):
+    def __init__(self, parent, main_app):
         super().__init__(parent)
-        self.parent = parent
+        self.main_app = main_app
 
         self.grid_columnconfigure(0, weight=1)
 
@@ -95,7 +95,7 @@ class SettingsView(ctk.CTkFrame):
         coro = self._get_models_coro(provider_name, ollama_base_url)
 
         # Use the thread-safe queue to schedule the UI update
-        run_async_task(coro, self.parent.async_queue, self._update_models_ui)
+        run_async_task(coro, self.main_app.async_queue, self._update_models_ui)
 
     async def _get_models_coro(self, provider_name, ollama_base_url=None):
         provider = None

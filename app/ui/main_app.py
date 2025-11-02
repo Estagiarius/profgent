@@ -76,7 +76,7 @@ class MainApp(ctk.CTk):
             "class_management": ClassManagementView(self.main_frame, self),
             "class_detail": ClassDetailView(self.main_frame, self),
             "assistant": AssistantView(self.main_frame),
-            "settings": SettingsView(self.main_frame)
+            "settings": SettingsView(self.main_frame, self)
         }
 
         # Show the dashboard view by default
