@@ -75,7 +75,7 @@ class MainApp(ctk.CTk):
             "management": ManagementView(self.main_frame),
             "class_management": ClassManagementView(self.main_frame, self),
             "class_detail": ClassDetailView(self.main_frame, self),
-            "assistant": AssistantView(self.main_frame),
+            "assistant": AssistantView(self.main_frame, self),
             "settings": SettingsView(self.main_frame, self)
         }
 

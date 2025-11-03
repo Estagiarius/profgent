@@ -3,10 +3,10 @@ from app.services.assistant_service import AssistantService
 from app.utils.async_utils import run_async_task
 
 class AssistantView(ctk.CTkFrame):
-    def __init__(self, parent):
+    def __init__(self, parent, main_app):
         super().__init__(parent)
         self.assistant_service = AssistantService()
-        self.parent = parent # To schedule UI updates with after()
+        self.main_app = main_app
 
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -40,7 +40,7 @@ class AssistantView(ctk.CTkFrame):
 
         # Use the new async utility to run the task
         coro = self.assistant_service.get_response(user_text)
-        run_async_task(coro, lambda result: self.parent.after(0, self.update_ui_with_response, result))
+        run_async_task(coro, self.main_app.async_queue, lambda result: self.main_app.after(0, self.update_ui_with_response, result))
 
     def update_ui_with_response(self, response):
         """Updates the chat history with the assistant's final response."""
