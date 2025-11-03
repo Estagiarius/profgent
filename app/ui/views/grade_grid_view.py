@@ -31,9 +31,7 @@ class GradeGridView(ctk.CTkFrame):
         self.grid_frame = ctk.CTkFrame(self)
         self.grid_frame.grid(row=2, column=0, padx=20, pady=10, sticky="nsew")
 
-        self.bind("<Visibility>", self.on_show)
-
-    def on_show(self, event):
+    def on_show(self, **kwargs):
         self.load_classes()
 
     def load_classes(self):

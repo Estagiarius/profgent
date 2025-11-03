@@ -58,7 +58,7 @@ class MainApp(ctk.CTk):
         self.assistant_button.grid(row=6, column=0, padx=20, pady=10)
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Settings", command=lambda: self.show_view("settings"))
-        self.settings_button.grid(row=6, column=0, padx=20, pady=10)
+        self.settings_button.grid(row=7, column=0, padx=20, pady=10)
 
 
         # Create main content frame
