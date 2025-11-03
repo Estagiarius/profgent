@@ -143,7 +143,7 @@ class DataService:
 
     def get_class_by_id(self, class_id: int) -> Class | None:
         with get_db_session() as db:
-            return db.query(Class).filter(Class.id == class_id).first()
+            return db.query(Class).options(joinedload(Class.assessments)).filter(Class.id == class_id).first()
 
     def add_student_to_class(self, student_id: int, class_id: int, call_number: int) -> ClassEnrollment | None:
         if not all([student_id, class_id, call_number is not None]): return None
