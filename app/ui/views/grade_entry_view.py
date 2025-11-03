@@ -61,11 +61,7 @@ class GradeEntryView(ctk.CTkFrame):
         self.feedback_label = ctk.CTkLabel(self, text="")
         self.feedback_label.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
-        # Bind the visibility event to reload data
-        self.bind("<Visibility>", self.on_show)
-
-
-    def on_show(self, event):
+    def on_show(self, **kwargs):
         self.load_data()
 
     def load_data(self):
