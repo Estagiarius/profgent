@@ -139,7 +139,7 @@ class DataService:
 
     def get_all_classes(self) -> list[Class]:
         with get_db_session() as db:
-            return db.query(Class).order_by(Class.name).all()
+            return db.query(Class).options(joinedload(Class.course)).order_by(Class.name).all()
 
     def get_class_by_id(self, class_id: int) -> Class | None:
         with get_db_session() as db:
