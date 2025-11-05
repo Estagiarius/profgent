@@ -60,14 +60,14 @@ class ManagementView(ctk.CTkFrame):
 
     def _populate_students(self):
         self._clear_frame(self.students_frame)
-        students = data_service.get_all_students()
-
         if self.show_active_only.get():
-            students = [s for s in students if s.status and s.status.lower() == "active"]
+            students = data_service.get_students_with_active_enrollment()
+        else:
+            students = data_service.get_all_students()
 
         for student in students:
             f = ctk.CTkFrame(self.students_frame); f.pack(fill="x", pady=5)
-            label_text = f"ID: {student.id} | {student.first_name} {student.last_name} | Status: {student.status or 'N/A'}"
+            label_text = f"ID: {student.id} | {student.first_name} {student.last_name}"
             ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
             ctk.CTkButton(f, text="Delete", fg_color="red", command=lambda s=student.id: self.delete_student(s)).pack(side="right", padx=5)
             ctk.CTkButton(f, text="Edit", command=lambda s=student: self.edit_student(s)).pack(side="right", padx=5)
@@ -102,10 +102,10 @@ class ManagementView(ctk.CTkFrame):
 
     def edit_student(self, s):
         def cb(id, data):
-            data_service.update_student(id, data['first_name'], data['last_name'], data['status'])
+            data_service.update_student(id, data['first_name'], data['last_name'])
             self.populate_data()
-        EditDialog(self, "Edit Student", {"first_name":"First Name", "last_name":"Last Name", "status": "Status (e.g., Active)"}, {
-            "id": s.id, "first_name": s.first_name, "last_name": s.last_name, "status": s.status or ""
+        EditDialog(self, "Edit Student", {"first_name":"First Name", "last_name":"Last Name"}, {
+            "id": s.id, "first_name": s.first_name, "last_name": s.last_name
         }, cb)
 
     def edit_course(self, c):
@@ -120,9 +120,9 @@ class ManagementView(ctk.CTkFrame):
 
     def add_student_popup(self):
         def cb(data):
-            data_service.add_student(data['first_name'], data['last_name'], data.get('status', 'Active'))
+            data_service.add_student(data['first_name'], data['last_name'])
             self.populate_data()
-        AddDialog(self, "Add Student", {"first_name":"First Name", "last_name":"Last Name", "status": "Status"}, save_callback=cb)
+        AddDialog(self, "Add Student", {"first_name":"First Name", "last_name":"Last Name"}, save_callback=cb)
 
     def add_course_popup(self):
         def cb(data): data_service.add_course(data['course_name'], data['course_code']); self.populate_data()

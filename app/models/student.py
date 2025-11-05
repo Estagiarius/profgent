@@ -9,7 +9,6 @@ class Student(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     enrollment_date = Column(String, nullable=False)
-    status = Column(String, nullable=True) # Ex: "Active", "Transferred", "Inactive"
 
     grades = relationship("Grade", back_populates="student", cascade="all, delete-orphan")
 

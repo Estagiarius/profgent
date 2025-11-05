@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -9,6 +9,7 @@ class ClassEnrollment(Base):
     class_id = Column(Integer, ForeignKey('classes.id'), nullable=False)
     student_id = Column(Integer, ForeignKey('students.id'), nullable=False)
     call_number = Column(Integer, nullable=False)
+    status = Column(String, nullable=False, default='Active') # Ex: "Active", "Inactive"
 
     student = relationship("Student")
     class_ = relationship("Class", back_populates="enrollments")
