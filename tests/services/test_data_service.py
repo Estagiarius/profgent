@@ -174,3 +174,18 @@ def test_get_students_with_active_enrollment(data_service: DataService):
     active_students = data_service.get_students_with_active_enrollment()
     assert len(active_students) == 1
     assert active_students[0].first_name == "Active"
+
+def test_get_next_call_number(data_service: DataService):
+    """Test calculating the next call number for a class."""
+    student1 = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+
+    # Test with an empty class
+    next_num = data_service.get_next_call_number(class_.id)
+    assert next_num == 1
+
+    # Add a student and test again
+    data_service.add_student_to_class(student1.id, class_.id, 5) # Use a non-sequential number
+    next_num = data_service.get_next_call_number(class_.id)
+    assert next_num == 6

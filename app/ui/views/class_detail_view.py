@@ -2,7 +2,6 @@ import customtkinter as ctk
 from tkinter import filedialog
 import csv
 from app.services import data_service
-from app.ui.views.add_dialog import AddDialog
 
 class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
@@ -19,48 +18,8 @@ class ClassDetailView(ctk.CTkFrame):
         self.student_list_frame = ctk.CTkFrame(self)
         self.student_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
-        self.controls_frame = ctk.CTkFrame(self)
-        self.controls_frame.grid(row=2, column=0, padx=20, pady=(10, 20), sticky="ew")
-        self.controls_frame.grid_columnconfigure(0, weight=1)
-        self.controls_frame.grid_columnconfigure(1, weight=1)
-
-        self.enroll_student_button = ctk.CTkButton(self.controls_frame, text="Enroll Student", command=self.enroll_student_popup)
-        self.enroll_student_button.grid(row=0, column=0, padx=(0, 5), pady=0, sticky="ew")
-
-        self.import_button = ctk.CTkButton(self.controls_frame, text="Import Students (.csv)", command=self.import_students)
-        self.import_button.grid(row=0, column=1, padx=(5, 0), pady=0, sticky="ew")
-
-    def enroll_student_popup(self):
-        if not self.class_id:
-            return
-
-        unenrolled_students = data_service.get_unenrolled_students(self.class_id)
-        student_names = [f"{s.first_name} {s.last_name}" for s in unenrolled_students]
-
-        if not student_names:
-            # You might want to show a proper message dialog here
-            print("No students available to enroll.")
-            return
-
-        def save_callback(data):
-            student_name = data["student"]
-            call_number = data["call_number"]
-
-            student = next((s for s in unenrolled_students if f"{s.first_name} {s.last_name}" == student_name), None)
-
-            if student and call_number:
-                try:
-                    call_number_int = int(call_number)
-                    data_service.add_student_to_class(student.id, self.class_id, call_number_int)
-                    self.populate_student_list()
-                except ValueError:
-                    # Handle non-integer call number
-                    print("Invalid call number.")
-
-        fields = {"call_number": "Call Number"}
-        dropdowns = {"student": ("Student", student_names)}
-        AddDialog(self, "Enroll New Student", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
-
+        self.import_button = ctk.CTkButton(self, text="Import Students (.csv)", command=self.import_students)
+        self.import_button.grid(row=2, column=0, padx=20, pady=(10, 20), sticky="ew")
 
     def populate_student_list(self):
         for widget in self.student_list_frame.winfo_children():
@@ -70,7 +29,7 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         enrollments = data_service.get_enrollments_for_class(self.class_id)
-        headers = ["Call #", "Student Name", "Status", "Actions"]
+        headers = ["Call #", "Student Name", "Status"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.student_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -78,16 +37,7 @@ class ClassDetailView(ctk.CTkFrame):
         for i, enrollment in enumerate(enrollments, start=1):
             ctk.CTkLabel(self.student_list_frame, text=str(enrollment.call_number)).grid(row=i, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.student_list_frame, text=f"{enrollment.student.first_name} {enrollment.student.last_name}").grid(row=i, column=1, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.student_list_frame, text=enrollment.status).grid(row=i, column=2, padx=10, pady=5, sticky="w")
-
-            status_menu = ctk.CTkOptionMenu(self.student_list_frame, values=["Active", "Inactive"],
-                                            command=lambda status, eid=enrollment.id: self.update_status(eid, status))
-            status_menu.set(enrollment.status)
-            status_menu.grid(row=i, column=3, padx=10, pady=5, sticky="w")
-
-    def update_status(self, enrollment_id, status):
-        data_service.update_enrollment_status(enrollment_id, status)
-        self.populate_student_list()
+            ctk.CTkLabel(self.student_list_frame, text=enrollment.student.status).grid(row=i, column=2, padx=10, pady=5, sticky="w")
 
     def import_students(self):
         if not self.class_id:
@@ -114,10 +64,14 @@ class ClassDetailView(ctk.CTkFrame):
                     # Find or create student
                     student = data_service.get_student_by_name(f"{first_name} {last_name}")
                     if not student:
-                        student = data_service.add_student(first_name, last_name)
+                        student = data_service.add_student(first_name, last_name, status)
+                    else:
+                        # Update status if it has changed
+                        if student.status != status:
+                            data_service.update_student(student.id, student.first_name, student.last_name, status)
 
                     # Enroll student in the class
-                    data_service.add_student_to_class(student.id, self.class_id, call_number, status)
+                    data_service.add_student_to_class(student.id, self.class_id, call_number)
 
             self.populate_student_list() # Refresh the list
         except Exception as e:

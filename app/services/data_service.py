@@ -154,7 +154,7 @@ class DataService:
 
     def get_enrollments_for_class(self, class_id: int) -> list[ClassEnrollment]:
         with get_db_session() as db:
-            return db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).order_by(ClassEnrollment.call_number).all()
+            return db.query(ClassEnrollment).options(joinedload(ClassEnrollment.student)).filter(ClassEnrollment.class_id == class_id).order_by(ClassEnrollment.call_number).all()
 
     def update_enrollment_status(self, enrollment_id: int, status: str):
         with get_db_session() as db:
@@ -162,6 +162,11 @@ class DataService:
             if enrollment:
                 enrollment.status = status
                 db.commit()
+
+    def get_next_call_number(self, class_id: int) -> int:
+        with get_db_session() as db:
+            max_call_number = db.query(func.max(ClassEnrollment.call_number)).filter(ClassEnrollment.class_id == class_id).scalar()
+            return (max_call_number or 0) + 1
 
     # --- Assessment Methods ---
     def add_assessment(self, class_id: int, name: str, weight: float) -> Assessment | None:
