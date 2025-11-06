@@ -14,10 +14,17 @@ class ClassDetailView(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
 
         self.title_label = ctk.CTkLabel(self, text="Class Details", font=ctk.CTkFont(size=20, weight="bold"))
-        self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
+        self.title_label.grid(row=0, column=0, columnspan=2, padx=20, pady=(20, 10), sticky="ew")
 
-        self.student_list_frame = ctk.CTkFrame(self)
-        self.student_list_frame.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+        self.options_frame = ctk.CTkFrame(self)
+        self.options_frame.grid(row=1, column=0, columnspan=2, padx=20, pady=(0, 10), sticky="ew")
+
+        self.show_active_only_checkbox = ctk.CTkCheckBox(self.options_frame, text="Show Active Students Only", command=self.populate_student_list)
+        self.show_active_only_checkbox.pack(side="left", padx=10, pady=5)
+        self.show_active_only_checkbox.select() # Default to showing active only
+
+        self.student_list_frame = ctk.CTkScrollableFrame(self)
+        self.student_list_frame.grid(row=2, column=0, columnspan=2, padx=20, pady=10, sticky="nsew")
 
         self.controls_frame = ctk.CTkFrame(self)
         self.controls_frame.grid(row=2, column=0, padx=20, pady=(10, 20), sticky="ew")
@@ -63,7 +70,11 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         enrollments = data_service.get_enrollments_for_class(self.class_id)
-        headers = ["Call #", "Student Name", "Status"]
+
+        if self.show_active_only_checkbox.get():
+            enrollments = [e for e in enrollments if e.status == 'Active']
+
+        headers = ["Call #", "Student Name", "Status", "Actions"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.student_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -72,6 +83,15 @@ class ClassDetailView(ctk.CTkFrame):
             ctk.CTkLabel(self.student_list_frame, text=str(enrollment.call_number)).grid(row=i, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.student_list_frame, text=f"{enrollment.student.first_name} {enrollment.student.last_name}").grid(row=i, column=1, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.student_list_frame, text=enrollment.status).grid(row=i, column=2, padx=10, pady=5, sticky="w")
+
+            status_menu = ctk.CTkOptionMenu(self.student_list_frame, values=["Active", "Inactive"],
+                                            command=lambda status, eid=enrollment.id: self.update_status(eid, status))
+            status_menu.set(enrollment.status)
+            status_menu.grid(row=i, column=3, padx=10, pady=5, sticky="w")
+
+    def update_status(self, enrollment_id, status):
+        data_service.update_enrollment_status(enrollment_id, status)
+        self.populate_student_list()
 
     def import_students(self):
         if not self.class_id:
@@ -98,14 +118,10 @@ class ClassDetailView(ctk.CTkFrame):
                     # Find or create student
                     student = data_service.get_student_by_name(f"{first_name} {last_name}")
                     if not student:
-                        student = data_service.add_student(first_name, last_name, status)
-                    else:
-                        # Update status if it has changed
-                        if student.status != status:
-                            data_service.update_student(student.id, student.first_name, student.last_name, status)
+                        student = data_service.add_student(first_name, last_name)
 
                     # Enroll student in the class
-                    data_service.add_student_to_class(student.id, self.class_id, call_number)
+                    data_service.add_student_to_class(student.id, self.class_id, call_number, status)
 
             self.populate_student_list() # Refresh the list
         except Exception as e:

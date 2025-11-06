@@ -195,7 +195,12 @@ class DataService:
 
     def get_grades_for_class(self, class_id: int) -> list[Grade]:
         with get_db_session() as db:
-            return db.query(Grade).join(Assessment).filter(Assessment.class_id == class_id).all()
+            return db.query(Grade)\
+                .join(Assessment)\
+                .join(ClassEnrollment, (ClassEnrollment.student_id == Grade.student_id) & (ClassEnrollment.class_id == Assessment.class_id))\
+                .filter(Assessment.class_id == class_id)\
+                .filter(ClassEnrollment.status == 'Active')\
+                .all()
 
     def delete_grade(self, grade_id: int):
         with get_db_session() as db:

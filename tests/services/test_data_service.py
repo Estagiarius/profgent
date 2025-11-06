@@ -32,6 +32,7 @@ def test_add_grade(data_service: DataService):
     course = data_service.add_course("Science 101", "SCI101")
     class_ = data_service.create_class("1A", course.id)
     assessment = data_service.add_assessment(class_.id, "Midterm", 1.0)
+    data_service.add_student_to_class(student.id, class_.id, 1) # Enroll student
     grade = data_service.add_grade(student.id, assessment.id, 85.5)
 
     assert grade is not None
@@ -189,3 +190,24 @@ def test_get_next_call_number(data_service: DataService):
     data_service.add_student_to_class(student1.id, class_.id, 5) # Use a non-sequential number
     next_num = data_service.get_next_call_number(class_.id)
     assert next_num == 6
+
+def test_get_grades_for_class_filters_inactive_students(data_service: DataService):
+    """Test that get_grades_for_class only returns grades for active students."""
+    student_active = data_service.add_student("Active", "Student")
+    student_inactive = data_service.add_student("Inactive", "Student")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    assessment = data_service.add_assessment(class_.id, "Test", 1.0)
+
+    # Enroll both students
+    enrollment_active = data_service.add_student_to_class(student_active.id, class_.id, 1, status="Active")
+    enrollment_inactive = data_service.add_student_to_class(student_inactive.id, class_.id, 2, status="Inactive")
+
+    # Add grades for both
+    data_service.add_grade(student_active.id, assessment.id, 100)
+    data_service.add_grade(student_inactive.id, assessment.id, 50)
+
+    grades = data_service.get_grades_for_class(class_.id)
+
+    assert len(grades) == 1
+    assert grades[0].student_id == student_active.id

@@ -10,6 +10,7 @@ def test_get_student_grade_found(data_service: DataService):
     course = data_service.add_course("Math 101", "M101")
     class_ = data_service.create_class("1A", course.id)
     assessment = data_service.add_assessment(class_.id, "Final Exam", 1.0)
+    data_service.add_student_to_class(student.id, class_.id, 1) # Enroll student
     data_service.add_grade(student.id, assessment.id, 95.5)
 
     result = get_student_grade("John Doe", "Math 101")
@@ -48,6 +49,8 @@ def test_get_class_average(data_service: DataService):
     course = data_service.add_course("Physics 303", "P303")
     class_ = data_service.create_class("1A", course.id)
     assessment = data_service.add_assessment(class_.id, "Lab 1", 1.0)
+    data_service.add_student_to_class(student1.id, class_.id, 1) # Enroll student
+    data_service.add_student_to_class(student2.id, class_.id, 2) # Enroll student
     data_service.add_grade(student1.id, assessment.id, 70)
     data_service.add_grade(student2.id, assessment.id, 90)
 
