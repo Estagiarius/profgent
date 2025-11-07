@@ -178,6 +178,25 @@ class DataService:
             db.refresh(assessment)
             return assessment
 
+    def update_assessment(self, assessment_id: int, name: str, weight: float):
+        with get_db_session() as db:
+            assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+            if assessment:
+                assessment.name = name
+                assessment.weight = weight
+                db.commit()
+
+    def delete_assessment(self, assessment_id: int):
+        with get_db_session() as db:
+            # First, delete all grades associated with this assessment
+            db.query(Grade).filter(Grade.assessment_id == assessment_id).delete()
+
+            # Then, delete the assessment itself
+            assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+            if assessment:
+                db.delete(assessment)
+                db.commit()
+
     # --- Grade Methods ---
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> Grade | None:
         if not all([student_id, assessment_id, score is not None]): return None

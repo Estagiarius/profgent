@@ -211,3 +211,34 @@ def test_get_grades_for_class_filters_inactive_students(data_service: DataServic
 
     assert len(grades) == 1
     assert grades[0].student_id == student_active.id
+
+def test_update_assessment(data_service: DataService):
+    """Test updating an assessment's information."""
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    assessment = data_service.add_assessment(class_.id, "Old Name", 1.0)
+
+    data_service.update_assessment(assessment.id, "New Name", 2.0)
+
+    updated_assessment = data_service.get_class_by_id(class_.id).assessments[0]
+    assert updated_assessment.name == "New Name"
+    assert updated_assessment.weight == 2.0
+
+def test_delete_assessment(data_service: DataService):
+    """Test deleting an assessment and its associated grades."""
+    student = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    assessment = data_service.add_assessment(class_.id, "Test to Delete", 1.0)
+    data_service.add_student_to_class(student.id, class_.id, 1)
+    data_service.add_grade(student.id, assessment.id, 100)
+
+    # Verify initial state
+    assert len(data_service.get_class_by_id(class_.id).assessments) == 1
+    assert len(data_service.get_all_grades()) == 1
+
+    data_service.delete_assessment(assessment.id)
+
+    # Verify final state
+    assert len(data_service.get_class_by_id(class_.id).assessments) == 0
+    assert len(data_service.get_all_grades()) == 0
