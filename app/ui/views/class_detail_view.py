@@ -24,6 +24,8 @@ class ClassDetailView(ctk.CTkFrame):
         self.tab_view.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
         self.tab_view.add("Students")
         self.tab_view.add("Assessments")
+        self.tab_view.add("Lessons")
+        self.tab_view.add("Incidents")
 
         # --- Students Tab ---
         students_tab = self.tab_view.tab("Students")
