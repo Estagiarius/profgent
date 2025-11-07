@@ -13,6 +13,8 @@ class Class(Base):
     course = relationship("Course", back_populates="classes")
     enrollments = relationship("ClassEnrollment", back_populates="class_")
     assessments = relationship("Assessment", backref="class_", cascade="all, delete-orphan")
+    lessons = relationship("Lesson", back_populates="class_")
+    incidents = relationship("Incident", back_populates="class_")
 
     def __repr__(self):
         return f"<Class(id={self.id}, name='{self.name}')>"

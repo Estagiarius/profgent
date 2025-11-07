@@ -1,7 +1,7 @@
 from app.ui.main_app import MainApp
 from app.data.database import engine, Base
 # Import all models to ensure they are registered with SQLAlchemy's metadata
-from app.models import student, course, class_, class_enrollment, assessment, grade
+from app.models import student, course, class_, class_enrollment, assessment, grade, lesson, incident
 import os
 
 def initialize_database():
