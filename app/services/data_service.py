@@ -11,14 +11,14 @@ from app.models.assessment import Assessment
 
 class DataService:
     # --- Student Methods ---
-    def add_student(self, first_name: str, last_name: str, status: str = "Active") -> Student | None:
+    def add_student(self, first_name: str, last_name: str) -> Student | None:
         if not first_name or not last_name: return None
         with get_db_session() as db:
             existing = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == f"{first_name} {last_name}".lower()).first()
             if existing:
                 return existing
             today = date.today().isoformat()
-            new_student = Student(first_name=first_name, last_name=last_name, enrollment_date=today, status=status)
+            new_student = Student(first_name=first_name, last_name=last_name, enrollment_date=today)
             db.add(new_student)
             db.commit()
             db.refresh(new_student)
@@ -32,13 +32,12 @@ class DataService:
         with get_db_session() as db:
             return db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == name.lower()).first()
 
-    def update_student(self, student_id: int, first_name: str, last_name: str, status: str):
+    def update_student(self, student_id: int, first_name: str, last_name: str):
         with get_db_session() as db:
             student = db.query(Student).filter(Student.id == student_id).first()
             if student:
                 student.first_name = first_name
                 student.last_name = last_name
-                student.status = status
                 db.commit()
 
     def delete_student(self, student_id: int):
@@ -53,6 +52,15 @@ class DataService:
     def get_student_count(self) -> int:
         with get_db_session() as db:
             return db.query(Student).count()
+
+    def get_students_with_active_enrollment(self) -> list[Student]:
+        with get_db_session() as db:
+            return db.query(Student).join(ClassEnrollment).filter(ClassEnrollment.status == 'Active').distinct().all()
+
+    def get_unenrolled_students(self, class_id: int) -> list[Student]:
+        with get_db_session() as db:
+            enrolled_student_ids = db.query(ClassEnrollment.student_id).filter(ClassEnrollment.class_id == class_id)
+            return db.query(Student).filter(Student.id.notin_(enrolled_student_ids)).all()
 
     # --- Course Methods ---
     def add_course(self, course_name: str, course_code: str) -> Course | None:
@@ -129,15 +137,16 @@ class DataService:
         with get_db_session() as db:
             return db.query(Class).options(joinedload(Class.assessments)).filter(Class.id == class_id).first()
 
-    def add_student_to_class(self, student_id: int, class_id: int, call_number: int) -> ClassEnrollment | None:
+    def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active") -> ClassEnrollment | None:
         if not all([student_id, class_id, call_number is not None]): return None
         with get_db_session() as db:
             existing = db.query(ClassEnrollment).filter_by(student_id=student_id, class_id=class_id).first()
             if existing:
                 existing.call_number = call_number
+                existing.status = status
                 db.commit()
                 return existing
-            enrollment = ClassEnrollment(student_id=student_id, class_id=class_id, call_number=call_number)
+            enrollment = ClassEnrollment(student_id=student_id, class_id=class_id, call_number=call_number, status=status)
             db.add(enrollment)
             db.commit()
             db.refresh(enrollment)
@@ -145,7 +154,19 @@ class DataService:
 
     def get_enrollments_for_class(self, class_id: int) -> list[ClassEnrollment]:
         with get_db_session() as db:
-            return db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).order_by(ClassEnrollment.call_number).all()
+            return db.query(ClassEnrollment).options(joinedload(ClassEnrollment.student)).filter(ClassEnrollment.class_id == class_id).order_by(ClassEnrollment.call_number).all()
+
+    def update_enrollment_status(self, enrollment_id: int, status: str):
+        with get_db_session() as db:
+            enrollment = db.query(ClassEnrollment).filter(ClassEnrollment.id == enrollment_id).first()
+            if enrollment:
+                enrollment.status = status
+                db.commit()
+
+    def get_next_call_number(self, class_id: int) -> int:
+        with get_db_session() as db:
+            max_call_number = db.query(func.max(ClassEnrollment.call_number)).filter(ClassEnrollment.class_id == class_id).scalar()
+            return (max_call_number or 0) + 1
 
     # --- Assessment Methods ---
     def add_assessment(self, class_id: int, name: str, weight: float) -> Assessment | None:
@@ -156,6 +177,25 @@ class DataService:
             db.commit()
             db.refresh(assessment)
             return assessment
+
+    def update_assessment(self, assessment_id: int, name: str, weight: float):
+        with get_db_session() as db:
+            assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+            if assessment:
+                assessment.name = name
+                assessment.weight = weight
+                db.commit()
+
+    def delete_assessment(self, assessment_id: int):
+        with get_db_session() as db:
+            # First, delete all grades associated with this assessment
+            db.query(Grade).filter(Grade.assessment_id == assessment_id).delete()
+
+            # Then, delete the assessment itself
+            assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
+            if assessment:
+                db.delete(assessment)
+                db.commit()
 
     # --- Grade Methods ---
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> Grade | None:
@@ -174,7 +214,12 @@ class DataService:
 
     def get_grades_for_class(self, class_id: int) -> list[Grade]:
         with get_db_session() as db:
-            return db.query(Grade).join(Assessment).filter(Assessment.class_id == class_id).all()
+            return db.query(Grade)\
+                .join(Assessment)\
+                .join(ClassEnrollment, (ClassEnrollment.student_id == Grade.student_id) & (ClassEnrollment.class_id == Assessment.class_id))\
+                .filter(Assessment.class_id == class_id)\
+                .filter(ClassEnrollment.status == 'Active')\
+                .all()
 
     def delete_grade(self, grade_id: int):
         with get_db_session() as db:

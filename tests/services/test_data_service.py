@@ -32,6 +32,7 @@ def test_add_grade(data_service: DataService):
     course = data_service.add_course("Science 101", "SCI101")
     class_ = data_service.create_class("1A", course.id)
     assessment = data_service.add_assessment(class_.id, "Midterm", 1.0)
+    data_service.add_student_to_class(student.id, class_.id, 1) # Enroll student
     grade = data_service.add_grade(student.id, assessment.id, 85.5)
 
     assert grade is not None
@@ -51,9 +52,14 @@ def test_get_all_students(data_service: DataService):
 
 def test_update_student(data_service: DataService):
     """Test updating a student's information."""
-    student = data_service.add_student("Jon", "Doe", status="Inactive")
-    data_service.update_student(student.id, "John", "Doe", "Active")
+    student = data_service.add_student("Jon", "Doe")
+    data_service.update_student(student.id, "John", "Doe")
 
+    # Verify that the old name is not found
+    old_student = data_service.get_student_by_name("Jon Doe")
+    assert old_student is None
+
+    # Verify that the new name is found
     updated_student = data_service.get_student_by_name("John Doe")
     assert updated_student is not None
     assert updated_student.first_name == "John"
@@ -126,3 +132,113 @@ def test_get_students_in_class(data_service: DataService):
     student_names = [f"{e.student.first_name} {e.student.last_name}" for e in enrolled_students]
     assert "Student One" in student_names
     assert "Student Two" in student_names
+
+def test_update_enrollment_status(data_service: DataService):
+    """Test updating the status of an enrollment."""
+    student = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    enrollment = data_service.add_student_to_class(student.id, class_.id, 1)
+    assert enrollment.status == "Active"
+
+    data_service.update_enrollment_status(enrollment.id, "Inactive")
+
+    updated_enrollment = data_service.get_enrollments_for_class(class_.id)[0]
+    assert updated_enrollment.status == "Inactive"
+
+def test_get_unenrolled_students(data_service: DataService):
+    """Test retrieving students not enrolled in a specific class."""
+    student1 = data_service.add_student("Enrolled", "Student")
+    student2 = data_service.add_student("Unenrolled", "Student")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    data_service.add_student_to_class(student1.id, class_.id, 1)
+
+    unenrolled = data_service.get_unenrolled_students(class_.id)
+    assert len(unenrolled) == 1
+    assert unenrolled[0].first_name == "Unenrolled"
+
+def test_get_students_with_active_enrollment(data_service: DataService):
+    """Test retrieving students who have at least one active enrollment."""
+    student_active = data_service.add_student("Active", "Student")
+    student_inactive = data_service.add_student("Inactive", "Student")
+    student_none = data_service.add_student("None", "Student") # No enrollments
+
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+
+    # Enroll student_active with status Active
+    data_service.add_student_to_class(student_active.id, class_.id, 1, status="Active")
+    # Enroll student_inactive with status Inactive
+    data_service.add_student_to_class(student_inactive.id, class_.id, 2, status="Inactive")
+
+    active_students = data_service.get_students_with_active_enrollment()
+    assert len(active_students) == 1
+    assert active_students[0].first_name == "Active"
+
+def test_get_next_call_number(data_service: DataService):
+    """Test calculating the next call number for a class."""
+    student1 = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+
+    # Test with an empty class
+    next_num = data_service.get_next_call_number(class_.id)
+    assert next_num == 1
+
+    # Add a student and test again
+    data_service.add_student_to_class(student1.id, class_.id, 5) # Use a non-sequential number
+    next_num = data_service.get_next_call_number(class_.id)
+    assert next_num == 6
+
+def test_get_grades_for_class_filters_inactive_students(data_service: DataService):
+    """Test that get_grades_for_class only returns grades for active students."""
+    student_active = data_service.add_student("Active", "Student")
+    student_inactive = data_service.add_student("Inactive", "Student")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    assessment = data_service.add_assessment(class_.id, "Test", 1.0)
+
+    # Enroll both students
+    enrollment_active = data_service.add_student_to_class(student_active.id, class_.id, 1, status="Active")
+    enrollment_inactive = data_service.add_student_to_class(student_inactive.id, class_.id, 2, status="Inactive")
+
+    # Add grades for both
+    data_service.add_grade(student_active.id, assessment.id, 100)
+    data_service.add_grade(student_inactive.id, assessment.id, 50)
+
+    grades = data_service.get_grades_for_class(class_.id)
+
+    assert len(grades) == 1
+    assert grades[0].student_id == student_active.id
+
+def test_update_assessment(data_service: DataService):
+    """Test updating an assessment's information."""
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    assessment = data_service.add_assessment(class_.id, "Old Name", 1.0)
+
+    data_service.update_assessment(assessment.id, "New Name", 2.0)
+
+    updated_assessment = data_service.get_class_by_id(class_.id).assessments[0]
+    assert updated_assessment.name == "New Name"
+    assert updated_assessment.weight == 2.0
+
+def test_delete_assessment(data_service: DataService):
+    """Test deleting an assessment and its associated grades."""
+    student = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    assessment = data_service.add_assessment(class_.id, "Test to Delete", 1.0)
+    data_service.add_student_to_class(student.id, class_.id, 1)
+    data_service.add_grade(student.id, assessment.id, 100)
+
+    # Verify initial state
+    assert len(data_service.get_class_by_id(class_.id).assessments) == 1
+    assert len(data_service.get_all_grades()) == 1
+
+    data_service.delete_assessment(assessment.id)
+
+    # Verify final state
+    assert len(data_service.get_class_by_id(class_.id).assessments) == 0
+    assert len(data_service.get_all_grades()) == 0
