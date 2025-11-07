@@ -242,3 +242,27 @@ def test_delete_assessment(data_service: DataService):
     # Verify final state
     assert len(data_service.get_class_by_id(class_.id).assessments) == 0
     assert len(data_service.get_all_grades()) == 0
+
+def test_update_and_delete_class(data_service: DataService):
+    """Test updating and deleting a class."""
+    student = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Old Name", course.id)
+    data_service.add_student_to_class(student.id, class_.id, 1)
+
+    # Test Update
+    data_service.update_class(class_.id, "New Name")
+    updated_class = data_service.get_class_by_id(class_.id)
+    assert updated_class.name == "New Name"
+
+    # Test Delete
+    assert len(data_service.get_all_classes()) == 1
+    enrollments = data_service.get_enrollments_for_class(class_.id)
+    assert len(enrollments) == 1
+
+    data_service.delete_class(class_.id)
+
+    assert len(data_service.get_all_classes()) == 0
+    # Check that enrollments were cascade deleted
+    enrollments_after_delete = data_service.get_enrollments_for_class(class_.id)
+    assert len(enrollments_after_delete) == 0

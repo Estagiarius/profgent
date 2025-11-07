@@ -142,6 +142,23 @@ class DataService:
         with get_db_session() as db:
             return db.query(Class).options(joinedload(Class.assessments)).filter(Class.id == class_id).first()
 
+    def update_class(self, class_id: int, name: str):
+        with get_db_session() as db:
+            class_ = db.query(Class).filter(Class.id == class_id).first()
+            if class_:
+                class_.name = name
+                db.commit()
+
+    def delete_class(self, class_id: int):
+        with get_db_session() as db:
+            # Delete related enrollments first
+            db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete()
+            # Now delete the class
+            class_ = db.query(Class).filter(Class.id == class_id).first()
+            if class_:
+                db.delete(class_)
+                db.commit()
+
     def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active") -> ClassEnrollment | None:
         if not all([student_id, class_id, call_number is not None]): return None
         with get_db_session() as db:
