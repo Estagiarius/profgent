@@ -8,6 +8,8 @@ from app.models.grade import Grade
 from app.models.class_ import Class
 from app.models.class_enrollment import ClassEnrollment
 from app.models.assessment import Assessment
+from app.models.lesson import Lesson
+from app.models.incident import Incident
 
 class DataService:
     # --- Student Methods ---
@@ -199,6 +201,52 @@ class DataService:
             if assessment:
                 db.delete(assessment)
                 db.commit()
+
+    # --- Lesson Methods ---
+    def get_lessons_for_class(self, class_id: int) -> list[Lesson]:
+        with get_db_session() as db:
+            return db.query(Lesson).filter(Lesson.class_id == class_id).order_by(Lesson.date.desc()).all()
+
+    def create_lesson(self, class_id: int, title: str, content: str, lesson_date: date) -> Lesson | None:
+        if not all([class_id, title, lesson_date]): return None
+        new_lesson = Lesson(class_id=class_id, title=title, content=content, date=lesson_date)
+        with get_db_session() as db:
+            db.add(new_lesson)
+            db.commit()
+            db.refresh(new_lesson)
+            return new_lesson
+
+    def update_lesson(self, lesson_id: int, title: str, content: str, lesson_date: date):
+        with get_db_session() as db:
+            lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+            if lesson:
+                lesson.title = title
+                lesson.content = content
+                lesson.date = lesson_date
+                db.commit()
+
+    def delete_lesson(self, lesson_id: int):
+        with get_db_session() as db:
+            lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+            if lesson:
+                db.delete(lesson)
+                db.commit()
+
+    # --- Incident Methods ---
+    def get_incidents_for_class(self, class_id: int) -> list[Incident]:
+        with get_db_session() as db:
+            return db.query(Incident).options(
+                joinedload(Incident.student)
+            ).filter(Incident.class_id == class_id).order_by(Incident.date.desc()).all()
+
+    def create_incident(self, class_id: int, student_id: int, description: str, incident_date: date) -> Incident | None:
+        if not all([class_id, student_id, description, incident_date]): return None
+        new_incident = Incident(class_id=class_id, student_id=student_id, description=description, date=incident_date)
+        with get_db_session() as db:
+            db.add(new_incident)
+            db.commit()
+            db.refresh(new_incident)
+            return new_incident
 
     # --- Grade Methods ---
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> Grade | None:

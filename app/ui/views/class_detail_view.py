@@ -1,6 +1,7 @@
 import customtkinter as ctk
 from tkinter import filedialog
 import csv
+from datetime import date, datetime
 from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
@@ -11,6 +12,7 @@ class ClassDetailView(ctk.CTkFrame):
         super().__init__(parent)
         self.main_app = main_app
         self.class_id = None
+        self.editing_lesson_id = None
 
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
@@ -59,6 +61,164 @@ class ClassDetailView(ctk.CTkFrame):
 
         self.add_assessment_button = ctk.CTkButton(assessments_tab, text="Add New Assessment", command=self.add_assessment_popup)
         self.add_assessment_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+        # --- Lessons Tab ---
+        lessons_tab = self.tab_view.tab("Lessons")
+        lessons_tab.grid_rowconfigure(0, weight=1)
+        lessons_tab.grid_columnconfigure(0, weight=1)
+
+        # Container for list and editor to toggle visibility
+        self.lesson_container = ctk.CTkFrame(lessons_tab)
+        self.lesson_container.grid(row=0, column=0, sticky="nsew")
+        self.lesson_container.grid_rowconfigure(0, weight=1)
+        self.lesson_container.grid_columnconfigure(0, weight=1)
+
+        # --- Lesson List View ---
+        self.lesson_list_view = ctk.CTkFrame(self.lesson_container)
+        self.lesson_list_view.grid(row=0, column=0, sticky="nsew")
+        self.lesson_list_view.grid_rowconfigure(0, weight=1)
+        self.lesson_list_view.grid_columnconfigure(0, weight=1)
+
+        self.lesson_list_frame = ctk.CTkScrollableFrame(self.lesson_list_view)
+        self.lesson_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.add_lesson_button = ctk.CTkButton(self.lesson_list_view, text="Add New Lesson", command=self.show_lesson_editor)
+        self.add_lesson_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+        # --- Lesson Editor View ---
+        self.lesson_editor_view = ctk.CTkFrame(self.lesson_container)
+        self.lesson_editor_view.grid_rowconfigure(2, weight=1)
+        self.lesson_editor_view.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(self.lesson_editor_view, text="Title:").grid(row=0, column=0, padx=(10,0), pady=10, sticky="w")
+        self.lesson_editor_title_entry = ctk.CTkEntry(self.lesson_editor_view, placeholder_text="Lesson Title")
+        self.lesson_editor_title_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
+
+        ctk.CTkLabel(self.lesson_editor_view, text="Date (YYYY-MM-DD):").grid(row=1, column=0, padx=(10,0), pady=10, sticky="w")
+        self.lesson_editor_date_entry = ctk.CTkEntry(self.lesson_editor_view)
+        self.lesson_editor_date_entry.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
+
+        ctk.CTkLabel(self.lesson_editor_view, text="Content:").grid(row=2, column=0, padx=(10,0), pady=10, sticky="nw")
+        self.lesson_editor_content_textbox = ctk.CTkTextbox(self.lesson_editor_view)
+        self.lesson_editor_content_textbox.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
+
+        editor_buttons_frame = ctk.CTkFrame(self.lesson_editor_view)
+        editor_buttons_frame.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
+
+        self.save_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Save", command=self.save_lesson)
+        self.save_lesson_button.pack(side="left", padx=5)
+
+        self.cancel_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Cancel", command=self.hide_lesson_editor)
+        self.cancel_lesson_button.pack(side="left", padx=5)
+
+        self.hide_lesson_editor() # Initially hidden
+
+        # --- Incidents Tab ---
+        incidents_tab = self.tab_view.tab("Incidents")
+        incidents_tab.grid_rowconfigure(0, weight=1)
+        incidents_tab.grid_columnconfigure(0, weight=1)
+
+        self.incident_list_frame = ctk.CTkScrollableFrame(incidents_tab)
+        self.incident_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.add_incident_button = ctk.CTkButton(incidents_tab, text="Add New Incident", command=self.add_incident_popup)
+        self.add_incident_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+    def add_incident_popup(self):
+        if not self.class_id:
+            return
+
+        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        student_names = [f"{e.student.first_name} {e.student.last_name}" for e in enrollments]
+
+        if not student_names:
+            # TODO: Show a proper message dialog
+            print("No students in this class to assign an incident to.")
+            return
+
+        def save_callback(data):
+            student_name = data["student"]
+            description = data["description"]
+
+            selected_enrollment = next((e for e in enrollments if f"{e.student.first_name} {e.student.last_name}" == student_name), None)
+
+            if selected_enrollment and description:
+                data_service.create_incident(self.class_id, selected_enrollment.student.id, description, date.today())
+                self.populate_incident_list()
+
+        fields = {"description": "Description"}
+        dropdowns = {"student": ("Student", student_names)}
+        AddDialog(self, "Add New Incident", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
+
+    def populate_incident_list(self):
+        for widget in self.incident_list_frame.winfo_children():
+            widget.destroy()
+
+        if not self.class_id:
+            return
+
+        incidents = data_service.get_incidents_for_class(self.class_id)
+
+        headers = ["Student Name", "Date", "Description"]
+        for i, header in enumerate(headers):
+            label = ctk.CTkLabel(self.incident_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
+            label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
+
+        for i, incident in enumerate(incidents, start=1):
+            student_name = f"{incident.student.first_name} {incident.student.last_name}"
+            ctk.CTkLabel(self.incident_list_frame, text=student_name).grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.incident_list_frame, text=str(incident.date)).grid(row=i, column=1, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.incident_list_frame, text=incident.description, wraplength=400, justify="left").grid(row=i, column=2, padx=10, pady=5, sticky="w")
+
+    def show_lesson_editor(self, lesson=None):
+        self.editing_lesson_id = lesson.id if lesson else None
+        self.lesson_list_view.grid_forget()
+        self.lesson_editor_view.grid(row=0, column=0, sticky="nsew")
+
+        # Clear fields
+        self.lesson_editor_title_entry.delete(0, "end")
+        self.lesson_editor_date_entry.delete(0, "end")
+        self.lesson_editor_content_textbox.delete("1.0", "end")
+
+        if lesson:
+            self.lesson_editor_title_entry.insert(0, lesson.title)
+            self.lesson_editor_date_entry.insert(0, lesson.date.isoformat())
+            self.lesson_editor_content_textbox.insert("1.0", lesson.content or "")
+        else:
+            self.lesson_editor_date_entry.insert(0, date.today().isoformat())
+
+
+    def hide_lesson_editor(self):
+        self.editing_lesson_id = None
+        self.lesson_editor_view.grid_forget()
+        self.lesson_list_view.grid(row=0, column=0, sticky="nsew")
+
+    def save_lesson(self):
+        title = self.lesson_editor_title_entry.get()
+        content = self.lesson_editor_content_textbox.get("1.0", "end-1c")
+        date_str = self.lesson_editor_date_entry.get()
+
+        if not title or not date_str:
+            # TODO: Show error dialog
+            print("Title and Date are required.")
+            return
+
+        try:
+            lesson_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            # TODO: Show error dialog
+            print("Invalid date format. Please use YYYY-MM-DD.")
+            return
+
+        if self.editing_lesson_id:
+            data_service.update_lesson(self.editing_lesson_id, title, content, lesson_date)
+        else:
+            data_service.create_lesson(self.class_id, title, content, lesson_date)
+
+        self.populate_lesson_list()
+        self.hide_lesson_editor()
+        self.lesson_editor_view.grid_forget()
+        self.lesson_list_view.grid(row=0, column=0, sticky="nsew")
 
     def add_assessment_popup(self):
         if not self.class_id:
@@ -226,6 +386,28 @@ class ClassDetailView(ctk.CTkFrame):
             print(f"Error importing students: {e}")
 
 
+    def populate_lesson_list(self):
+        for widget in self.lesson_list_frame.winfo_children():
+            widget.destroy()
+
+        if not self.class_id:
+            return
+
+        lessons = data_service.get_lessons_for_class(self.class_id)
+
+        headers = ["Date", "Title", "Actions"]
+        for i, header in enumerate(headers):
+            label = ctk.CTkLabel(self.lesson_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
+            label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
+
+        for i, lesson in enumerate(lessons, start=1):
+            ctk.CTkLabel(self.lesson_list_frame, text=str(lesson.date)).grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.lesson_list_frame, text=lesson.title).grid(row=i, column=1, padx=10, pady=5, sticky="w")
+
+            edit_button = ctk.CTkButton(self.lesson_list_frame, text="Edit", command=lambda l=lesson: self.show_lesson_editor(l))
+            edit_button.grid(row=i, column=2, padx=10, pady=5, sticky="e")
+
+
     def on_show(self, class_id=None):
         self.class_id = class_id
         if class_id:
@@ -233,3 +415,5 @@ class ClassDetailView(ctk.CTkFrame):
             self.title_label.configure(text=f"Class Details: {class_.name}")
             self.populate_student_list()
             self.populate_assessment_list()
+            self.populate_lesson_list()
+            self.populate_incident_list()
