@@ -314,3 +314,25 @@ def test_update_and_delete_class(data_service: DataService):
     # Check that enrollments were cascade deleted
     enrollments_after_delete = data_service.get_enrollments_for_class(class_.id)
     assert len(enrollments_after_delete) == 0
+
+def test_get_all_grades_with_details(data_service: DataService):
+    """Test retrieving all grades with their full relational details."""
+    student = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    assessment = data_service.add_assessment(class_.id, "Final Exam", 1.0)
+    data_service.add_student_to_class(student.id, class_.id, 1)
+    grade = data_service.add_grade(student.id, assessment.id, 95.0)
+
+    # Call the function to test
+    grades_with_details = data_service.get_all_grades_with_details()
+
+    assert len(grades_with_details) == 1
+    retrieved_grade = grades_with_details[0]
+
+    # Check that all related objects were loaded and are correct
+    assert retrieved_grade.id == grade.id
+    assert retrieved_grade.student.first_name == "Student"
+    assert retrieved_grade.assessment.name == "Final Exam"
+    assert retrieved_grade.assessment.class_.name == "Class"
+    assert retrieved_grade.assessment.class_.course.course_name == "Course"

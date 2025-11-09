@@ -280,6 +280,13 @@ class DataService:
         with get_db_session() as db:
             return db.query(Grade).all()
 
+    def get_all_grades_with_details(self) -> list[Grade]:
+        with get_db_session() as db:
+            return db.query(Grade).options(
+                joinedload(Grade.student),
+                joinedload(Grade.assessment).joinedload(Assessment.class_).joinedload(Class.course)
+            ).all()
+
     def get_grades_for_class(self, class_id: int) -> list[Grade]:
         with get_db_session() as db:
             return db.query(Grade)\
