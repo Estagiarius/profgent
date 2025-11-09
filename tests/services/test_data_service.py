@@ -243,6 +243,54 @@ def test_delete_assessment(data_service: DataService):
     assert len(data_service.get_class_by_id(class_.id).assessments) == 0
     assert len(data_service.get_all_grades()) == 0
 
+def test_grade_grid_logic(data_service: DataService):
+    """Test weighted average calculation and upserting grades."""
+    student1 = data_service.add_student("Student", "One")
+    student2 = data_service.add_student("Student", "Two")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+
+    # Enroll students
+    data_service.add_student_to_class(student1.id, class_.id, 1)
+    data_service.add_student_to_class(student2.id, class_.id, 2)
+
+    # Create assessments with weights
+    assess1 = data_service.add_assessment(class_.id, "Test 1", 1.0)
+    assess2 = data_service.add_assessment(class_.id, "Test 2", 2.0)
+    assessments = [assess1, assess2]
+
+    # Add a grade for student 1 in Test 1
+    data_service.add_grade(student1.id, assess1.id, 8.0)
+
+    # Test average calculation
+    grades = data_service.get_grades_for_class(class_.id)
+    # Student 1: (8.0 * 1.0 + 0.0 * 2.0) / (1.0 + 2.0) = 8.0 / 3.0 = 2.67
+    avg1 = data_service.calculate_weighted_average(student1.id, grades, assessments)
+    assert round(avg1, 2) == 2.67
+    # Student 2: (0.0 * 1.0 + 0.0 * 2.0) / (1.0 + 2.0) = 0.0
+    avg2 = data_service.calculate_weighted_average(student2.id, grades, assessments)
+    assert avg2 == 0.0
+
+    # Test upsert
+    grades_to_upsert = [
+        {'student_id': student1.id, 'assessment_id': assess1.id, 'score': 9.0}, # Update
+        {'student_id': student1.id, 'assessment_id': assess2.id, 'score': 7.0}, # Insert
+        {'student_id': student2.id, 'assessment_id': assess1.id, 'score': 10.0}  # Insert
+    ]
+    data_service.upsert_grades_for_class(class_.id, grades_to_upsert)
+
+    # Verify upsert results
+    final_grades = data_service.get_grades_for_class(class_.id)
+    assert len(final_grades) == 3
+
+    # Test new average calculation
+    # Student 1: (9.0 * 1.0 + 7.0 * 2.0) / (1.0 + 2.0) = 23.0 / 3.0 = 7.67
+    final_avg1 = data_service.calculate_weighted_average(student1.id, final_grades, assessments)
+    assert round(final_avg1, 2) == 7.67
+    # Student 2: (10.0 * 1.0 + 0.0 * 2.0) / (1.0 + 2.0) = 10.0 / 3.0 = 3.33
+    final_avg2 = data_service.calculate_weighted_average(student2.id, final_grades, assessments)
+    assert round(final_avg2, 2) == 3.33
+
 def test_update_and_delete_class(data_service: DataService):
     """Test updating and deleting a class."""
     student = data_service.add_student("Student", "One")

@@ -295,3 +295,48 @@ class DataService:
             if grade:
                 db.delete(grade)
                 db.commit()
+
+    def upsert_grades_for_class(self, class_id: int, grades_data: list[dict]):
+        with get_db_session() as db:
+            # Fetch existing grades for the class to optimize updates
+            existing_grades_query = db.query(Grade).join(Assessment).filter(Assessment.class_id == class_id)
+            existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
+
+            for grade_info in grades_data:
+                student_id = grade_info['student_id']
+                assessment_id = grade_info['assessment_id']
+                score = grade_info['score']
+
+                existing_grade = existing_grades_map.get((student_id, assessment_id))
+
+                if existing_grade:
+                    # Update existing grade
+                    if existing_grade.score != score:
+                        existing_grade.score = score
+                else:
+                    # Create new grade
+                    new_grade = Grade(
+                        student_id=student_id,
+                        assessment_id=assessment_id,
+                        score=score,
+                        date_recorded=date.today().isoformat()
+                    )
+                    db.add(new_grade)
+
+            db.commit()
+
+    def calculate_weighted_average(self, student_id: int, grades: list[Grade], assessments: list[Assessment]) -> float:
+        total_weight = 0
+        weighted_sum = 0
+
+        student_grades = {g.assessment_id: g.score for g in grades if g.student_id == student_id}
+
+        for assessment in assessments:
+            score = student_grades.get(assessment.id, 0.0) # Treat missing grade as 0
+            weighted_sum += score * assessment.weight
+            total_weight += assessment.weight
+
+        if total_weight == 0:
+            return 0.0
+
+        return weighted_sum / total_weight

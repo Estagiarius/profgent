@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import csv
 from datetime import date, datetime
 from app.services import data_service
@@ -26,6 +26,7 @@ class ClassDetailView(ctk.CTkFrame):
         self.tab_view.add("Assessments")
         self.tab_view.add("Lessons")
         self.tab_view.add("Incidents")
+        self.tab_view.add("Grade Grid")
 
         # --- Students Tab ---
         students_tab = self.tab_view.tab("Students")
@@ -125,6 +126,86 @@ class ClassDetailView(ctk.CTkFrame):
 
         self.add_incident_button = ctk.CTkButton(incidents_tab, text="Add New Incident", command=self.add_incident_popup)
         self.add_incident_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+        # --- Grade Grid Tab ---
+        grade_grid_tab = self.tab_view.tab("Grade Grid")
+        grade_grid_tab.grid_rowconfigure(0, weight=1)
+        grade_grid_tab.grid_columnconfigure(0, weight=1)
+
+        self.grade_grid_frame = ctk.CTkScrollableFrame(grade_grid_tab)
+        self.grade_grid_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.save_grades_button = ctk.CTkButton(grade_grid_tab, text="Save All Changes", command=self.save_all_grades)
+        self.save_grades_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+    def save_all_grades(self):
+        grades_to_upsert = []
+        for (student_id, assessment_id), entry_widget in self.grade_entries.items():
+            score_str = entry_widget.get()
+            if not score_str:  # Skip empty entries
+                continue
+
+            try:
+                score = float(score_str)
+                if not (0 <= score <= 10):
+                    messagebox.showerror("Invalid Grade", f"Invalid score '{score}'. Grades must be between 0 and 10.")
+                    return
+                grades_to_upsert.append({'student_id': student_id, 'assessment_id': assessment_id, 'score': score})
+            except ValueError:
+                messagebox.showerror("Invalid Grade", f"Invalid score '{score_str}'. Grades must be numeric.")
+                return
+
+        if not grades_to_upsert:
+            messagebox.showinfo("No Changes", "No new or modified grades to save.")
+            return
+
+        data_service.upsert_grades_for_class(self.class_id, grades_to_upsert)
+
+        messagebox.showinfo("Success", "All grades were saved successfully.")
+        self.populate_grade_grid() # Refresh grid to show updated averages
+
+    def populate_grade_grid(self):
+        for widget in self.grade_grid_frame.winfo_children():
+            widget.destroy()
+
+        if not self.class_id:
+            return
+
+        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        class_ = data_service.get_class_by_id(self.class_id)
+        assessments = class_.assessments if class_ else []
+
+        # Create Header
+        headers = ["Student Name"] + [a.name for a in assessments] + ["Final Average"]
+        for col, header in enumerate(headers):
+            label = ctk.CTkLabel(self.grade_grid_frame, text=header, font=ctk.CTkFont(weight="bold"))
+            label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
+
+        # Create Rows for each student
+        self.grade_entries = {} # To store the entry widgets
+        grades = data_service.get_grades_for_class(self.class_id)
+
+        for row, enrollment in enumerate(enrollments, start=1):
+            student_name = f"{enrollment.student.first_name} {enrollment.student.last_name}"
+            name_label = ctk.CTkLabel(self.grade_grid_frame, text=student_name)
+            name_label.grid(row=row, column=0, padx=5, pady=5, sticky="w")
+
+            for col, assessment in enumerate(assessments, start=1):
+                entry = ctk.CTkEntry(self.grade_grid_frame, width=80)
+                entry.grid(row=row, column=col, padx=5, pady=5)
+
+                # Find the existing grade for this student and assessment
+                existing_grade = next((g for g in grades if g.student_id == enrollment.student_id and g.assessment_id == assessment.id), None)
+                if existing_grade:
+                    entry.insert(0, str(existing_grade.score))
+
+                self.grade_entries[(enrollment.student_id, assessment.id)] = entry
+
+            # Calculate and display final average
+            average = data_service.calculate_weighted_average(enrollment.student_id, grades, assessments)
+            average_label = ctk.CTkLabel(self.grade_grid_frame, text=f"{average:.2f}")
+            average_label.grid(row=row, column=len(assessments) + 1, padx=5, pady=5, sticky="w")
+
 
     def add_incident_popup(self):
         if not self.class_id:
@@ -419,3 +500,4 @@ class ClassDetailView(ctk.CTkFrame):
             self.populate_assessment_list()
             self.populate_lesson_list()
             self.populate_incident_list()
+            self.populate_grade_grid()
