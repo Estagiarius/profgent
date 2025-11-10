@@ -8,6 +8,8 @@ from app.models.grade import Grade
 from app.models.class_ import Class
 from app.models.class_enrollment import ClassEnrollment
 from app.models.assessment import Assessment
+from app.models.lesson import Lesson
+from app.models.incident import Incident
 
 class DataService:
     # --- Student Methods ---
@@ -131,11 +133,31 @@ class DataService:
 
     def get_all_classes(self) -> list[Class]:
         with get_db_session() as db:
-            return db.query(Class).options(joinedload(Class.course)).order_by(Class.name).all()
+            return db.query(Class).options(
+                joinedload(Class.course),
+                joinedload(Class.enrollments)
+            ).order_by(Class.name).all()
 
     def get_class_by_id(self, class_id: int) -> Class | None:
         with get_db_session() as db:
             return db.query(Class).options(joinedload(Class.assessments)).filter(Class.id == class_id).first()
+
+    def update_class(self, class_id: int, name: str):
+        with get_db_session() as db:
+            class_ = db.query(Class).filter(Class.id == class_id).first()
+            if class_:
+                class_.name = name
+                db.commit()
+
+    def delete_class(self, class_id: int):
+        with get_db_session() as db:
+            # Delete related enrollments first
+            db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete()
+            # Now delete the class
+            class_ = db.query(Class).filter(Class.id == class_id).first()
+            if class_:
+                db.delete(class_)
+                db.commit()
 
     def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active") -> ClassEnrollment | None:
         if not all([student_id, class_id, call_number is not None]): return None
@@ -197,6 +219,52 @@ class DataService:
                 db.delete(assessment)
                 db.commit()
 
+    # --- Lesson Methods ---
+    def get_lessons_for_class(self, class_id: int) -> list[Lesson]:
+        with get_db_session() as db:
+            return db.query(Lesson).filter(Lesson.class_id == class_id).order_by(Lesson.date.desc()).all()
+
+    def create_lesson(self, class_id: int, title: str, content: str, lesson_date: date) -> Lesson | None:
+        if not all([class_id, title, lesson_date]): return None
+        new_lesson = Lesson(class_id=class_id, title=title, content=content, date=lesson_date)
+        with get_db_session() as db:
+            db.add(new_lesson)
+            db.commit()
+            db.refresh(new_lesson)
+            return new_lesson
+
+    def update_lesson(self, lesson_id: int, title: str, content: str, lesson_date: date):
+        with get_db_session() as db:
+            lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+            if lesson:
+                lesson.title = title
+                lesson.content = content
+                lesson.date = lesson_date
+                db.commit()
+
+    def delete_lesson(self, lesson_id: int):
+        with get_db_session() as db:
+            lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+            if lesson:
+                db.delete(lesson)
+                db.commit()
+
+    # --- Incident Methods ---
+    def get_incidents_for_class(self, class_id: int) -> list[Incident]:
+        with get_db_session() as db:
+            return db.query(Incident).options(
+                joinedload(Incident.student)
+            ).filter(Incident.class_id == class_id).order_by(Incident.date.desc()).all()
+
+    def create_incident(self, class_id: int, student_id: int, description: str, incident_date: date) -> Incident | None:
+        if not all([class_id, student_id, description, incident_date]): return None
+        new_incident = Incident(class_id=class_id, student_id=student_id, description=description, date=incident_date)
+        with get_db_session() as db:
+            db.add(new_incident)
+            db.commit()
+            db.refresh(new_incident)
+            return new_incident
+
     # --- Grade Methods ---
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> Grade | None:
         if not all([student_id, assessment_id, score is not None]): return None
@@ -211,6 +279,13 @@ class DataService:
     def get_all_grades(self) -> list[Grade]:
         with get_db_session() as db:
             return db.query(Grade).all()
+
+    def get_all_grades_with_details(self) -> list[Grade]:
+        with get_db_session() as db:
+            return db.query(Grade).options(
+                joinedload(Grade.student),
+                joinedload(Grade.assessment).joinedload(Assessment.class_).joinedload(Class.course)
+            ).all()
 
     def get_grades_for_class(self, class_id: int) -> list[Grade]:
         with get_db_session() as db:
@@ -227,3 +302,48 @@ class DataService:
             if grade:
                 db.delete(grade)
                 db.commit()
+
+    def upsert_grades_for_class(self, class_id: int, grades_data: list[dict]):
+        with get_db_session() as db:
+            # Fetch existing grades for the class to optimize updates
+            existing_grades_query = db.query(Grade).join(Assessment).filter(Assessment.class_id == class_id)
+            existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
+
+            for grade_info in grades_data:
+                student_id = grade_info['student_id']
+                assessment_id = grade_info['assessment_id']
+                score = grade_info['score']
+
+                existing_grade = existing_grades_map.get((student_id, assessment_id))
+
+                if existing_grade:
+                    # Update existing grade
+                    if existing_grade.score != score:
+                        existing_grade.score = score
+                else:
+                    # Create new grade
+                    new_grade = Grade(
+                        student_id=student_id,
+                        assessment_id=assessment_id,
+                        score=score,
+                        date_recorded=date.today().isoformat()
+                    )
+                    db.add(new_grade)
+
+            db.commit()
+
+    def calculate_weighted_average(self, student_id: int, grades: list[Grade], assessments: list[Assessment]) -> float:
+        total_weight = 0
+        weighted_sum = 0
+
+        student_grades = {g.assessment_id: g.score for g in grades if g.student_id == student_id}
+
+        for assessment in assessments:
+            score = student_grades.get(assessment.id, 0.0) # Treat missing grade as 0
+            weighted_sum += score * assessment.weight
+            total_weight += assessment.weight
+
+        if total_weight == 0:
+            return 0.0
+
+        return weighted_sum / total_weight

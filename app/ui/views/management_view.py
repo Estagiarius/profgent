@@ -82,13 +82,22 @@ class ManagementView(ctk.CTkFrame):
 
     def _populate_grades(self):
         self._clear_frame(self.grades_frame)
-        students = {s.id: f"{s.first_name} {s.last_name}" for s in data_service.get_all_students()}
-        courses = {c.id: c.course_name for c in data_service.get_all_courses()}
-        for grade in data_service.get_all_grades():
-            f = ctk.CTkFrame(self.grades_frame); f.pack(fill="x", pady=5)
-            ctk.CTkLabel(f, text=f"ID: {grade.id} | {students.get(grade.student_id)} | {courses.get(grade.course_id)} | {grade.assignment_name}: {grade.score}").pack(side="left", padx=10)
+        grades = data_service.get_all_grades_with_details()
+
+        for grade in grades:
+            f = ctk.CTkFrame(self.grades_frame)
+            f.pack(fill="x", pady=5)
+
+            student_name = f"{grade.student.first_name} {grade.student.last_name}"
+            course_name = grade.assessment.class_.course.course_name
+            assessment_name = grade.assessment.name
+
+            label_text = f"ID: {grade.id} | {student_name} | {course_name} | {assessment_name}: {grade.score}"
+
+            ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
             ctk.CTkButton(f, text="Delete", fg_color="red", command=lambda g=grade.id: self.delete_grade(g)).pack(side="right", padx=5)
-            ctk.CTkButton(f, text="Edit", command=lambda g=grade: self.edit_grade(g)).pack(side="right", padx=5)
+            # Edit functionality for grades in this view is complex due to the new structure and has been removed.
+            # The Grade Grid is the primary place for editing.
 
     def _confirm_delete(self):
         d = CTkInputDialog(text="Type 'DELETE' to confirm.", title="Confirm Deletion"); return d.get_input() == "DELETE"
@@ -111,12 +120,6 @@ class ManagementView(ctk.CTkFrame):
     def edit_course(self, c):
         def cb(id, data): data_service.update_course(id, data['course_name'], data['course_code']); self.populate_data()
         EditDialog(self, "Edit Course", {"course_name":"Name", "course_code":"Code"}, vars(c), cb)
-
-    def edit_grade(self, g):
-        def cb(id, data):
-            try: data_service.update_grade(id, data['assignment_name'], float(data['score'])); self.populate_data()
-            except ValueError: pass
-        EditDialog(self, "Edit Grade", {"assignment_name":"Assignment", "score":"Score"}, vars(g), cb)
 
     def add_student_popup(self):
         def cb(data):

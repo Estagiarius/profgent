@@ -242,3 +242,97 @@ def test_delete_assessment(data_service: DataService):
     # Verify final state
     assert len(data_service.get_class_by_id(class_.id).assessments) == 0
     assert len(data_service.get_all_grades()) == 0
+
+def test_grade_grid_logic(data_service: DataService):
+    """Test weighted average calculation and upserting grades."""
+    student1 = data_service.add_student("Student", "One")
+    student2 = data_service.add_student("Student", "Two")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+
+    # Enroll students
+    data_service.add_student_to_class(student1.id, class_.id, 1)
+    data_service.add_student_to_class(student2.id, class_.id, 2)
+
+    # Create assessments with weights
+    assess1 = data_service.add_assessment(class_.id, "Test 1", 1.0)
+    assess2 = data_service.add_assessment(class_.id, "Test 2", 2.0)
+    assessments = [assess1, assess2]
+
+    # Add a grade for student 1 in Test 1
+    data_service.add_grade(student1.id, assess1.id, 8.0)
+
+    # Test average calculation
+    grades = data_service.get_grades_for_class(class_.id)
+    # Student 1: (8.0 * 1.0 + 0.0 * 2.0) / (1.0 + 2.0) = 8.0 / 3.0 = 2.67
+    avg1 = data_service.calculate_weighted_average(student1.id, grades, assessments)
+    assert round(avg1, 2) == 2.67
+    # Student 2: (0.0 * 1.0 + 0.0 * 2.0) / (1.0 + 2.0) = 0.0
+    avg2 = data_service.calculate_weighted_average(student2.id, grades, assessments)
+    assert avg2 == 0.0
+
+    # Test upsert
+    grades_to_upsert = [
+        {'student_id': student1.id, 'assessment_id': assess1.id, 'score': 9.0}, # Update
+        {'student_id': student1.id, 'assessment_id': assess2.id, 'score': 7.0}, # Insert
+        {'student_id': student2.id, 'assessment_id': assess1.id, 'score': 10.0}  # Insert
+    ]
+    data_service.upsert_grades_for_class(class_.id, grades_to_upsert)
+
+    # Verify upsert results
+    final_grades = data_service.get_grades_for_class(class_.id)
+    assert len(final_grades) == 3
+
+    # Test new average calculation
+    # Student 1: (9.0 * 1.0 + 7.0 * 2.0) / (1.0 + 2.0) = 23.0 / 3.0 = 7.67
+    final_avg1 = data_service.calculate_weighted_average(student1.id, final_grades, assessments)
+    assert round(final_avg1, 2) == 7.67
+    # Student 2: (10.0 * 1.0 + 0.0 * 2.0) / (1.0 + 2.0) = 10.0 / 3.0 = 3.33
+    final_avg2 = data_service.calculate_weighted_average(student2.id, final_grades, assessments)
+    assert round(final_avg2, 2) == 3.33
+
+def test_update_and_delete_class(data_service: DataService):
+    """Test updating and deleting a class."""
+    student = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Old Name", course.id)
+    data_service.add_student_to_class(student.id, class_.id, 1)
+
+    # Test Update
+    data_service.update_class(class_.id, "New Name")
+    updated_class = data_service.get_class_by_id(class_.id)
+    assert updated_class.name == "New Name"
+
+    # Test Delete
+    assert len(data_service.get_all_classes()) == 1
+    enrollments = data_service.get_enrollments_for_class(class_.id)
+    assert len(enrollments) == 1
+
+    data_service.delete_class(class_.id)
+
+    assert len(data_service.get_all_classes()) == 0
+    # Check that enrollments were cascade deleted
+    enrollments_after_delete = data_service.get_enrollments_for_class(class_.id)
+    assert len(enrollments_after_delete) == 0
+
+def test_get_all_grades_with_details(data_service: DataService):
+    """Test retrieving all grades with their full relational details."""
+    student = data_service.add_student("Student", "One")
+    course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class", course.id)
+    assessment = data_service.add_assessment(class_.id, "Final Exam", 1.0)
+    data_service.add_student_to_class(student.id, class_.id, 1)
+    grade = data_service.add_grade(student.id, assessment.id, 95.0)
+
+    # Call the function to test
+    grades_with_details = data_service.get_all_grades_with_details()
+
+    assert len(grades_with_details) == 1
+    retrieved_grade = grades_with_details[0]
+
+    # Check that all related objects were loaded and are correct
+    assert retrieved_grade.id == grade.id
+    assert retrieved_grade.student.first_name == "Student"
+    assert retrieved_grade.assessment.name == "Final Exam"
+    assert retrieved_grade.assessment.class_.name == "Class"
+    assert retrieved_grade.assessment.class_.course.course_name == "Course"

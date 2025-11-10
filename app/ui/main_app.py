@@ -2,17 +2,21 @@ import asyncio
 import customtkinter as ctk
 from queue import Queue, Empty
 from app.ui.views.dashboard_view import DashboardView
-from app.ui.views.grade_entry_view import GradeEntryView
 from app.ui.views.assistant_view import AssistantView
 from app.ui.views.settings_view import SettingsView
 from app.ui.views.management_view import ManagementView
-from app.ui.views.class_management_view import ClassManagementView
+from app.ui.views.class_selection_view import ClassSelectionView
 from app.ui.views.class_detail_view import ClassDetailView
-from app.ui.views.grade_grid_view import GradeGridView
+
+from app.services.data_service import DataService
+from app.services.assistant_service import AssistantService
 
 class MainApp(ctk.CTk):
-    def __init__(self):
+    def __init__(self, data_service: DataService, assistant_service: AssistantService):
         super().__init__()
+
+        self.data_service = data_service
+        self.assistant_service = assistant_service
 
         self.title("Academic Management")
         self.geometry("1100x800")
@@ -45,17 +49,11 @@ class MainApp(ctk.CTk):
         self.management_button = ctk.CTkButton(self.navigation_frame, text="Data Management", command=lambda: self.show_view("management"))
         self.management_button.grid(row=2, column=0, padx=20, pady=10)
 
-        self.class_management_button = ctk.CTkButton(self.navigation_frame, text="Class Management", command=lambda: self.show_view("class_management"))
-        self.class_management_button.grid(row=3, column=0, padx=20, pady=10)
-
-        self.grade_entry_button = ctk.CTkButton(self.navigation_frame, text="Grade Entry", command=lambda: self.show_view("grade_entry"))
-        self.grade_entry_button.grid(row=4, column=0, padx=20, pady=10)
-
-        self.grade_grid_button = ctk.CTkButton(self.navigation_frame, text="Grade Grid", command=lambda: self.show_view("grade_grid"))
-        self.grade_grid_button.grid(row=5, column=0, padx=20, pady=10)
+        self.class_selection_button = ctk.CTkButton(self.navigation_frame, text="My Classes", command=lambda: self.show_view("class_selection"))
+        self.class_selection_button.grid(row=3, column=0, padx=20, pady=10)
 
         self.assistant_button = ctk.CTkButton(self.navigation_frame, text="AI Assistant", command=lambda: self.show_view("assistant"))
-        self.assistant_button.grid(row=6, column=0, padx=20, pady=10)
+        self.assistant_button.grid(row=4, column=0, padx=20, pady=10)
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Settings", command=lambda: self.show_view("settings"))
         self.settings_button.grid(row=7, column=0, padx=20, pady=10)
@@ -70,12 +68,10 @@ class MainApp(ctk.CTk):
         # Create views and store them in a dictionary
         self.views = {
             "dashboard": DashboardView(self.main_frame),
-            "grade_entry": GradeEntryView(self.main_frame),
-            "grade_grid": GradeGridView(self.main_frame),
             "management": ManagementView(self.main_frame),
-            "class_management": ClassManagementView(self.main_frame, self),
+            "class_selection": ClassSelectionView(self.main_frame, self),
             "class_detail": ClassDetailView(self.main_frame, self),
-            "assistant": AssistantView(self.main_frame, self),
+            "assistant": AssistantView(self.main_frame, self, assistant_service=self.assistant_service),
             "settings": SettingsView(self.main_frame, self)
         }
 
@@ -109,19 +105,36 @@ class MainApp(ctk.CTk):
     def update_asyncio(self):
         self.loop.call_soon(self.loop.stop)
         self.loop.run_forever()
-        self.after(1, self.update_asyncio)
+        self._poll_id = self.after(1, self.update_asyncio)
 
     def on_closing(self):
-        tasks = asyncio.all_tasks(loop=self.loop)
-        for task in tasks:
-            task.cancel()
+        # 1. Stop the asyncio polling loop from rescheduling itself
+        if hasattr(self, '_poll_id'):
+            self.after_cancel(self._poll_id)
 
-        async def gather_tasks():
-            await asyncio.gather(*tasks, return_exceptions=True)
+        # 2. Create and schedule the final cleanup task
+        async def cleanup():
+            if self.assistant_service:
+                await self.assistant_service.close()
 
-        self.loop.run_until_complete(gather_tasks())
-        self.loop.close()
-        self.destroy()
+            tasks = [t for t in asyncio.all_tasks(loop=self.loop) if t is not asyncio.current_task()]
+            for task in tasks:
+                task.cancel()
+
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+
+        cleanup_task = self.loop.create_task(cleanup())
+
+        # 3. Start polling to check for cleanup completion
+        self._check_cleanup_done(cleanup_task)
+
+    def _check_cleanup_done(self, task):
+        # 4. If the cleanup task is done, destroy the window. Otherwise, check again later.
+        if task.done():
+            self.destroy()
+        else:
+            self.after(100, self._check_cleanup_done, task)
 
 if __name__ == "__main__":
     app = MainApp()

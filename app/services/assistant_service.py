@@ -112,3 +112,8 @@ class AssistantService:
         if final_response.content:
             self.messages.append({"role": "assistant", "content": final_response.content})
         return final_response
+
+    async def close(self):
+        """Closes the underlying LLM provider's resources."""
+        if self.provider:
+            await self.provider.close()

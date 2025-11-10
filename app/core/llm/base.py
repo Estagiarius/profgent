@@ -36,3 +36,9 @@ class LLMProvider(ABC):
         Asynchronously retrieves a list of available model names from the provider.
         """
         pass
+
+    async def close(self):
+        """
+        Asynchronously closes any open resources, like network clients.
+        """
+        pass

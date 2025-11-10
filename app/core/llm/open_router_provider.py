@@ -45,3 +45,6 @@ class OpenRouterProvider(LLMProvider):
         except Exception as e:
             print(f"Error listing OpenRouter models: {e}")
             return []
+
+    async def close(self):
+        await self.client.close()

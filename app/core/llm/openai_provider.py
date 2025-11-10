@@ -41,3 +41,6 @@ class OpenAIProvider(LLMProvider):
         except Exception as e:
             print(f"Error listing OpenAI models: {e}")
             return []
+
+    async def close(self):
+        await self.client.close()
