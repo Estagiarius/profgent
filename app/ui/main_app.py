@@ -105,14 +105,23 @@ class MainApp(ctk.CTk):
     def update_asyncio(self):
         self.loop.call_soon(self.loop.stop)
         self.loop.run_forever()
-        self.after(1, self.update_asyncio)
+        self._poll_id = self.after(1, self.update_asyncio)
 
     def on_closing(self):
-        # First, gracefully close services that need async cleanup
-        if self.assistant_service:
-            self.loop.run_until_complete(self.assistant_service.close())
+        # 1. Stop the asyncio polling loop
+        if hasattr(self, '_poll_id'):
+            self.after_cancel(self._poll_id)
 
-        # Then, cancel all other running tasks
+        # 2. Gracefully close services that need async cleanup
+        if self.assistant_service:
+            try:
+                self.loop.run_until_complete(self.assistant_service.close())
+            except RuntimeError as e:
+                # This can happen if the loop is already closing, which is fine.
+                print(f"Ignoring error during service shutdown: {e}")
+
+
+        # 3. Cancel all other potentially running asyncio tasks
         tasks = asyncio.all_tasks(loop=self.loop)
         for task in tasks:
             task.cancel()
@@ -120,7 +129,10 @@ class MainApp(ctk.CTk):
         async def gather_tasks():
             await asyncio.gather(*tasks, return_exceptions=True)
 
-        self.loop.run_until_complete(gather_tasks())
+        if tasks:
+            self.loop.run_until_complete(gather_tasks())
+
+        # 4. Finally, close the asyncio loop
         self.loop.close()
         self.destroy()
 
