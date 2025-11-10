@@ -42,3 +42,6 @@ class MaritacaProvider(LLMProvider):
         # Maritaca's OpenAI-compatible endpoint does not seem to support listing models.
         # We will return the known models manually.
         return ["sabia-3", "sabia-2-small"]
+
+    async def close(self):
+        await self.client.close()

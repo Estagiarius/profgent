@@ -58,3 +58,6 @@ class OllamaProvider(LLMProvider):
             # This can happen if the API exists but doesn't return a valid model list (e.g., 404)
             print(f"Error listing Ollama models (this might be normal for older versions): {e}")
             return []
+
+    async def close(self):
+        await self.client.close()

@@ -1,11 +1,10 @@
 import customtkinter as ctk
-from app.services.assistant_service import AssistantService
 from app.utils.async_utils import run_async_task
 
 class AssistantView(ctk.CTkFrame):
-    def __init__(self, parent, main_app):
+    def __init__(self, parent, main_app, assistant_service):
         super().__init__(parent)
-        self.assistant_service = AssistantService()
+        self.assistant_service = assistant_service
         self.main_app = main_app
 
         self.grid_rowconfigure(0, weight=1)

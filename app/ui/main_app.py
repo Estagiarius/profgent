@@ -8,9 +8,15 @@ from app.ui.views.management_view import ManagementView
 from app.ui.views.class_selection_view import ClassSelectionView
 from app.ui.views.class_detail_view import ClassDetailView
 
+from app.services.data_service import DataService
+from app.services.assistant_service import AssistantService
+
 class MainApp(ctk.CTk):
-    def __init__(self):
+    def __init__(self, data_service: DataService, assistant_service: AssistantService):
         super().__init__()
+
+        self.data_service = data_service
+        self.assistant_service = assistant_service
 
         self.title("Academic Management")
         self.geometry("1100x800")
@@ -65,7 +71,7 @@ class MainApp(ctk.CTk):
             "management": ManagementView(self.main_frame),
             "class_selection": ClassSelectionView(self.main_frame, self),
             "class_detail": ClassDetailView(self.main_frame, self),
-            "assistant": AssistantView(self.main_frame, self),
+            "assistant": AssistantView(self.main_frame, self, assistant_service=self.assistant_service),
             "settings": SettingsView(self.main_frame, self)
         }
 
@@ -102,6 +108,11 @@ class MainApp(ctk.CTk):
         self.after(1, self.update_asyncio)
 
     def on_closing(self):
+        # First, gracefully close services that need async cleanup
+        if self.assistant_service:
+            self.loop.run_until_complete(self.assistant_service.close())
+
+        # Then, cancel all other running tasks
         tasks = asyncio.all_tasks(loop=self.loop)
         for task in tasks:
             task.cancel()

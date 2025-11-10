@@ -17,10 +17,17 @@ def initialize_database():
         print("Database already exists. Skipping creation.")
 
 
+from app.services.data_service import DataService
+from app.services.assistant_service import AssistantService
+
 def main():
     initialize_database()
 
-    app = MainApp()
+    # Instantiate services
+    data_service = DataService()
+    assistant_service = AssistantService()
+
+    app = MainApp(data_service=data_service, assistant_service=assistant_service)
     app.mainloop()
 
 if __name__ == "__main__":
