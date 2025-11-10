@@ -27,7 +27,7 @@ class AddDialog(ctk.CTkToplevel):
             self.entries[key] = entry
             row_index += 1
 
-        save_button = ctk.CTkButton(self, text="Save", command=self.save)
+        save_button = ctk.CTkButton(self, text="Salvar", command=self.save)
         save_button.grid(row=row_index, column=0, columnspan=2, padx=10, pady=20)
 
     def save(self):

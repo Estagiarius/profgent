@@ -18,7 +18,7 @@ class MainApp(ctk.CTk):
         self.data_service = data_service
         self.assistant_service = assistant_service
 
-        self.title("Academic Management")
+        self.title("Gestão Acadêmica")
         self.geometry("1100x800")
 
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
@@ -36,9 +36,9 @@ class MainApp(ctk.CTk):
         # Create navigation frame
         self.navigation_frame = ctk.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew")
-        self.navigation_frame.grid_rowconfigure(8, weight=1) # Adjusted for the new button
+        self.navigation_frame.grid_rowconfigure(8, weight=1)
 
-        self.navigation_frame_label = ctk.CTkLabel(self.navigation_frame, text="Navigation",
+        self.navigation_frame_label = ctk.CTkLabel(self.navigation_frame, text="Navegação",
                                                   font=ctk.CTkFont(size=20, weight="bold"))
         self.navigation_frame_label.grid(row=0, column=0, padx=20, pady=20)
 
@@ -46,16 +46,16 @@ class MainApp(ctk.CTk):
         self.dashboard_button = ctk.CTkButton(self.navigation_frame, text="Dashboard", command=lambda: self.show_view("dashboard"))
         self.dashboard_button.grid(row=1, column=0, padx=20, pady=10)
 
-        self.management_button = ctk.CTkButton(self.navigation_frame, text="Data Management", command=lambda: self.show_view("management"))
+        self.management_button = ctk.CTkButton(self.navigation_frame, text="Gestão de Dados", command=lambda: self.show_view("management"))
         self.management_button.grid(row=2, column=0, padx=20, pady=10)
 
-        self.class_selection_button = ctk.CTkButton(self.navigation_frame, text="My Classes", command=lambda: self.show_view("class_selection"))
+        self.class_selection_button = ctk.CTkButton(self.navigation_frame, text="Minhas Turmas", command=lambda: self.show_view("class_selection"))
         self.class_selection_button.grid(row=3, column=0, padx=20, pady=10)
 
-        self.assistant_button = ctk.CTkButton(self.navigation_frame, text="AI Assistant", command=lambda: self.show_view("assistant"))
+        self.assistant_button = ctk.CTkButton(self.navigation_frame, text="Assistente IA", command=lambda: self.show_view("assistant"))
         self.assistant_button.grid(row=4, column=0, padx=20, pady=10)
 
-        self.settings_button = ctk.CTkButton(self.navigation_frame, text="Settings", command=lambda: self.show_view("settings"))
+        self.settings_button = ctk.CTkButton(self.navigation_frame, text="Configurações", command=lambda: self.show_view("settings"))
         self.settings_button.grid(row=7, column=0, padx=20, pady=10)
 
 

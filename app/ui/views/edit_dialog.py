@@ -16,7 +16,7 @@ class EditDialog(ctk.CTkToplevel):
             entry.grid(row=i, column=1, padx=10, pady=10, sticky="ew")
             self.entries[key] = entry
 
-        save_button = ctk.CTkButton(self, text="Save", command=self.save)
+        save_button = ctk.CTkButton(self, text="Salvar", command=self.save)
         save_button.grid(row=len(fields), column=0, columnspan=2, padx=10, pady=20)
 
     def save(self):

@@ -14,29 +14,32 @@ class ClassDetailView(ctk.CTkFrame):
         self.class_id = None
         self.editing_lesson_id = None
 
+        self.status_map = {"Ativo": "Active", "Inativo": "Inactive"}
+        self.status_map_rev = {v: k for k, v in self.status_map.items()}
+
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
-        self.title_label = ctk.CTkLabel(self, text="Class Details", font=ctk.CTkFont(size=20, weight="bold"))
+        self.title_label = ctk.CTkLabel(self, text="Detalhes da Turma", font=ctk.CTkFont(size=20, weight="bold"))
         self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
 
         self.tab_view = ctk.CTkTabview(self)
         self.tab_view.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
-        self.tab_view.add("Students")
-        self.tab_view.add("Assessments")
-        self.tab_view.add("Lessons")
-        self.tab_view.add("Incidents")
-        self.tab_view.add("Grade Grid")
+        self.tab_view.add("Alunos")
+        self.tab_view.add("Avaliações")
+        self.tab_view.add("Aulas")
+        self.tab_view.add("Incidentes")
+        self.tab_view.add("Quadro de Notas")
 
         # --- Students Tab ---
-        students_tab = self.tab_view.tab("Students")
+        students_tab = self.tab_view.tab("Alunos")
         students_tab.grid_rowconfigure(1, weight=1)
         students_tab.grid_columnconfigure(0, weight=1)
 
         self.options_frame = ctk.CTkFrame(students_tab)
         self.options_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
-        self.show_active_only_checkbox = ctk.CTkCheckBox(self.options_frame, text="Show Active Students Only", command=self.populate_student_list)
+        self.show_active_only_checkbox = ctk.CTkCheckBox(self.options_frame, text="Mostrar Apenas Alunos Ativos", command=self.populate_student_list)
         self.show_active_only_checkbox.pack(side="left", padx=10, pady=5)
         self.show_active_only_checkbox.select()
 
@@ -48,25 +51,25 @@ class ClassDetailView(ctk.CTkFrame):
         self.controls_frame.grid_columnconfigure(0, weight=1)
         self.controls_frame.grid_columnconfigure(1, weight=1)
 
-        self.enroll_student_button = ctk.CTkButton(self.controls_frame, text="Enroll Student", command=self.enroll_student_popup)
+        self.enroll_student_button = ctk.CTkButton(self.controls_frame, text="Matricular Aluno", command=self.enroll_student_popup)
         self.enroll_student_button.grid(row=0, column=0, padx=(0, 5), sticky="ew")
 
-        self.import_button = ctk.CTkButton(self.controls_frame, text="Import Students (.csv)", command=self.import_students)
+        self.import_button = ctk.CTkButton(self.controls_frame, text="Importar Alunos (.csv)", command=self.import_students)
         self.import_button.grid(row=0, column=1, padx=(5, 0), sticky="ew")
 
         # --- Assessments Tab ---
-        assessments_tab = self.tab_view.tab("Assessments")
+        assessments_tab = self.tab_view.tab("Avaliações")
         assessments_tab.grid_rowconfigure(0, weight=1)
         assessments_tab.grid_columnconfigure(0, weight=1)
 
         self.assessment_list_frame = ctk.CTkScrollableFrame(assessments_tab)
         self.assessment_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.add_assessment_button = ctk.CTkButton(assessments_tab, text="Add New Assessment", command=self.add_assessment_popup)
+        self.add_assessment_button = ctk.CTkButton(assessments_tab, text="Adicionar Nova Avaliação", command=self.add_assessment_popup)
         self.add_assessment_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
 
         # --- Lessons Tab ---
-        lessons_tab = self.tab_view.tab("Lessons")
+        lessons_tab = self.tab_view.tab("Aulas")
         lessons_tab.grid_rowconfigure(0, weight=1)
         lessons_tab.grid_columnconfigure(0, weight=1)
 
@@ -85,7 +88,7 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_list_frame = ctk.CTkScrollableFrame(self.lesson_list_view)
         self.lesson_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.add_lesson_button = ctk.CTkButton(self.lesson_list_view, text="Add New Lesson", command=self.show_lesson_editor)
+        self.add_lesson_button = ctk.CTkButton(self.lesson_list_view, text="Adicionar Nova Aula", command=self.show_lesson_editor)
         self.add_lesson_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
 
         # --- Lesson Editor View ---
@@ -93,49 +96,49 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_editor_view.grid_rowconfigure(2, weight=1)
         self.lesson_editor_view.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(self.lesson_editor_view, text="Title:").grid(row=0, column=0, padx=(10,0), pady=10, sticky="w")
-        self.lesson_editor_title_entry = ctk.CTkEntry(self.lesson_editor_view, placeholder_text="Lesson Title")
+        ctk.CTkLabel(self.lesson_editor_view, text="Título:").grid(row=0, column=0, padx=(10,0), pady=10, sticky="w")
+        self.lesson_editor_title_entry = ctk.CTkEntry(self.lesson_editor_view, placeholder_text="Título da Aula")
         self.lesson_editor_title_entry.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
-        ctk.CTkLabel(self.lesson_editor_view, text="Date (YYYY-MM-DD):").grid(row=1, column=0, padx=(10,0), pady=10, sticky="w")
+        ctk.CTkLabel(self.lesson_editor_view, text="Data (AAAA-MM-DD):").grid(row=1, column=0, padx=(10,0), pady=10, sticky="w")
         self.lesson_editor_date_entry = ctk.CTkEntry(self.lesson_editor_view)
         self.lesson_editor_date_entry.grid(row=1, column=1, padx=10, pady=10, sticky="ew")
 
-        ctk.CTkLabel(self.lesson_editor_view, text="Content:").grid(row=2, column=0, padx=(10,0), pady=10, sticky="nw")
+        ctk.CTkLabel(self.lesson_editor_view, text="Conteúdo:").grid(row=2, column=0, padx=(10,0), pady=10, sticky="nw")
         self.lesson_editor_content_textbox = ctk.CTkTextbox(self.lesson_editor_view)
         self.lesson_editor_content_textbox.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
 
         editor_buttons_frame = ctk.CTkFrame(self.lesson_editor_view)
         editor_buttons_frame.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
 
-        self.save_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Save", command=self.save_lesson)
+        self.save_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Salvar", command=self.save_lesson)
         self.save_lesson_button.pack(side="left", padx=5)
 
-        self.cancel_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Cancel", command=self.hide_lesson_editor)
+        self.cancel_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Cancelar", command=self.hide_lesson_editor)
         self.cancel_lesson_button.pack(side="left", padx=5)
 
         self.hide_lesson_editor() # Initially hidden
 
         # --- Incidents Tab ---
-        incidents_tab = self.tab_view.tab("Incidents")
+        incidents_tab = self.tab_view.tab("Incidentes")
         incidents_tab.grid_rowconfigure(0, weight=1)
         incidents_tab.grid_columnconfigure(0, weight=1)
 
         self.incident_list_frame = ctk.CTkScrollableFrame(incidents_tab)
         self.incident_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.add_incident_button = ctk.CTkButton(incidents_tab, text="Add New Incident", command=self.add_incident_popup)
+        self.add_incident_button = ctk.CTkButton(incidents_tab, text="Adicionar Novo Incidente", command=self.add_incident_popup)
         self.add_incident_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
 
         # --- Grade Grid Tab ---
-        grade_grid_tab = self.tab_view.tab("Grade Grid")
+        grade_grid_tab = self.tab_view.tab("Quadro de Notas")
         grade_grid_tab.grid_rowconfigure(0, weight=1)
         grade_grid_tab.grid_columnconfigure(0, weight=1)
 
         self.grade_grid_frame = ctk.CTkScrollableFrame(grade_grid_tab)
         self.grade_grid_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        self.save_grades_button = ctk.CTkButton(grade_grid_tab, text="Save All Changes", command=self.save_all_grades)
+        self.save_grades_button = ctk.CTkButton(grade_grid_tab, text="Salvar Todas as Alterações", command=self.save_all_grades)
         self.save_grades_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
 
     def save_all_grades(self):
@@ -148,20 +151,20 @@ class ClassDetailView(ctk.CTkFrame):
             try:
                 score = float(score_str)
                 if not (0 <= score <= 10):
-                    messagebox.showerror("Invalid Grade", f"Invalid score '{score}'. Grades must be between 0 and 10.")
+                    messagebox.showerror("Nota Inválida", f"Nota inválida '{score}'. As notas devem ser entre 0 e 10.")
                     return
                 grades_to_upsert.append({'student_id': student_id, 'assessment_id': assessment_id, 'score': score})
             except ValueError:
-                messagebox.showerror("Invalid Grade", f"Invalid score '{score_str}'. Grades must be numeric.")
+                messagebox.showerror("Nota Inválida", f"Nota inválida '{score_str}'. As notas devem ser numéricas.")
                 return
 
         if not grades_to_upsert:
-            messagebox.showinfo("No Changes", "No new or modified grades to save.")
+            messagebox.showinfo("Nenhuma Mudança", "Nenhuma nota nova ou modificada para salvar.")
             return
 
         data_service.upsert_grades_for_class(self.class_id, grades_to_upsert)
 
-        messagebox.showinfo("Success", "All grades were saved successfully.")
+        messagebox.showinfo("Sucesso", "Todas as notas foram salvas com sucesso.")
         self.populate_grade_grid() # Refresh grid to show updated averages
 
     def populate_grade_grid(self):
@@ -176,7 +179,7 @@ class ClassDetailView(ctk.CTkFrame):
         assessments = class_.assessments if class_ else []
 
         # Create Header
-        headers = ["Student Name"] + [a.name for a in assessments] + ["Final Average"]
+        headers = ["Nome do Aluno"] + [a.name for a in assessments] + ["Média Final"]
         for col, header in enumerate(headers):
             label = ctk.CTkLabel(self.grade_grid_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
@@ -216,7 +219,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         if not student_names:
             # TODO: Show a proper message dialog
-            print("No students in this class to assign an incident to.")
+            print("Nenhum aluno nesta turma para registrar um incidente.")
             return
 
         def save_callback(data):
@@ -229,9 +232,9 @@ class ClassDetailView(ctk.CTkFrame):
                 data_service.create_incident(self.class_id, selected_enrollment.student.id, description, date.today())
                 self.populate_incident_list()
 
-        fields = {"description": "Description"}
-        dropdowns = {"student": ("Student", student_names)}
-        AddDialog(self, "Add New Incident", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
+        fields = {"description": "Descrição"}
+        dropdowns = {"student": ("Aluno", student_names)}
+        AddDialog(self, "Adicionar Novo Incidente", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
 
     def populate_incident_list(self):
         for widget in self.incident_list_frame.winfo_children():
@@ -242,7 +245,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         incidents = data_service.get_incidents_for_class(self.class_id)
 
-        headers = ["Student Name", "Date", "Description"]
+        headers = ["Nome do Aluno", "Data", "Descrição"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.incident_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -283,14 +286,14 @@ class ClassDetailView(ctk.CTkFrame):
 
         if not title or not date_str:
             # TODO: Show error dialog
-            print("Title and Date are required.")
+            print("Título e Data são obrigatórios.")
             return
 
         try:
             lesson_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
             # TODO: Show error dialog
-            print("Invalid date format. Please use YYYY-MM-DD.")
+            print("Formato de data inválido. Use AAAA-MM-DD.")
             return
 
         if self.editing_lesson_id:
@@ -316,10 +319,10 @@ class ClassDetailView(ctk.CTkFrame):
                     data_service.add_assessment(self.class_id, name, weight)
                     self.populate_assessment_list()
                 except ValueError:
-                    print("Invalid weight. Please enter a number.") # Replace with a proper dialog
+                    print("Peso inválido. Por favor, insira um número.") # Replace with a proper dialog
 
-        fields = {"name": "Assessment Name", "weight": "Weight"}
-        AddDialog(self, "Add New Assessment", fields=fields, save_callback=save_callback)
+        fields = {"name": "Nome da Avaliação", "weight": "Peso"}
+        AddDialog(self, "Adicionar Nova Avaliação", fields=fields, save_callback=save_callback)
 
     def populate_assessment_list(self):
         for widget in self.assessment_list_frame.winfo_children():
@@ -332,7 +335,7 @@ class ClassDetailView(ctk.CTkFrame):
         if not class_:
             return
 
-        headers = ["Assessment Name", "Weight", "Actions"]
+        headers = ["Nome da Avaliação", "Peso", "Ações"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.assessment_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -344,14 +347,14 @@ class ClassDetailView(ctk.CTkFrame):
             actions_frame = ctk.CTkFrame(self.assessment_list_frame)
             actions_frame.grid(row=i, column=2, padx=5, pady=5, sticky="e")
 
-            edit_button = ctk.CTkButton(actions_frame, text="Edit", command=lambda a=assessment: self.edit_assessment_popup(a))
+            edit_button = ctk.CTkButton(actions_frame, text="Editar", command=lambda a=assessment: self.edit_assessment_popup(a))
             edit_button.pack(side="left", padx=5)
 
-            delete_button = ctk.CTkButton(actions_frame, text="Delete", fg_color="red", command=lambda a_id=assessment.id: self.delete_assessment_action(a_id))
+            delete_button = ctk.CTkButton(actions_frame, text="Excluir", fg_color="red", command=lambda a_id=assessment.id: self.delete_assessment_action(a_id))
             delete_button.pack(side="left", padx=5)
 
     def delete_assessment_action(self, assessment_id):
-        dialog = CTkInputDialog(text="Type 'DELETE' to confirm deletion:", title="Confirm Deletion")
+        dialog = CTkInputDialog(text="Digite 'DELETE' para confirmar a exclusão:", title="Confirmar Exclusão")
         user_input = dialog.get_input()
         if user_input == "DELETE":
             data_service.delete_assessment(assessment_id)
@@ -367,15 +370,15 @@ class ClassDetailView(ctk.CTkFrame):
                     data_service.update_assessment(assessment_id, name, weight)
                     self.populate_assessment_list()
                 except ValueError:
-                    print("Invalid weight. Please enter a number.")
+                    print("Peso inválido. Por favor, insira um número.")
 
-        fields = {"name": "Assessment Name", "weight": "Weight"}
+        fields = {"name": "Nome da Avaliação", "weight": "Peso"}
         initial_data = {
             "id": assessment.id,
             "name": assessment.name,
             "weight": str(assessment.weight)
         }
-        EditDialog(self, "Edit Assessment", fields, initial_data, save_callback)
+        EditDialog(self, "Editar Avaliação", fields, initial_data, save_callback)
 
     def enroll_student_popup(self):
         if not self.class_id:
@@ -386,7 +389,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         if not student_names:
             # You might want to show a proper message dialog here
-            print("No students available to enroll.")
+            print("Nenhum aluno disponível para matricular.")
             return
 
         def save_callback(data):
@@ -398,8 +401,8 @@ class ClassDetailView(ctk.CTkFrame):
                 data_service.add_student_to_class(student.id, self.class_id, next_call_number)
                 self.populate_student_list()
 
-        dropdowns = {"student": ("Student", student_names)}
-        AddDialog(self, "Enroll New Student", fields={}, dropdowns=dropdowns, save_callback=save_callback)
+        dropdowns = {"student": ("Aluno", student_names)}
+        AddDialog(self, "Matricular Novo Aluno", fields={}, dropdowns=dropdowns, save_callback=save_callback)
 
 
     def populate_student_list(self):
@@ -414,7 +417,7 @@ class ClassDetailView(ctk.CTkFrame):
         if self.show_active_only_checkbox.get():
             enrollments = [e for e in enrollments if e.status == 'Active']
 
-        headers = ["Call #", "Student Name", "Status", "Actions"]
+        headers = ["Nº de Chamada", "Nome do Aluno", "Status", "Ações"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.student_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -422,15 +425,18 @@ class ClassDetailView(ctk.CTkFrame):
         for i, enrollment in enumerate(enrollments, start=1):
             ctk.CTkLabel(self.student_list_frame, text=str(enrollment.call_number)).grid(row=i, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.student_list_frame, text=f"{enrollment.student.first_name} {enrollment.student.last_name}").grid(row=i, column=1, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.student_list_frame, text=enrollment.status).grid(row=i, column=2, padx=10, pady=5, sticky="w")
 
-            status_menu = ctk.CTkOptionMenu(self.student_list_frame, values=["Active", "Inactive"],
+            display_status = self.status_map_rev.get(enrollment.status, enrollment.status)
+            ctk.CTkLabel(self.student_list_frame, text=display_status).grid(row=i, column=2, padx=10, pady=5, sticky="w")
+
+            status_menu = ctk.CTkOptionMenu(self.student_list_frame, values=["Ativo", "Inativo"],
                                             command=lambda status, eid=enrollment.id: self.update_status(eid, status))
-            status_menu.set(enrollment.status)
+            status_menu.set(display_status)
             status_menu.grid(row=i, column=3, padx=10, pady=5, sticky="w")
 
     def update_status(self, enrollment_id, status):
-        data_service.update_enrollment_status(enrollment_id, status)
+        db_status = self.status_map.get(status, status)
+        data_service.update_enrollment_status(enrollment_id, db_status)
         self.populate_student_list()
 
     def import_students(self):
@@ -438,8 +444,8 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         filepath = filedialog.askopenfilename(
-            title="Select a CSV file",
-            filetypes=(("CSV files", "*.csv"), ("All files", "*.*"))
+            title="Selecione um arquivo CSV",
+            filetypes=(("Arquivos CSV", "*.csv"), ("Todos os arquivos", "*.*"))
         )
         if not filepath:
             return
@@ -466,7 +472,7 @@ class ClassDetailView(ctk.CTkFrame):
             self.populate_student_list() # Refresh the list
         except Exception as e:
             # Simple error handling for now
-            print(f"Error importing students: {e}")
+            print(f"Erro ao importar alunos: {e}")
 
 
     def populate_lesson_list(self):
@@ -478,7 +484,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         lessons = data_service.get_lessons_for_class(self.class_id)
 
-        headers = ["Date", "Title", "Actions"]
+        headers = ["Data", "Título", "Ações"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.lesson_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -487,7 +493,7 @@ class ClassDetailView(ctk.CTkFrame):
             ctk.CTkLabel(self.lesson_list_frame, text=str(lesson.date)).grid(row=i, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.lesson_list_frame, text=lesson.title).grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
-            edit_button = ctk.CTkButton(self.lesson_list_frame, text="Edit", command=lambda l=lesson: self.show_lesson_editor(l))
+            edit_button = ctk.CTkButton(self.lesson_list_frame, text="Editar", command=lambda l=lesson: self.show_lesson_editor(l))
             edit_button.grid(row=i, column=2, padx=10, pady=5, sticky="e")
 
 
@@ -495,7 +501,7 @@ class ClassDetailView(ctk.CTkFrame):
         self.class_id = class_id
         if class_id:
             class_ = data_service.get_class_by_id(self.class_id)
-            self.title_label.configure(text=f"Class Details: {class_.name}")
+            self.title_label.configure(text=f"Detalhes da Turma: {class_.name}")
             self.populate_student_list()
             self.populate_assessment_list()
             self.populate_lesson_list()
