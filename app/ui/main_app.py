@@ -108,29 +108,30 @@ class MainApp(ctk.CTk):
         self._poll_id = self.after(1, self.update_asyncio)
 
     def on_closing(self):
-        # 1. Stop the asyncio polling loop
+        # 1. Stop the asyncio polling loop from rescheduling itself
         if hasattr(self, '_poll_id'):
             self.after_cancel(self._poll_id)
 
-        # 2. Gracefully close services that need async cleanup
-        if self.assistant_service:
-            try:
-                self.loop.run_until_complete(self.assistant_service.close())
-            except RuntimeError as e:
-                # This can happen if the loop is already closing, which is fine.
-                print(f"Ignoring error during service shutdown: {e}")
+        # 2. Create a final cleanup task
+        async def cleanup():
+            # Gracefully close services that need async cleanup
+            if self.assistant_service:
+                await self.assistant_service.close()
 
+            # Cancel all other potentially running asyncio tasks
+            tasks = [t for t in asyncio.all_tasks(loop=self.loop) if t is not asyncio.current_task()]
+            for task in tasks:
+                task.cancel()
 
-        # 3. Cancel all other potentially running asyncio tasks
-        tasks = asyncio.all_tasks(loop=self.loop)
-        for task in tasks:
-            task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
 
-        async def gather_tasks():
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-        if tasks:
-            self.loop.run_until_complete(gather_tasks())
+        # 3. Run the cleanup task to completion using a manual polling mechanism
+        cleanup_task = self.loop.create_task(cleanup())
+        while not cleanup_task.done():
+            self.loop.call_soon(self.loop.stop)
+            self.loop.run_forever()
+            self.update() # Process tkinter events
 
         # 4. Finally, destroy the tkinter window, which will stop the mainloop
         self.destroy()
