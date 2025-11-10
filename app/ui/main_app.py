@@ -132,8 +132,7 @@ class MainApp(ctk.CTk):
         if tasks:
             self.loop.run_until_complete(gather_tasks())
 
-        # 4. Finally, close the asyncio loop
-        self.loop.close()
+        # 4. Finally, destroy the tkinter window, which will stop the mainloop
         self.destroy()
 
 if __name__ == "__main__":
