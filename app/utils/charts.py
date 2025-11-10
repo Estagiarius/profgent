@@ -15,7 +15,7 @@ def create_grade_distribution_chart(grades: list[Grade], course_name: str) -> st
     fig, ax = plt.subplots()
 
     if not grades:
-        ax.text(0.5, 0.5, 'No grades available for this course.', horizontalalignment='center', verticalalignment='center')
+        ax.text(0.5, 0.5, 'Nenhuma nota disponível para este curso.', horizontalalignment='center', verticalalignment='center')
     else:
         # Clamp scores to a maximum of 10
         scores = [min(grade.score, 10) for grade in grades]
@@ -25,7 +25,7 @@ def create_grade_distribution_chart(grades: list[Grade], course_name: str) -> st
         # Set ticks from 0 to 10
         ax.set_xticks(range(0, 11, 1))
 
-    ax.set_title(f'Grade Distribution for {course_name}')
+    ax.set_title(f'Distribuição de Notas para {course_name}')
 
     plt.savefig(output_path)
     plt.close(fig)

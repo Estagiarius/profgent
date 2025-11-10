@@ -15,14 +15,14 @@ class DashboardView(ctk.CTkFrame):
         self.grid_rowconfigure(2, weight=1)
 
         # --- Title ---
-        self.title_label = ctk.CTkLabel(self, text="Dashboard Analytics", font=ctk.CTkFont(size=20, weight="bold"))
+        self.title_label = ctk.CTkLabel(self, text="Dashboard de Análises", font=ctk.CTkFont(size=20, weight="bold"))
         self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
 
         # --- Controls Frame ---
         self.controls_frame = ctk.CTkFrame(self)
         self.controls_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
 
-        self.course_label = ctk.CTkLabel(self.controls_frame, text="Select Course to Analyze:")
+        self.course_label = ctk.CTkLabel(self.controls_frame, text="Selecione o Curso para Análise:")
         self.course_label.pack(side="left", padx=10, pady=10)
 
         self.course_menu = ctk.CTkOptionMenu(self.controls_frame, values=[], command=self.on_course_select)
@@ -32,7 +32,7 @@ class DashboardView(ctk.CTkFrame):
         self.chart_frame = ctk.CTkFrame(self)
         self.chart_frame.grid(row=2, column=0, padx=20, pady=20, sticky="nsew")
 
-        self.chart_label = ctk.CTkLabel(self.chart_frame, text="Select a course to see the grade distribution.")
+        self.chart_label = ctk.CTkLabel(self.chart_frame, text="Selecione um curso para ver a distribuição de notas.")
         self.chart_label.pack(expand=True)
         self.chart_image = None
 
@@ -51,8 +51,8 @@ class DashboardView(ctk.CTkFrame):
                 self.course_menu.set(course_names[0])
                 self.on_course_select(course_names[0])
         else:
-            self.course_menu.configure(values=["No courses available"])
-            self.course_menu.set("No courses available")
+            self.course_menu.configure(values=["Nenhum curso disponível"])
+            self.course_menu.set("Nenhum curso disponível")
             self.selected_course_id = None
 
     def on_course_select(self, selected_name: str):
@@ -66,13 +66,13 @@ class DashboardView(ctk.CTkFrame):
     def update_chart(self):
         """Generates and displays the chart for the selected course."""
         if self.selected_course_id is None:
-            self.chart_label.configure(text="No course selected or no courses available.", image=None)
+            self.chart_label.configure(text="Nenhum curso selecionado ou disponível.", image=None)
             return
 
         # Fetch a fresh, session-bound course object to prevent DetachedInstanceError
         selected_course = self.data_service.get_course_by_id(self.selected_course_id)
         if not selected_course:
-            self.chart_label.configure(text=f"Could not find course with ID: {self.selected_course_id}", image=None)
+            self.chart_label.configure(text=f"Não foi possível encontrar o curso com ID: {self.selected_course_id}", image=None)
             return
 
         # Aggregate grades from all classes within the selected course
@@ -89,4 +89,4 @@ class DashboardView(ctk.CTkFrame):
             self.chart_image = ctk.CTkImage(light_image=img, size=img.size)
             self.chart_label.configure(image=self.chart_image, text="")
         else:
-            self.chart_label.configure(image=None, text="Could not generate chart.")
+            self.chart_label.configure(image=None, text="Não foi possível gerar o gráfico.")

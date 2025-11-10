@@ -11,13 +11,13 @@ class ClassSelectionView(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(1, weight=1)
 
-        self.title_label = ctk.CTkLabel(self, text="My Classes", font=ctk.CTkFont(size=20, weight="bold"))
+        self.title_label = ctk.CTkLabel(self, text="Minhas Turmas", font=ctk.CTkFont(size=20, weight="bold"))
         self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="w")
 
-        self.add_class_button = ctk.CTkButton(self, text="Add New Class", command=self.add_class_popup)
+        self.add_class_button = ctk.CTkButton(self, text="Adicionar Nova Turma", command=self.add_class_popup)
         self.add_class_button.grid(row=0, column=1, padx=20, pady=(20, 10), sticky="e")
 
-        self.scrollable_frame = ctk.CTkScrollableFrame(self, label_text="Select a class to view details")
+        self.scrollable_frame = ctk.CTkScrollableFrame(self, label_text="Selecione uma turma para ver os detalhes")
         self.scrollable_frame.grid(row=1, column=0, columnspan=2, padx=20, pady=10, sticky="nsew")
         self.scrollable_frame.grid_columnconfigure(0, weight=1)
 
@@ -46,26 +46,26 @@ class ClassSelectionView(ctk.CTkFrame):
 
         # Number of Students
         student_count = len(class_.enrollments)
-        student_count_label = ctk.CTkLabel(card, text=f"{student_count} students enrolled", font=ctk.CTkFont(size=10))
+        student_count_label = ctk.CTkLabel(card, text=f"{student_count} alunos matriculados", font=ctk.CTkFont(size=10))
         student_count_label.grid(row=2, column=0, padx=15, pady=(5, 10), sticky="w")
 
         # Action Buttons Frame
         actions_frame = ctk.CTkFrame(card)
         actions_frame.grid(row=0, column=1, rowspan=3, padx=15, pady=15, sticky="e")
 
-        details_button = ctk.CTkButton(actions_frame, text="View Details", command=lambda c=class_.id: self.view_class_details(c))
+        details_button = ctk.CTkButton(actions_frame, text="Ver Detalhes", command=lambda c=class_.id: self.view_class_details(c))
         details_button.pack(side="top", fill="x", padx=5, pady=5)
 
-        edit_button = ctk.CTkButton(actions_frame, text="Edit", command=lambda c=class_: self.edit_class_popup(c))
+        edit_button = ctk.CTkButton(actions_frame, text="Editar", command=lambda c=class_: self.edit_class_popup(c))
         edit_button.pack(side="top", fill="x", padx=5, pady=5)
 
-        delete_button = ctk.CTkButton(actions_frame, text="Delete", fg_color="red", command=lambda c_id=class_.id: self.delete_class_action(c_id))
+        delete_button = ctk.CTkButton(actions_frame, text="Excluir", fg_color="red", command=lambda c_id=class_.id: self.delete_class_action(c_id))
         delete_button.pack(side="top", fill="x", padx=5, pady=5)
 
         return card
 
     def delete_class_action(self, class_id):
-        dialog = CTkInputDialog(text="This is a destructive action. All enrollments and grades related to this class will be lost.\nType 'DELETE' to confirm deletion:", title="Confirm Deletion")
+        dialog = CTkInputDialog(text="Esta é uma ação destrutiva. Todas as matrículas e notas relacionadas a esta turma serão perdidas.\nDigite 'DELETE' para confirmar a exclusão:", title="Confirmar Exclusão")
         user_input = dialog.get_input()
         if user_input == "DELETE":
             data_service.delete_class(class_id)
@@ -81,16 +81,16 @@ class ClassSelectionView(ctk.CTkFrame):
                 data_service.update_class(class_id, new_name)
                 self.populate_class_cards()
 
-        fields = {"name": "Class Name"}
+        fields = {"name": "Nome da Turma"}
         initial_data = {"id": class_.id, "name": class_.name}
 
-        EditDialog(self, "Edit Class", fields, initial_data, save_callback)
+        EditDialog(self, "Editar Turma", fields, initial_data, save_callback)
 
     def add_class_popup(self):
         courses = data_service.get_all_courses()
         if not courses:
             # TODO: Show a proper error dialog to the user
-            print("Error: No courses available. Please add a course first.")
+            print("Erro: Nenhum curso disponível. Adicione um curso primeiro.")
             return
 
         course_names = [c.course_name for c in courses]
@@ -100,7 +100,7 @@ class ClassSelectionView(ctk.CTkFrame):
             selected_course_name = data.get("course")
 
             if not class_name or not selected_course_name:
-                print("Error: Class name and course are required.")
+                print("Erro: O nome da turma e o curso são obrigatórios.")
                 return
 
             selected_course = next((c for c in courses if c.course_name == selected_course_name), None)
@@ -109,10 +109,10 @@ class ClassSelectionView(ctk.CTkFrame):
                 data_service.create_class(name=class_name, course_id=selected_course.id)
                 self.populate_class_cards()  # Refresh the list
 
-        fields = {"name": "Class Name"}
-        dropdowns = {"course": ("Course", course_names)}
+        fields = {"name": "Nome da Turma"}
+        dropdowns = {"course": ("Curso", course_names)}
 
-        AddDialog(self, "Add New Class", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
+        AddDialog(self, "Adicionar Nova Turma", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
 
     def on_show(self, **kwargs):
         self.populate_class_cards()
