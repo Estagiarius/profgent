@@ -6,6 +6,7 @@ from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from customtkinter import CTkInputDialog
 from app.utils.import_utils import import_students_from_csv
+from app.utils.async_utils import run_async_from_sync
 
 class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
@@ -459,13 +460,14 @@ class ClassDetailView(ctk.CTkFrame):
         self.update_idletasks()
 
         try:
-            # Run the async utility function from the sync UI method
-            success_count, errors = asyncio.run(import_students_from_csv(
+            # Safely run the async utility function from the sync UI method
+            coro = import_students_from_csv(
                 filepath,
                 self.class_id,
                 self.main_app.data_service,
                 self.main_app.assistant_service
-            ))
+            )
+            success_count, errors = run_async_from_sync(coro, self.main_app.loop)
 
             self.populate_student_list()
 

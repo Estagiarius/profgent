@@ -1,31 +1,20 @@
 import asyncio
-import threading
-from typing import Coroutine, Callable
-from queue import Queue
+from concurrent.futures import Future
 
-def run_async_task(coro: Coroutine, queue: Queue, callback: Callable):
+def run_async_from_sync(coro, loop):
     """
-    Runs a coroutine in a background thread and puts the callback and result
-    onto a queue for the main thread to process.
+    Executes a coroutine on a running asyncio event loop from a synchronous context
+    and waits for its result.
+
+    This is a safe way to call async code from a sync UI thread without closing
+    the main event loop.
 
     Args:
-        coro: The coroutine to run.
-        queue: The queue to put the result on.
-        callback: The function to be called with the result.
-    """
-    def thread_target():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(coro)
-            # Put the callback and its arguments onto the queue
-            queue.put((callback, (result,)))
-        except Exception as e:
-            # It's good practice to handle potential exceptions in the async task
-            print(f"Error in background task: {e}")
-            # Optionally put the error on the queue for the UI to handle
-            # queue.put((error_callback, (e,)))
-        finally:
-            loop.close()
+        coro: The coroutine to execute.
+        loop: The asyncio event loop on which to run the coroutine.
 
-    threading.Thread(target=thread_target).start()
+    Returns:
+        The result of the coroutine.
+    """
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result()
