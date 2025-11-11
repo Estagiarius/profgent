@@ -477,6 +477,9 @@ class ClassDetailView(ctk.CTkFrame):
             else:
                 messagebox.showinfo("Sucesso", f"{success_count} alunos importados com sucesso!")
 
+        except Exception as e:
+            messagebox.showerror("Erro Inesperado", f"Ocorreu um erro inesperado durante a importação:\n\n{e}")
+
         finally:
             # Always restore the cursor
             self.configure(cursor="")
