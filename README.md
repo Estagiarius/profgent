@@ -1,8 +1,8 @@
-# Academic Management System with AI Assistant
+# ProfGent - Sistema Simples de Administração Interna de Professores com Agente de IA Embutido
 
 ## Sobre o Projeto
 
-Este projeto é um sistema de gerenciamento acadêmico robusto, desenvolvido em Python, que visa simplificar a administração de estudantes, cursos, turmas e notas. A aplicação possui uma interface gráfica intuitiva construída com CustomTkinter e um banco de dados relacional gerenciado pelo SQLAlchemy.
+Este projeto é um sistema de gerenciamento acadêmico, desenvolvido em Python, que visa simplificar a administração de estudantes, cursos, turmas e notas. A aplicação possui uma interface gráfica intuitiva construída com CustomTkinter e um banco de dados relacional gerenciado pelo SQLAlchemy.
 
 O grande diferencial deste sistema é a integração de um **Assistente de IA**, que permite aos usuários interagir com o sistema através de linguagem natural para realizar consultas e executar operações de gerenciamento, otimizando o fluxo de trabalho e tornando a gestão acadêmica mais eficiente.
 
