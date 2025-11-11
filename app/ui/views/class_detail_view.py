@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
+import asyncio
 from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
@@ -453,21 +454,30 @@ class ClassDetailView(ctk.CTkFrame):
         if not filepath:
             return
 
-        # Delegate the core logic to the utility function
-        success_count, errors = import_students_from_csv(
-            filepath,
-            self.class_id,
-            self.main_app.data_service,
-            self.main_app.assistant_service
-        )
+        # Provide user feedback that a process is running
+        self.config(cursor="watch")
+        self.update_idletasks()
 
-        self.populate_student_list()
+        try:
+            # Run the async utility function from the sync UI method
+            success_count, errors = asyncio.run(import_students_from_csv(
+                filepath,
+                self.class_id,
+                self.main_app.data_service,
+                self.main_app.assistant_service
+            ))
 
-        if errors:
-            error_message = f"{success_count} alunos importados com sucesso, mas ocorreram os seguintes erros:\n\n" + "\n".join(errors)
-            messagebox.showwarning("Importação com Erros", error_message)
-        else:
-            messagebox.showinfo("Sucesso", f"{success_count} alunos importados com sucesso!")
+            self.populate_student_list()
+
+            if errors:
+                error_message = f"{success_count} alunos importados com sucesso, mas ocorreram os seguintes erros:\n\n" + "\n".join(errors)
+                messagebox.showwarning("Importação com Erros", error_message)
+            else:
+                messagebox.showinfo("Sucesso", f"{success_count} alunos importados com sucesso!")
+
+        finally:
+            # Always restore the cursor
+            self.config(cursor="")
 
 
     def populate_lesson_list(self):

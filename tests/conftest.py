@@ -66,3 +66,7 @@ def assistant_service(mocker: MockerFixture) -> "AssistantService":
     service.provider = mocker.MagicMock()
 
     return service
+
+@pytest.fixture(scope="session")
+def anyio_backend():
+    return "asyncio"
