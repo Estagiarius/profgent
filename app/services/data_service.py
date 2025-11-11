@@ -219,6 +219,128 @@ class DataService:
                 db.delete(assessment)
                 db.commit()
 
+    # --- Analysis Methods ---
+    def get_student_performance_summary(self, student_id: int, class_id: int) -> dict | None:
+        with get_db_session() as db:
+            # Eagerly load all necessary data in one go
+            enrollment = db.query(ClassEnrollment).options(
+                joinedload(ClassEnrollment.student),
+                joinedload(ClassEnrollment.class_).options(
+                    joinedload(Class.assessments),
+                    joinedload(Class.course)
+                )
+            ).filter(
+                ClassEnrollment.student_id == student_id,
+                ClassEnrollment.class_id == class_id
+            ).first()
+
+            if not enrollment:
+                return None
+
+            student = enrollment.student
+            class_ = enrollment.class_
+
+            # Get grades for the student in this class
+            grades = db.query(Grade).join(Assessment).filter(
+                Grade.student_id == student_id,
+                Assessment.class_id == class_id
+            ).options(joinedload(Grade.assessment)).all()
+
+            # Get incidents for the student in this class
+            incidents = db.query(Incident).filter(
+                Incident.student_id == student_id,
+                Incident.class_id == class_id
+            ).order_by(Incident.date.desc()).all()
+
+            # Calculate weighted average
+            weighted_average = self.calculate_weighted_average(student_id, grades, class_.assessments)
+
+            # Process grades to find highest/lowest and format for output
+            highest_grade = None
+            lowest_grade = None
+            formatted_grades = []
+
+            if grades:
+                grades.sort(key=lambda g: g.score, reverse=True)
+                highest_grade = {"assessment_name": grades[0].assessment.name, "score": grades[0].score}
+                lowest_grade = {"assessment_name": grades[-1].assessment.name, "score": grades[-1].score}
+                formatted_grades = [
+                    {"assessment_name": g.assessment.name, "score": g.score, "weight": g.assessment.weight}
+                    for g in grades
+                ]
+
+            # Format incidents for output
+            formatted_incidents = [
+                {"date": i.date.isoformat(), "description": i.description}
+                for i in incidents
+            ]
+
+            summary = {
+                "student_name": f"{student.first_name} {student.last_name}",
+                "class_name": class_.name,
+                "course_name": class_.course.course_name,
+                "weighted_average": round(weighted_average, 2),
+                "grades": formatted_grades,
+                "incident_count": len(incidents),
+                "incidents": formatted_incidents,
+                "highest_grade": highest_grade,
+                "lowest_grade": lowest_grade
+            }
+
+            return summary
+
+    def get_students_at_risk(self, class_id: int, grade_threshold: float = 5.0, incident_threshold: int = 2) -> list[dict]:
+        with get_db_session() as db:
+            # Subquery to find student IDs with low grades in the specified class
+            low_grade_student_ids = db.query(Grade.student_id).join(Assessment).filter(
+                Assessment.class_id == class_id,
+                Grade.score < grade_threshold
+            ).distinct()
+
+            # Subquery to find student IDs with high incident counts in the specified class
+            high_incident_student_ids = db.query(Incident.student_id).filter(
+                Incident.class_id == class_id
+            ).group_by(Incident.student_id).having(
+                func.count(Incident.id) >= incident_threshold
+            ).distinct()
+
+            # Combine the student IDs from both queries
+            at_risk_student_ids = low_grade_student_ids.union(high_incident_student_ids).subquery()
+
+            # Fetch the student details along with their risk factors
+            at_risk_students = db.query(
+                Student,
+                func.count(func.distinct(Incident.id)).label('incident_count'),
+                func.min(Grade.score).label('lowest_grade_score')
+            ).join(
+                ClassEnrollment, Student.id == ClassEnrollment.student_id
+            ).outerjoin(
+                Incident, (Student.id == Incident.student_id) & (Incident.class_id == class_id)
+            ).outerjoin(
+                Grade, (Student.id == Grade.student_id) & (Grade.assessment.has(Assessment.class_id == class_id))
+            ).filter(
+                ClassEnrollment.class_id == class_id,
+                ClassEnrollment.status == 'Active',
+                Student.id.in_(at_risk_student_ids)
+            ).group_by(Student.id).all()
+
+            # Format the output
+            result = []
+            for student, incident_count, lowest_grade in at_risk_students:
+                reasons = []
+                if lowest_grade is not None and lowest_grade < grade_threshold:
+                    reasons.append(f"Nota mais baixa: {lowest_grade:.2f}")
+                if incident_count is not None and incident_count >= incident_threshold:
+                    reasons.append(f"{incident_count} incidentes registrados")
+
+                result.append({
+                    "student_id": student.id,
+                    "student_name": f"{student.first_name} {student.last_name}",
+                    "reasons": reasons
+                })
+
+            return result
+
     # --- Lesson Methods ---
     def get_lessons_for_class(self, class_id: int) -> list[Lesson]:
         with get_db_session() as db:
