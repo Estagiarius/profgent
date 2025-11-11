@@ -164,16 +164,17 @@ class DataService:
                 db.delete(class_)
                 db.commit()
 
-    def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active") -> ClassEnrollment | None:
+    def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active", status_detail: str | None = None) -> ClassEnrollment | None:
         if not all([student_id, class_id, call_number is not None]): return None
         with get_db_session() as db:
             existing = db.query(ClassEnrollment).filter_by(student_id=student_id, class_id=class_id).first()
             if existing:
                 existing.call_number = call_number
                 existing.status = status
+                existing.status_detail = status_detail
                 db.commit()
                 return existing
-            enrollment = ClassEnrollment(student_id=student_id, class_id=class_id, call_number=call_number, status=status)
+            enrollment = ClassEnrollment(student_id=student_id, class_id=class_id, call_number=call_number, status=status, status_detail=status_detail)
             db.add(enrollment)
             db.commit()
             db.refresh(enrollment)

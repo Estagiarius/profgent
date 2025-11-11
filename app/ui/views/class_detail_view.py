@@ -1,11 +1,10 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-import csv
-from datetime import date, datetime
 from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from customtkinter import CTkInputDialog
+from app.utils.import_utils import import_students_from_csv
 
 class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
@@ -444,46 +443,31 @@ class ClassDetailView(ctk.CTkFrame):
 
     def import_students(self):
         if not self.class_id:
+            messagebox.showerror("Erro", "Selecione uma turma antes de importar alunos.")
             return
 
         filepath = filedialog.askopenfilename(
-            title="Selecione um arquivo CSV",
+            title="Selecione um arquivo CSV de Alunos",
             filetypes=(("Arquivos CSV", "*.csv"), ("Todos os arquivos", "*.*"))
         )
         if not filepath:
             return
 
-        try:
-            with open(filepath, mode='r', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                for row in reader:
-                    # Assuming CSV has columns: 'call_number', 'student_name', 'status', 'birth_date'
-                    call_number = int(row['call_number'])
-                    full_name = row['student_name'].split()
-                    first_name = full_name[0]
-                    last_name = " ".join(full_name[1:])
-                    status = row['status']
-                    birth_date_str = row.get('birth_date')
+        # Delegate the core logic to the utility function
+        success_count, errors = import_students_from_csv(
+            filepath,
+            self.class_id,
+            self.main_app.data_service,
+            self.main_app.assistant_service
+        )
 
-                    birth_date = None
-                    if birth_date_str:
-                        try:
-                            birth_date = datetime.strptime(birth_date_str, "%d/%m/%Y").date()
-                        except ValueError:
-                            print(f"Formato de data de nascimento inválido para o aluno {full_name}. Use DD/MM/AAAA.")
+        self.populate_student_list()
 
-                    # Find or create student
-                    student = data_service.get_student_by_name(f"{first_name} {last_name}")
-                    if not student:
-                        student = data_service.add_student(first_name, last_name, birth_date)
-
-                    # Enroll student in the class
-                    data_service.add_student_to_class(student.id, self.class_id, call_number, status)
-
-            self.populate_student_list() # Refresh the list
-        except Exception as e:
-            # Simple error handling for now
-            print(f"Erro ao importar alunos: {e}")
+        if errors:
+            error_message = f"{success_count} alunos importados com sucesso, mas ocorreram os seguintes erros:\n\n" + "\n".join(errors)
+            messagebox.showwarning("Importação com Erros", error_message)
+        else:
+            messagebox.showinfo("Sucesso", f"{success_count} alunos importados com sucesso!")
 
 
     def populate_lesson_list(self):

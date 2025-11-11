@@ -120,6 +120,56 @@ class AssistantService:
             self.messages.append({"role": "assistant", "content": final_response.content})
         return final_response
 
+    async def split_full_name(self, full_name: str) -> tuple[str, str]:
+        """
+        Splits a full name into first and last names using an AI model.
+        Falls back to a simple split if the AI fails.
+        """
+        # Fallback function
+        def simple_split(name):
+            parts = name.split()
+            return parts[0], " ".join(parts[1:])
+
+        if not self.provider or not full_name:
+            return simple_split(full_name)
+
+        try:
+            if not self.provider:
+                # Attempt to initialize if it hasn't been already
+                self._initialize_provider()
+                if not self.provider:
+                    return simple_split(full_name)
+
+            prompt = (
+                "You are a linguistic expert specializing in Brazilian names. "
+                "Your task is to separate a full name into a first name and a last name. "
+                "The first name may be composite (e.g., 'Ana Julia', 'Maria Clara'). "
+                "Respond with only a JSON object with two keys: 'first_name' and 'last_name'.\n\n"
+                f"Full name: \"{full_name}\""
+            )
+
+            messages = [{"role": "user", "content": prompt}]
+
+            # Use a simpler, direct call that doesn't involve the main chat history
+            response = await self.provider.get_chat_response(messages)
+
+            if response.content:
+                import json
+                try:
+                    name_parts = json.loads(response.content)
+                    first_name = name_parts.get('first_name')
+                    last_name = name_parts.get('last_name')
+                    if first_name and last_name:
+                        return first_name, last_name
+                except (json.JSONDecodeError, KeyError):
+                    print(f"AI response for name splitting was not valid JSON: {response.content}")
+
+        except Exception as e:
+            print(f"An error occurred during AI name splitting: {e}")
+
+        # If anything fails, use the simple fallback
+        return simple_split(full_name)
+
     async def close(self):
         """Closes the underlying LLM provider's resources."""
         if self.provider:

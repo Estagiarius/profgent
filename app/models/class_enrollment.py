@@ -10,6 +10,7 @@ class ClassEnrollment(Base):
     student_id = Column(Integer, ForeignKey('students.id'), nullable=False)
     call_number = Column(Integer, nullable=False)
     status = Column(String, nullable=False, default='Active') # Ex: "Active", "Inactive"
+    status_detail = Column(String, nullable=True)  # Ex: "Transferido"
 
     student = relationship("Student")
     class_ = relationship("Class", back_populates="enrollments")

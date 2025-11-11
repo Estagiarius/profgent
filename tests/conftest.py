@@ -47,3 +47,22 @@ def data_service(db_session: Session, mocker: MockerFixture) -> DataService:
 
     service = DataService()
     return service
+
+@pytest.fixture(scope="function")
+def assistant_service(mocker: MockerFixture) -> "AssistantService":
+    """
+    Pytest fixture to create a new AssistantService instance for each test function,
+    with the provider initialization mocked out to prevent heavy loading.
+    """
+    # We need to import it here to avoid circular dependencies
+    from app.services.assistant_service import AssistantService
+
+    # Mock the method that initializes the (potentially heavy) LLM provider
+    mocker.patch("app.services.assistant_service.AssistantService._initialize_provider")
+
+    service = AssistantService()
+    # Since initialization is mocked, we need to manually set a mock provider
+    # for any tests that might need it.
+    service.provider = mocker.MagicMock()
+
+    return service
