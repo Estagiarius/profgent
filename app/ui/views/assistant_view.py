@@ -39,7 +39,7 @@ class AssistantView(ctk.CTkFrame):
 
         # Use the new async utility to run the task
         coro = self.assistant_service.get_response(user_text)
-        run_async_task(coro, self.main_app.async_queue, lambda result: self.main_app.after(0, self.update_ui_with_response, result))
+        run_async_task(coro, self.main_app.loop, self.main_app.async_queue, lambda result: self.main_app.after(0, self.update_ui_with_response, result))
 
     def update_ui_with_response(self, response):
         """Updates the chat history with the assistant's final response."""

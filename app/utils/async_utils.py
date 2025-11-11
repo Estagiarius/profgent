@@ -1,30 +1,32 @@
 import asyncio
-from concurrent.futures import Future
 import threading
 
-def run_async_task(coro, queue, callback):
+def run_async_task(coro, loop, queue, callback):
     """
-    Runs a coroutine in a background thread and puts the result in a queue.
-    This is for non-blocking async tasks where the UI should remain responsive.
+    Executes a coroutine in a background thread on the main application's event loop,
+    and queues a callback to be executed on the main UI thread upon completion.
+
+    This is the standard, non-blocking way to run async tasks from the UI in this application.
+
+    Args:
+        coro: The coroutine to execute.
+        loop: The main asyncio event loop of the application.
+        queue: The thread-safe queue for UI updates.
+        callback: The function to call on the main thread with the result of the coroutine.
     """
     def task_wrapper():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # This function runs in a separate thread.
+        # It submits the coroutine to the main event loop and waits for the result.
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
         try:
-            result = loop.run_until_complete(coro)
+            result = future.result()
+            # Once the result is ready, put it and the callback into the thread-safe queue.
             queue.put((callback, (result,)))
-        finally:
-            loop.close()
+        except Exception as e:
+            # If the async task raises an exception, queue it for the callback to handle.
+            queue.put((callback, (e,)))
 
+    # Start the background thread to manage the async task.
     thread = threading.Thread(target=task_wrapper)
     thread.daemon = True
     thread.start()
-
-def run_async_and_wait(coro, loop):
-    """
-    Executes a coroutine on a running asyncio event loop from a synchronous context
-    and waits for its result.
-    This is for blocking tasks where the UI should wait for the result.
-    """
-    future = asyncio.run_coroutine_threadsafe(coro, loop)
-    return future.result()
