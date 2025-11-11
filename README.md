@@ -8,12 +8,12 @@ O grande diferencial deste sistema é a integração de um **Assistente de IA**,
 
 ## Funcionalidades Principais
 
-*   **Gerenciamento Completo (CRUD):** Interface para criar, visualizar, atualizar e deletar registros de estudantes, cursos, turmas, matrículas e notas.
+*   **Gerenciamento Acadêmico Abrangente (CRUD):** Interface completa para criar, visualizar, atualizar e deletar registros de estudantes, cursos, turmas, matrículas, avaliações, notas, aulas e incidentes disciplinares.
 *   **Assistente de IA Integrado:** Utilize comandos em linguagem natural para interagir com o banco de dados, como "liste todos os alunos da turma de Cálculo" ou "adicione o curso de História". O assistente utiliza um framework de ferramentas seguro para executar operações de leitura e escrita.
 *   **Interface Gráfica Intuitiva:** Uma aplicação desktop desenvolvida com a biblioteca CustomTkinter, garantindo uma experiência de usuário moderna e agradável.
 *   **Visualização de Dados:** Geração de gráficos e visualizações para análise de dados acadêmicos, como a distribuição de notas por curso.
 *   **Importação de Dados:** Funcionalidade para importar listas de alunos para uma turma a partir de arquivos `.csv`.
-*   **Banco de Dados Persistente:** Utiliza SQLite com o ORM SQLAlchemy para um acesso seguro e eficiente aos dados, com migrações de schema gerenciadas pelo Alembic.
+*   **Banco de Dados Persistente:** Utiliza SQLite com o ORM SQLAlchemy para um acesso seguro e eficiente aos dados.
 
 ## Tecnologias Utilizadas
 
@@ -23,7 +23,6 @@ A aplicação é construída com um conjunto de tecnologias modernas e eficiente
 *   **Interface Gráfica (GUI):** CustomTkinter
 *   **Banco de Dados:** SQLite
 *   **ORM (Object-Relational Mapping):** SQLAlchemy
-*   **Migrações de Banco de Dados:** Alembic
 *   **Gerenciador de Dependências:** Poetry
 *   **Framework de Testes:** Pytest
 *   **Inteligência Artificial:** Integração com a API da OpenAI
@@ -59,7 +58,7 @@ Após a instalação das dependências, execute o comando abaixo para iniciar a 
 poetry run python main.py
 ```
 
-Ao ser iniciada, a aplicação executará automaticamente as migrações do banco de dados (Alembic) para garantir que o schema esteja atualizado.
+Ao ser iniciada, a aplicação verifica a existência do banco de dados. Se o arquivo do banco de dados não for encontrado, ele será criado automaticamente com todas as tabelas necessárias, garantindo que o sistema esteja pronto para uso.
 
 ## Como Executar os Testes
 
