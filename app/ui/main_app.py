@@ -137,7 +137,6 @@ class MainApp(ctk.CTk):
         #    Otherwise, schedule another check. This cooperative polling
         #    prevents blocking the Tkinter mainloop.
         if task.done():
-            self.loop.close()
             self.destroy()
         else:
             self.after(50, self._check_cleanup_done, task)
