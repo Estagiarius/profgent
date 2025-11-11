@@ -13,14 +13,19 @@ from app.models.incident import Incident
 
 class DataService:
     # --- Student Methods ---
-    def add_student(self, first_name: str, last_name: str) -> Student | None:
+    def add_student(self, first_name: str, last_name: str, birth_date: date | None = None) -> Student | None:
         if not first_name or not last_name: return None
         with get_db_session() as db:
             existing = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == f"{first_name} {last_name}".lower()).first()
             if existing:
                 return existing
             today = date.today().isoformat()
-            new_student = Student(first_name=first_name, last_name=last_name, enrollment_date=today)
+            new_student = Student(
+                first_name=first_name,
+                last_name=last_name,
+                enrollment_date=today,
+                birth_date=birth_date
+            )
             db.add(new_student)
             db.commit()
             db.refresh(new_student)

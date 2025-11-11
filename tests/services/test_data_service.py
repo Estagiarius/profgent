@@ -1,3 +1,4 @@
+from datetime import date
 from app.services.data_service import DataService
 
 def test_add_student(data_service: DataService):
@@ -6,6 +7,17 @@ def test_add_student(data_service: DataService):
     assert student is not None
     assert student.first_name == "John"
     assert student.last_name == "Doe"
+    assert student.birth_date is None
+    assert data_service.get_student_count() == 1
+
+def test_add_student_with_birth_date(data_service: DataService):
+    """Test adding a new student with a birth date."""
+    birth_date = date(2005, 5, 15)
+    student = data_service.add_student("Jane", "Doe", birth_date=birth_date)
+    assert student is not None
+    assert student.first_name == "Jane"
+    assert student.last_name == "Doe"
+    assert student.birth_date == birth_date
     assert data_service.get_student_count() == 1
 
 def test_add_course(data_service: DataService):
