@@ -108,11 +108,11 @@ class MainApp(ctk.CTk):
         self._poll_id = self.after(1, self.update_asyncio)
 
     def on_closing(self):
-        # 1. Stop the asyncio polling loop from rescheduling itself
-        if hasattr(self, '_poll_id'):
-            self.after_cancel(self._poll_id)
+        # The asyncio polling loop (`update_asyncio`) must continue running
+        # to allow the cleanup task to execute. We will cancel it only after
+        # the cleanup is complete.
 
-        # 2. Create and schedule the final cleanup task
+        # Create and schedule the final cleanup task
         async def cleanup():
             # Close the assistant service if it was initialized
             if self.assistant_service and self.assistant_service.provider:
@@ -129,14 +129,18 @@ class MainApp(ctk.CTk):
         # Start the cleanup in the asyncio event loop
         cleanup_task = self.loop.create_task(cleanup())
 
-        # 3. Start a non-blocking poll to check for cleanup completion
+        # Start a non-blocking poll to check for cleanup completion
         self._check_cleanup_done(cleanup_task)
 
     def _check_cleanup_done(self, task):
-        # 4. If the cleanup task is done, it's safe to destroy the window.
-        #    Otherwise, schedule another check. This cooperative polling
-        #    prevents blocking the Tkinter mainloop.
+        # If the cleanup task is done, it's safe to stop the polling and
+        # destroy the window. Otherwise, schedule another check.
         if task.done():
+            # Stop the asyncio polling loop
+            if hasattr(self, '_poll_id'):
+                self.after_cancel(self._poll_id)
+
+            # Now, safely destroy the main window
             self.destroy()
         else:
             self.after(50, self._check_cleanup_done, task)
