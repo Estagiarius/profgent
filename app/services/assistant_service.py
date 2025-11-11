@@ -12,6 +12,8 @@ from app.core.tools.tool_executor import ToolExecutor
 from app.tools.database_tools import get_student_grade, list_courses_for_student, get_class_average
 from app.tools.internet_tools import search_internet
 from app.tools.database_write_tools import add_new_student, add_new_course, add_new_grade
+from app.tools.analysis_tools import get_student_performance_summary_tool, get_students_at_risk_tool
+from app.tools.pedagogical_tools import suggest_lesson_activities_tool
 
 class AssistantService:
     def __init__(self):
@@ -29,6 +31,11 @@ class AssistantService:
         self.tool_registry.register(get_student_grade)
         self.tool_registry.register(list_courses_for_student)
         self.tool_registry.register(get_class_average)
+        # Analysis tools
+        self.tool_registry.register(get_student_performance_summary_tool)
+        self.tool_registry.register(get_students_at_risk_tool)
+        # Pedagogical tools
+        self.tool_registry.register(suggest_lesson_activities_tool)
         # Internet tools
         self.tool_registry.register(search_internet)
         # Write tools
