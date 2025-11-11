@@ -6,7 +6,7 @@ from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from customtkinter import CTkInputDialog
 from app.utils.import_utils import import_students_from_csv
-from app.utils.async_utils import run_async_from_sync
+from app.utils.async_utils import run_async_and_wait
 
 class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
@@ -467,7 +467,7 @@ class ClassDetailView(ctk.CTkFrame):
                 self.main_app.data_service,
                 self.main_app.assistant_service
             )
-            success_count, errors = run_async_from_sync(coro, self.main_app.loop)
+            success_count, errors = run_async_and_wait(coro, self.main_app.loop)
 
             self.populate_student_list()
 
