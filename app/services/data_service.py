@@ -1,5 +1,5 @@
 from datetime import date
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload, Session
 from app.data.database import get_db_session
 from app.models.student import Student
@@ -291,21 +291,24 @@ class DataService:
 
     def get_students_at_risk(self, class_id: int, grade_threshold: float = 5.0, incident_threshold: int = 2) -> list[dict]:
         with get_db_session() as db:
-            # Subquery to find student IDs with low grades in the specified class
-            low_grade_student_ids = db.query(Grade.student_id).join(Assessment).filter(
+            # Subquery to find student IDs with low grades, ensuring the column is labeled
+            low_grade_student_ids = db.query(Grade.student_id.label("student_id")).join(Assessment).filter(
                 Assessment.class_id == class_id,
                 Grade.score < grade_threshold
             ).distinct()
 
-            # Subquery to find student IDs with high incident counts in the specified class
-            high_incident_student_ids = db.query(Incident.student_id).filter(
+            # Subquery to find student IDs with high incident counts, ensuring the column is labeled
+            high_incident_student_ids = db.query(Incident.student_id.label("student_id")).filter(
                 Incident.class_id == class_id
             ).group_by(Incident.student_id).having(
                 func.count(Incident.id) >= incident_threshold
             ).distinct()
 
-            # Combine the student IDs from both queries
-            at_risk_student_ids = low_grade_student_ids.union(high_incident_student_ids).subquery()
+            # Combine the labeled subqueries
+            combined_student_ids = low_grade_student_ids.union(high_incident_student_ids).subquery()
+
+            # Create an explicit select from the combined subquery
+            at_risk_student_ids = select(combined_student_ids.c.student_id)
 
             # Fetch the student details along with their risk factors
             at_risk_students = db.query(
