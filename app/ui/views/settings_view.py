@@ -95,7 +95,7 @@ class SettingsView(ctk.CTkFrame):
         coro = self._get_models_coro(provider_name, ollama_base_url)
 
         # Use the thread-safe queue to schedule the UI update
-        run_async_task(coro, self.main_app.async_queue, self._update_models_ui)
+        run_async_task(coro, self.main_app.loop, self.main_app.async_queue, self._update_models_ui)
 
     async def _get_models_coro(self, provider_name, ollama_base_url=None):
         provider = None
