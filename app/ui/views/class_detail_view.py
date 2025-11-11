@@ -455,7 +455,7 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         # Provide user feedback that a process is running
-        self.config(cursor="watch")
+        self.configure(cursor="watch")
         self.update_idletasks()
 
         try:
@@ -477,7 +477,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         finally:
             # Always restore the cursor
-            self.config(cursor="")
+            self.configure(cursor="")
 
 
     def populate_lesson_list(self):
