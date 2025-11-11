@@ -417,7 +417,7 @@ class ClassDetailView(ctk.CTkFrame):
         if self.show_active_only_checkbox.get():
             enrollments = [e for e in enrollments if e.status == 'Active']
 
-        headers = ["Nº de Chamada", "Nome do Aluno", "Status", "Ações"]
+        headers = ["Nº de Chamada", "Nome do Aluno", "Data de Nascimento", "Status", "Ações"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.student_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -426,13 +426,16 @@ class ClassDetailView(ctk.CTkFrame):
             ctk.CTkLabel(self.student_list_frame, text=str(enrollment.call_number)).grid(row=i, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.student_list_frame, text=f"{enrollment.student.first_name} {enrollment.student.last_name}").grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
+            birth_date_str = enrollment.student.birth_date.strftime("%d/%m/%Y") if enrollment.student.birth_date else ""
+            ctk.CTkLabel(self.student_list_frame, text=birth_date_str).grid(row=i, column=2, padx=10, pady=5, sticky="w")
+
             display_status = self.status_map_rev.get(enrollment.status, enrollment.status)
-            ctk.CTkLabel(self.student_list_frame, text=display_status).grid(row=i, column=2, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.student_list_frame, text=display_status).grid(row=i, column=3, padx=10, pady=5, sticky="w")
 
             status_menu = ctk.CTkOptionMenu(self.student_list_frame, values=["Ativo", "Inativo"],
                                             command=lambda status, eid=enrollment.id: self.update_status(eid, status))
             status_menu.set(display_status)
-            status_menu.grid(row=i, column=3, padx=10, pady=5, sticky="w")
+            status_menu.grid(row=i, column=4, padx=10, pady=5, sticky="w")
 
     def update_status(self, enrollment_id, status):
         db_status = self.status_map.get(status, status)
@@ -454,17 +457,25 @@ class ClassDetailView(ctk.CTkFrame):
             with open(filepath, mode='r', encoding='utf-8') as file:
                 reader = csv.DictReader(file)
                 for row in reader:
-                    # Assuming CSV has columns: 'call_number', 'student_name', 'status'
+                    # Assuming CSV has columns: 'call_number', 'student_name', 'status', 'birth_date'
                     call_number = int(row['call_number'])
                     full_name = row['student_name'].split()
                     first_name = full_name[0]
                     last_name = " ".join(full_name[1:])
                     status = row['status']
+                    birth_date_str = row.get('birth_date')
+
+                    birth_date = None
+                    if birth_date_str:
+                        try:
+                            birth_date = datetime.strptime(birth_date_str, "%d/%m/%Y").date()
+                        except ValueError:
+                            print(f"Formato de data de nascimento inválido para o aluno {full_name}. Use DD/MM/AAAA.")
 
                     # Find or create student
                     student = data_service.get_student_by_name(f"{first_name} {last_name}")
                     if not student:
-                        student = data_service.add_student(first_name, last_name)
+                        student = data_service.add_student(first_name, last_name, birth_date)
 
                     # Enroll student in the class
                     data_service.add_student_to_class(student.id, self.class_id, call_number, status)
