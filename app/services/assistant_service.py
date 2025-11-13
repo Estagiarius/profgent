@@ -203,9 +203,22 @@ class AssistantService:
 
         try:
             response = await self.provider.get_chat_response(messages)
+
+            # --- DIAGNOSTIC LOG ---
+            print("--- Raw AI Response for CSV Parsing ---")
+            if response and response.content:
+                print(response.content)
+            else:
+                print("Response object or its content is empty.")
+            print("------------------------------------")
+
             if not response or not response.content:
                 # Handle cases where the response is empty
                 raise RuntimeError("AI provider returned an empty response.")
+
+            # Check if the response content is an error message from the provider
+            if response.content.strip().startswith("Error:"):
+                raise RuntimeError(f"The AI provider reported an error: {response.content.strip()}")
 
             import json
             # The AI might wrap the JSON in markdown, so we need to clean it
