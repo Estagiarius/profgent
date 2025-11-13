@@ -27,16 +27,18 @@ async def import_students_from_csv(filepath, class_id, data_service, assistant_s
         try:
             # Convert date string from AI to date object
             birth_date = None
-            if student_data.get('birth_date'):
+            date_str = student_data.get('birth_date')
+            if date_str:
                 try:
-                    birth_date = datetime.strptime(student_data['birth_date'], "%d/%m/%Y").date()
+                    # Strip whitespace from the date string before parsing
+                    birth_date = datetime.strptime(date_str.strip(), "%d/%m/%Y").date()
                 except (ValueError, TypeError):
-                    errors.append(f"Aluno '{student_data.get('full_name', 'N/A')}': Formato de data inválido. Data não será salva.")
+                    errors.append(f"Aluno '{student_data.get('full_name', 'N/A')}': Formato de data inválido ('{date_str}'). Data não será salva.")
 
-            # Map status from AI to system status
-            status_str = student_data.get('status', '')
-            status = "Active" if status_str == 'Ativo' else "Inactive"
-            status_detail = None if status == "Active" else status_str
+            # Map status from AI to system status, ignoring case and whitespace
+            status_str = student_data.get('status', '').strip().lower()
+            status = "Active" if status_str == 'ativo' else "Inactive"
+            status_detail = None if status == "Active" else student_data.get('status', '').strip()
 
             student_data_for_batch.append({
                 'full_name': student_data.get('full_name'),
