@@ -174,3 +174,41 @@ class AssistantService:
         """Closes the underlying LLM provider's resources."""
         if self.provider:
             await self.provider.close()
+
+    async def parse_student_csv_with_ai(self, csv_content: str) -> list[dict]:
+        """
+        Uses a single AI call to parse the entire content of a student CSV.
+        """
+        if not self.provider:
+            self._initialize_provider()
+            if not self.provider:
+                raise RuntimeError("AI provider is not configured.")
+
+        prompt = (
+            "You are an expert data extraction assistant. Analyze the following text, which is the content of a student CSV file. "
+            "The file may contain header lines that should be ignored. The actual data columns are delimited by semicolons. "
+            "For each valid student row, extract the following information:\n"
+            "1.  The full name ('Nome do Aluno').\n"
+            "2.  The birth date ('Data de Nascimento') in 'DD/MM/AAAA' format.\n"
+            "3.  The student's status ('Situação do Aluno').\n\n"
+            "From the full name, intelligently separate the first name (which can be composite, like 'Ana Julia') from the last name.\n\n"
+            "Return ONLY a single JSON object. This object must be a list of dictionaries. Each dictionary must contain the following keys: "
+            "'full_name', 'first_name', 'last_name', 'birth_date', 'status'. "
+            "If a birth date is missing or malformed, the 'birth_date' value in the JSON should be null.\n\n"
+            "Here is the CSV content:\n\n"
+            f'"""{csv_content}"""'
+        )
+
+        messages = [{"role": "user", "content": prompt}]
+
+        try:
+            response = await self.provider.get_chat_response(messages)
+            if response.content:
+                import json
+                # The AI might wrap the JSON in markdown, so we need to clean it
+                cleaned_json_str = response.content.strip().replace("```json", "").replace("```", "").strip()
+                return json.loads(cleaned_json_str)
+            return []
+        except Exception as e:
+            # Propagate the error to be handled by the caller
+            raise RuntimeError(f"Failed to parse CSV with AI: {e}") from e

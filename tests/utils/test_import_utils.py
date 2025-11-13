@@ -1,78 +1,93 @@
 import pytest
-import asyncio
 from datetime import date
+from unittest.mock import MagicMock, call, AsyncMock
 from app.utils.import_utils import import_students_from_csv
 from app.services.data_service import DataService
 
 @pytest.fixture
-def test_csv_file(tmp_path):
-    """Creates a temporary CSV file for testing."""
-    filepath = tmp_path / "students.csv"
+def test_csv_content():
+    """Provides a string content of a CSV file for testing."""
     content = [
         "Relatório de Alunos",
         "Nome do Aluno;Data de Nascimento;Situação do Aluno",
         "ANA JULIA GONÇALVES;09/06/2008;Transferido",
         "ANDRÉ HENRIQUE COSTA E SILVA;01/10/2009;Ativo",
-        "NEW STUDENT TO BE CREATED;01/01/2010;Ativo",
-        "ANA JULIA GONÇALVES;09/06/2008;Transferido", # Duplicate name in CSV
     ]
-    with open(filepath, "w", newline="", encoding="utf-8") as f:
-        f.write("\n".join(content))
-    return str(filepath)
+    return "\n".join(content)
+
+@pytest.fixture
+def mock_ai_response():
+    """Provides a mock JSON response from the AI parser."""
+    return [
+        {
+            "full_name": "ANA JULIA GONÇALVES",
+            "first_name": "Ana Julia",
+            "last_name": "Gonçalves",
+            "birth_date": "09/06/2008",
+            "status": "Transferido"
+        },
+        {
+            "full_name": "ANDRÉ HENRIQUE COSTA E SILVA",
+            "first_name": "André Henrique",
+            "last_name": "Costa e Silva",
+            "birth_date": "01/10/2009",
+            "status": "Ativo"
+        },
+        {
+            "full_name": "STUDENT WITHOUT DATE",
+            "first_name": "Student",
+            "last_name": "Without Date",
+            "birth_date": None,
+            "status": "Ativo"
+        }
+    ]
 
 @pytest.mark.anyio
-async def test_import_hybrid_batch_logic(test_csv_file, data_service: DataService, assistant_service, mocker):
+async def test_import_with_ai_parser(test_csv_content, mock_ai_response, data_service: DataService, assistant_service, mocker, tmp_path):
     """
-    Tests the full import pipeline with the hybrid batching logic,
-    ensuring the final database state is correct.
+    Tests the import utility with the new AI parser flow.
     """
     # Arrange
-    # Pre-seed the database with one existing student
-    existing_student = data_service.add_student("Ana Julia", "Gonçalves")
+    # Create a temporary file with the content
+    filepath = tmp_path / "students.csv"
+    filepath.write_text(test_csv_content, encoding="utf-8")
 
-    course = data_service.add_course("Science", "SCI101")
-    class_to_import = data_service.create_class("Grade 5 Science", course.id)
+    class_id_to_import = 1
 
-    # Mock the assistant service to return predictable names
-    async def mock_split_name(full_name):
-        await asyncio.sleep(0.01)
-        if "ANA JULIA" in full_name:
-            return "Ana Julia", "Gonçalves"
-        if "NEW STUDENT" in full_name:
-            return "New Student", "To Be Created"
-        parts = full_name.split()
-        return parts[0], " ".join(parts[1:])
-    mocker.patch.object(assistant_service, 'split_full_name', new=mock_split_name)
+    # Mock the AI parser to return a predictable JSON structure
+    mocker.patch.object(assistant_service, 'parse_student_csv_with_ai', new=AsyncMock(return_value=mock_ai_response))
+
+    # Spy on the final batch database call
+    batch_spy = mocker.spy(data_service, "batch_upsert_students_and_enroll")
 
     # Act
     success_count, errors = await import_students_from_csv(
-        test_csv_file, class_to_import.id, data_service, assistant_service
+        str(filepath), class_id_to_import, data_service, assistant_service
     )
 
     # Assert
     assert success_count == 3
     assert len(errors) == 0
 
-    # Verify the database state
-    all_students = data_service.get_all_students()
-    enrollments = data_service.get_enrollments_for_class(class_to_import.id)
+    # Verify the AI parser was called once with the file content
+    assistant_service.parse_student_csv_with_ai.assert_called_once_with(test_csv_content)
 
-    # Should be 3 students total: 1 pre-existing, 1 from CSV that matched, 1 new from CSV
-    # Wait, the logic is based on full name matching. Let's adjust.
-    # The pre-existing student's name is "Ana Julia Gonçalves"
-    # The CSV has "ANA JULIA GONÇALVES" which should match.
-    # Then it has "ANDRÉ HENRIQUE COSTA E SILVA" (new) and "NEW STUDENT..." (new).
-    # Total students in DB should be 1 (pre-existing) + 2 (new) = 3
-    assert len(all_students) == 3
+    # Verify that the batch method was called once
+    batch_spy.assert_called_once()
 
-    # All 3 unique students from the CSV should be enrolled.
-    assert len(enrollments) == 3
+    # Inspect the data passed to the batch method
+    _, called_student_data = batch_spy.call_args.args
 
-    # Check enrollment details
-    ana_enrollment = next(e for e in enrollments if e.student.first_name == "Ana Julia")
-    assert ana_enrollment.status == "Inactive"
-    assert ana_enrollment.status_detail == "Transferido"
-    assert ana_enrollment.student_id == existing_student.id # Ensure it matched the existing one
+    assert len(called_student_data) == 3
 
-    new_student_enrollment = next(e for e in enrollments if e.student.first_name == "New Student")
-    assert new_student_enrollment.status == "Active"
+    # Check the processed data for a specific student
+    ana_data = next(d for d in called_student_data if d['full_name'] == "ANA JULIA GONÇALVES")
+    assert ana_data['first_name'] == "Ana Julia"
+    assert ana_data['birth_date'] == date(2008, 6, 9)
+    assert ana_data['status'] == "Inactive"
+    assert ana_data['status_detail'] == "Transferido"
+
+    # Check the student with no date
+    no_date_student = next(d for d in called_student_data if d['full_name'] == "STUDENT WITHOUT DATE")
+    assert no_date_student['birth_date'] is None
+    assert no_date_student['status'] == "Active"
