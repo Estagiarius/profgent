@@ -203,12 +203,22 @@ class AssistantService:
 
         try:
             response = await self.provider.get_chat_response(messages)
-            if response.content:
-                import json
-                # The AI might wrap the JSON in markdown, so we need to clean it
-                cleaned_json_str = response.content.strip().replace("```json", "").replace("```", "").strip()
-                return json.loads(cleaned_json_str)
-            return []
+            if not response or not response.content:
+                # Handle cases where the response is empty
+                raise RuntimeError("AI provider returned an empty response.")
+
+            import json
+            # The AI might wrap the JSON in markdown, so we need to clean it
+            cleaned_json_str = response.content.strip().replace("```json", "").replace("```", "").strip()
+
+            if not cleaned_json_str:
+                # Handle cases where the cleaned response is empty
+                raise RuntimeError("AI provider returned an empty JSON string.")
+
+            return json.loads(cleaned_json_str)
+        except json.JSONDecodeError as e:
+            # Specifically catch JSON parsing errors
+            raise RuntimeError(f"Failed to parse CSV with AI: Invalid JSON format. Error: {e}") from e
         except Exception as e:
-            # Propagate the error to be handled by the caller
-            raise RuntimeError(f"Failed to parse CSV with AI: {e}") from e
+            # Propagate other errors to be handled by the caller
+            raise RuntimeError(f"An unexpected error occurred while parsing CSV with AI: {e}") from e
