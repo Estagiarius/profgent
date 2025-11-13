@@ -164,17 +164,16 @@ class DataService:
                 db.delete(class_)
                 db.commit()
 
-    def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active", status_detail: str | None = None) -> ClassEnrollment | None:
+    def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active") -> ClassEnrollment | None:
         if not all([student_id, class_id, call_number is not None]): return None
         with get_db_session() as db:
             existing = db.query(ClassEnrollment).filter_by(student_id=student_id, class_id=class_id).first()
             if existing:
                 existing.call_number = call_number
                 existing.status = status
-                existing.status_detail = status_detail
                 db.commit()
                 return existing
-            enrollment = ClassEnrollment(student_id=student_id, class_id=class_id, call_number=call_number, status=status, status_detail=status_detail)
+            enrollment = ClassEnrollment(student_id=student_id, class_id=class_id, call_number=call_number, status=status)
             db.add(enrollment)
             db.commit()
             db.refresh(enrollment)
@@ -481,40 +480,48 @@ class DataService:
 
     def batch_upsert_students_and_enroll(self, class_id: int, student_data_list: list[dict]):
         with get_db_session() as db:
-            # Step 1: Extract full names and create a map for easy lookup
-            full_names = [data['full_name'] for data in student_data_list]
-
-            # Step 2: Find all existing students in a single query
-            existing_students_query = db.query(Student).filter(
-                func.lower(Student.first_name + " " + Student.last_name).in_([name.lower() for name in full_names])
-            )
-            existing_students_map = {f"{s.first_name} {s.last_name}".lower(): s for s in existing_students_query}
-
-            # Step 3: Identify new students and prepare them for bulk insertion
+            # Step 1: Initialize lists and get the starting call number
             new_students_to_create = []
+            all_students_for_enrollment = []
+            processed_full_names = set()
+
+            # Step 2: Iterate and query for students individually
             for data in student_data_list:
-                if data['full_name'].lower() not in existing_students_map:
-                    new_students_to_create.append(
-                        Student(
-                            first_name=data['first_name'],
-                            last_name=data['last_name'],
-                            birth_date=data['birth_date'],
-                            enrollment_date=date.today().isoformat()
-                        )
+                full_name_lower = data['full_name'].lower()
+                if full_name_lower in processed_full_names:
+                    continue # Avoid processing duplicate names from the CSV
+
+                # Query for each student individually - this is fast
+                student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == full_name_lower).first()
+
+                if student:
+                    all_students_for_enrollment.append(student)
+                else:
+                    new_student = Student(
+                        first_name=data['first_name'],
+                        last_name=data['last_name'],
+                        birth_date=data['birth_date'],
+                        enrollment_date=date.today().isoformat()
                     )
+                    new_students_to_create.append(new_student)
 
-            # Step 4: Bulk insert new students, if any
+                processed_full_names.add(full_name_lower)
+
+            # Step 3: Bulk insert new students, if any
             if new_students_to_create:
-                db.bulk_save_objects(new_students_to_create, return_defaults=True)
-                # After insertion, add the newly created students to our map
-                for student in new_students_to_create:
-                    existing_students_map[f"{student.first_name} {student.last_name}".lower()] = student
+                db.add_all(new_students_to_create)
+                db.flush() # Use flush to get IDs for the new students
+                all_students_for_enrollment.extend(new_students_to_create)
 
-            # Step 5: Prepare all enrollments for bulk insertion
+            # Step 4: Prepare all enrollments for bulk insertion
             next_call_number = self.get_next_call_number(class_id)
             enrollments_to_create = []
+
+            # Create a map of student full name to student object for easy lookup
+            student_map = {f"{s.first_name} {s.last_name}".lower(): s for s in all_students_for_enrollment}
+
             for i, data in enumerate(student_data_list):
-                student = existing_students_map.get(data['full_name'].lower())
+                student = student_map.get(data['full_name'].lower())
                 if student:
                     enrollments_to_create.append(
                         ClassEnrollment(
@@ -526,7 +533,7 @@ class DataService:
                         )
                     )
 
-            # Step 6: Bulk insert new enrollments
+            # Step 5: Bulk insert new enrollments
             if enrollments_to_create:
                 db.bulk_save_objects(enrollments_to_create)
 

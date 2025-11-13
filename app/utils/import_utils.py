@@ -9,6 +9,7 @@ async def import_students_from_csv(filepath, class_id, data_service, assistant_s
     """
     errors = []
     students_to_process = []
+    processed_full_names = set() # Set to track unique names
 
     # --- Step 1: Read and parse the CSV file ---
     try:
@@ -41,9 +42,10 @@ async def import_students_from_csv(filepath, class_id, data_service, assistant_s
                     continue
 
                 full_name = row[name_idx].strip()
-                if not full_name:
-                    continue
+                if not full_name or full_name.lower() in processed_full_names:
+                    continue # Skip empty or duplicate names
 
+                processed_full_names.add(full_name.lower())
                 students_to_process.append({
                     'full_name': full_name,
                     'status_str': row[status_idx].strip(),
@@ -97,6 +99,8 @@ async def import_students_from_csv(filepath, class_id, data_service, assistant_s
             data_service.batch_upsert_students_and_enroll(class_id, student_data_for_batch)
         except Exception as e:
             errors.append(f"Erro crítico ao salvar os dados no banco de dados: {e}")
-            return 0, errors
+            # Do not return 0 here, as some students might have been processed before the error
+            # The number of successfully processed students is the primary return value.
+            return len(student_data_for_batch) - 1 if len(student_data_for_batch) > 0 else 0, errors
 
     return len(student_data_for_batch), errors
