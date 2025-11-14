@@ -8,6 +8,8 @@ from app.ui.views.edit_dialog import EditDialog
 from customtkinter import CTkInputDialog
 from app.utils.async_utils import run_async_task
 from app.utils.import_utils import async_import_students
+
+class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app

@@ -33,7 +33,7 @@ def data_service(db_session):
     """
     return DataService(db_session=db_session)
 
-def test_import_students_from_csv_success(data_service, db_session):
+def test_import_students_from_csv_success(data_service: DataService, db_session):
     """
     Testa o fluxo completo de importação de CSV, verificando se os alunos
     são criados e matriculados corretamente.
@@ -45,6 +45,7 @@ def test_import_students_from_csv_success(data_service, db_session):
 
     # Executa a função de importação
     result = data_service.import_students_from_csv(class_.id, MOCK_CSV_CONTENT)
+    db_session.commit() # Commit para garantir que a transação seja salva
 
     # Verifica o resultado da importação
     assert result["imported_count"] == 5
@@ -85,7 +86,7 @@ def test_import_students_from_csv_success(data_service, db_session):
     call_numbers = sorted([e.call_number for e in enrollments])
     assert call_numbers == [1, 2, 3, 4, 5]
 
-def test_import_students_from_csv_invalid_header(data_service):
+def test_import_students_from_csv_invalid_header(data_service: DataService):
     """
     Testa se a importação falha corretamente quando o cabeçalho do CSV é inválido.
     """
@@ -96,7 +97,7 @@ def test_import_students_from_csv_invalid_header(data_service):
     assert len(result["errors"]) == 1
     assert "Cabeçalho do CSV não encontrado" in result["errors"][0]
 
-def test_import_handles_duplicate_students(data_service, db_session):
+def test_import_handles_duplicate_students(data_service: DataService, db_session):
     """
     Testa se o parser lida com alunos duplicados, importando apenas a última
     ocorrência com o status mais recente.
@@ -112,6 +113,7 @@ Nº de chamada;Nome do Aluno;Data de Nascimento;Situação do Aluno
     db_session.flush()
 
     result = data_service.import_students_from_csv(class_.id, duplicate_csv)
+    db_session.commit() # Commit para garantir que a transação seja salva
 
     assert result["imported_count"] == 2
     assert not result["errors"]
