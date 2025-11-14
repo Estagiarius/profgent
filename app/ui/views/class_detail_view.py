@@ -7,8 +7,7 @@ from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from customtkinter import CTkInputDialog
 from app.utils.async_utils import run_async_task
-
-class ClassDetailView(ctk.CTkFrame):
+from app.utils.import_utils import async_import_students
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
@@ -458,16 +457,13 @@ class ClassDetailView(ctk.CTkFrame):
         self.import_button.configure(state="disabled", text="Importando...")
         self.enroll_student_button.configure(state="disabled")
 
-        # The DataService method is synchronous and handles the entire transaction.
-        # We run it in a thread executor to avoid blocking the UI.
-        run_async_task(
-            self.main_app.data_service.import_students_from_csv,
-            self.main_app.loop,
-            self.main_app.async_queue,
-            self._on_import_complete,
+        coro = async_import_students(
+            filepath,
             self.class_id,
-            filepath
+            self.main_app.data_service
         )
+
+        run_async_task(coro, self.main_app.loop, self.main_app.async_queue, self._on_import_complete)
 
     def _on_import_complete(self, result):
         """

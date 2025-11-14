@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session
 
 def test_import_bug_with_user_csv(data_service: DataService, db_session: Session):
     """
-    Test case that uses the user's provided CSV to confirm the fix.
-    It writes the content to a temporary file to simulate the real workflow.
+    Test case that uses the user's provided CSV to confirm the final fix.
+    It simulates the orchestrator's workflow by reading the file content
+    and then passing it to the DataService.
     """
     course = data_service.add_course("Bug Repro Course", "BRC101")
     class_ = data_service.create_class("Bug Repro Class", course.id)
@@ -87,26 +88,16 @@ Nº de chamada;Nome do Aluno;Data de Nascimento;Situação do Aluno
 66;LUCAS SANTOS BATISTA;02/04/2010;Transferido
 67;ISABELLA DE OLIVEIRA SANTOS SILVA;15/11/2009;Ativo
 """
-    # Use a temporary file to more closely mimic the user's workflow
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8', suffix=".csv") as tmp:
-        tmp.write(csv_content)
-        filepath = tmp.name
 
-    try:
-        result = data_service.import_students_from_csv(class_.id, filepath)
-        db_session.commit() # Use commit to ensure data is persisted for subsequent queries
+    result = data_service.import_students_from_csv(class_.id, csv_content)
+    db_session.commit()
 
-        assert not result["errors"], f"Import failed with errors: {result['errors']}"
+    assert not result["errors"], f"Import failed with errors: {result['errors']}"
 
-        # The parser identifies 65 unique students from the 67 rows
-        expected_unique_students = 65
+    expected_unique_students = 65
 
-        enrollments = data_service.get_enrollments_for_class(class_.id)
-        assert len(enrollments) == expected_unique_students, f"Expected {expected_unique_students} enrollments, but found {len(enrollments)}"
+    enrollments = data_service.get_enrollments_for_class(class_.id)
+    assert len(enrollments) == expected_unique_students, f"Expected {expected_unique_students} enrollments, but found {len(enrollments)}"
 
-        student_count = data_service.get_student_count()
-        assert student_count == expected_unique_students, f"Expected {expected_unique_students} students in the DB, but found {student_count}"
-
-    finally:
-        # Clean up the temporary file
-        os.unlink(filepath)
+    student_count = data_service.get_student_count()
+    assert student_count == expected_unique_students, f"Expected {expected_unique_students} students in the DB, but found {student_count}"
