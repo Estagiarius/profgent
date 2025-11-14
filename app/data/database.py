@@ -5,6 +5,9 @@ from app.models.base import Base
 from app.models.student import Student
 from app.models.course import Course
 from app.models.grade import Grade
+import logging
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 DATABASE_URL = "sqlite:///academic_management.db"
 
@@ -19,7 +22,15 @@ def init_db():
 def get_db_session():
     """Provide a transactional scope around a series of operations."""
     db = SessionLocal()
+    logging.info("Sessão do banco de dados aberta.")
     try:
         yield db
+        db.commit()
+        logging.info("Transação commitada com sucesso.")
+    except Exception as e:
+        logging.error(f"Erro na transação. Realizando rollback. Erro: {e}", exc_info=True)
+        db.rollback()
+        raise
     finally:
+        logging.info("Sessão do banco de dados fechada.")
         db.close()

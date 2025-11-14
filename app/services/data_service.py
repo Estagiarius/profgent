@@ -10,9 +10,12 @@ from app.models.class_enrollment import ClassEnrollment
 from app.models.assessment import Assessment
 from app.models.lesson import Lesson
 from app.models.incident import Incident
+import logging
 from app.utils.student_csv_parser import parse_student_csv
 from datetime import datetime
 from contextlib import contextmanager
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class DataService:
     def __init__(self, db_session: Session = None):
@@ -27,11 +30,13 @@ class DataService:
                 yield db
 
     def import_students_from_csv(self, class_id: int, file_content: str) -> dict:
+        logging.info("Iniciando a importação de alunos a partir do conteúdo CSV.")
         errors = []
         imported_count = 0
 
         try:
             parsed_data = parse_student_csv(file_content)
+            logging.info(f"CSV parseado. {len(parsed_data)} registros de alunos encontrados.")
 
             if not parsed_data:
                 errors.append("O arquivo CSV não contém dados de alunos válidos.")
@@ -370,21 +375,21 @@ class DataService:
         return weighted_sum / total_weight
 
     def batch_upsert_students_and_enroll(self, class_id: int, student_data_list: list[dict]):
+        logging.info(f"Iniciando batch upsert para {len(student_data_list)} registros na turma ID: {class_id}.")
         with self._get_db() as db:
             # Step 1: Upsert Students
             # First, ensure all students exist in the Student table, creating them if they don't.
             all_students_in_db = []
             new_students_to_create = []
-            processed_full_names = set()
 
-            # Deduplicate incoming student data, keeping the last entry
             unique_student_data = {data['full_name'].lower(): data for data in student_data_list}
+            logging.info(f"{len(unique_student_data)} alunos únicos para processar.")
 
             for full_name_lower, data in unique_student_data.items():
                 student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == full_name_lower).first()
                 if student:
-                    # Update student info if necessary (e.g., birth_date)
                     if data['birth_date'] and student.birth_date != data['birth_date']:
+                        logging.info(f"Atualizando data de nascimento para o aluno: {student.first_name} {student.last_name}.")
                         student.birth_date = data['birth_date']
                     all_students_in_db.append(student)
                 else:
@@ -397,9 +402,12 @@ class DataService:
                     new_students_to_create.append(new_student)
 
             if new_students_to_create:
+                logging.info(f"Criando {len(new_students_to_create)} novos alunos.")
                 db.add_all(new_students_to_create)
-                db.flush() # Flush to get IDs for new students
+                db.flush()
                 all_students_in_db.extend(new_students_to_create)
+
+            logging.info("Upsert de alunos concluído. Iniciando upsert de matrículas.")
 
             # Step 2: Upsert Enrollments
             # Now, handle the enrollments for this specific class.
@@ -411,25 +419,32 @@ class DataService:
 
             next_call_number = self.get_next_call_number(class_id)
 
+            enrollments_to_create = []
+            enrollments_to_update = 0
             for data in unique_student_data.values():
                 student = student_map.get(data['full_name'].lower())
                 if not student:
-                    continue # Should not happen, but as a safeguard
+                    logging.warning(f"Aluno '{data['full_name']}' não encontrado no mapa de alunos após o upsert. Pulando matrícula.")
+                    continue
 
                 existing_enrollment = existing_enrollment_map.get(student.id)
 
                 if existing_enrollment:
-                    # Update existing enrollment
-                    existing_enrollment.status = data['status']
-                    # Optionally, update call number if your logic requires it.
-                    # For now, we leave it as is to maintain stability.
+                    if existing_enrollment.status != data['status']:
+                        logging.info(f"Atualizando status da matrícula para o aluno ID: {student.id} de '{existing_enrollment.status}' para '{data['status']}'.")
+                        existing_enrollment.status = data['status']
+                        enrollments_to_update += 1
                 else:
-                    # Create new enrollment
-                    new_enrollment = ClassEnrollment(
+                    enrollments_to_create.append(ClassEnrollment(
                         class_id=class_id,
                         student_id=student.id,
                         call_number=next_call_number,
                         status=data['status']
-                    )
-                    db.add(new_enrollment)
+                    ))
                     next_call_number += 1
+
+            if enrollments_to_create:
+                logging.info(f"Criando {len(enrollments_to_create)} novas matrículas.")
+                db.add_all(enrollments_to_create)
+
+            logging.info(f"Upsert de matrículas concluído. {len(enrollments_to_create)} matrículas criadas, {enrollments_to_update} atualizadas.")
