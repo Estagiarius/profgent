@@ -6,7 +6,6 @@ from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from customtkinter import CTkInputDialog
-from app.utils.import_utils import import_students_from_csv
 from app.utils.async_utils import run_async_task
 
 class ClassDetailView(ctk.CTkFrame):
@@ -456,19 +455,19 @@ class ClassDetailView(ctk.CTkFrame):
         if not filepath:
             return
 
-        # Disable UI elements and show a temporary status message
         self.import_button.configure(state="disabled", text="Importando...")
         self.enroll_student_button.configure(state="disabled")
 
-        # Create the coroutine for the import task
-        coro = import_students_from_csv(
-            filepath,
+        # The DataService method is synchronous and handles the entire transaction.
+        # We run it in a thread executor to avoid blocking the UI.
+        run_async_task(
+            self.main_app.data_service.import_students_from_csv,
+            self.main_app.loop,
+            self.main_app.async_queue,
+            self._on_import_complete,
             self.class_id,
-            self.main_app.data_service
+            filepath
         )
-
-        # Run the task in the background using the standard non-blocking utility
-        run_async_task(coro, self.main_app.loop, self.main_app.async_queue, self._on_import_complete)
 
     def _on_import_complete(self, result):
         """

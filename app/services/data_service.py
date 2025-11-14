@@ -26,7 +26,28 @@ class DataService:
             with get_db_session() as db:
                 yield db
 
-    def import_students_from_csv(self, class_id: int, file_content: str) -> dict:
+    def import_students_from_csv(self, class_id: int, filepath: str) -> dict:
+        """
+        Orchestrates the student import process from a CSV file.
+
+        This method reads the file and then calls the internal processing
+        method within a single, managed database session to ensure atomicity.
+        """
+        try:
+            with open(filepath, mode='r', encoding='utf-8', errors='ignore') as file:
+                file_content = file.read()
+        except Exception as e:
+            return {"imported_count": 0, "errors": [f"Erro fatal ao ler o arquivo CSV: {e}"]}
+
+        # The entire operation runs within a single transaction provided by _get_db()
+        with self._get_db():
+             return self._import_students_from_content(class_id, file_content)
+
+    def _import_students_from_content(self, class_id: int, file_content: str) -> dict:
+        """
+        Processes the content of a student CSV file and upserts the data.
+        This is the core, non-I/O part of the import logic.
+        """
         errors = []
         imported_count = 0
 
@@ -56,7 +77,7 @@ class DataService:
                 })
 
             self.batch_upsert_students_and_enroll(class_id, student_data_for_db)
-            imported_count = len(student_data_for_db)
+            imported_count = len({d['full_name'].lower() for d in student_data_for_db})
 
         except ValueError as ve:
             errors.append(str(ve))
