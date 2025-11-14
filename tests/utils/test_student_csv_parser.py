@@ -95,3 +95,38 @@ def test_import_students_from_csv_invalid_header(data_service):
     assert result["imported_count"] == 0
     assert len(result["errors"]) == 1
     assert "Cabeçalho do CSV não encontrado" in result["errors"][0]
+
+def test_import_handles_duplicate_students(data_service, db_session):
+    """
+    Testa se o parser lida com alunos duplicados, importando apenas a última
+    ocorrência com o status mais recente.
+    """
+    duplicate_csv = """
+Nº de chamada;Nome do Aluno;Data de Nascimento;Situação do Aluno
+18;JÚLIA NOGUEIRA RAMOS;28/09/2009;Transferido
+19;KAIQUE ALMEIDA CLEMENTE;29/01/2010;Ativo
+63;JÚLIA NOGUEIRA RAMOS;28/09/2009;Ativo
+"""
+    course = data_service.add_course("Português", "PT101")
+    class_ = data_service.create_class("Turma Duplicatas", course.id)
+    db_session.flush()
+
+    result = data_service.import_students_from_csv(class_.id, duplicate_csv)
+
+    assert result["imported_count"] == 2
+    assert not result["errors"]
+
+    # Deve haver apenas 2 alunos e 2 matrículas no total
+    students = db_session.query(Student).all()
+    enrollments = db_session.query(ClassEnrollment).all()
+    assert len(students) == 2
+    assert len(enrollments) == 2
+
+    # A aluna duplicada 'JÚLIA NOGUEIRA RAMOS' deve ter sido importada com o
+    # status da sua ÚLTIMA aparição ('Ativo')
+    julia_enrollment = db_session.query(ClassEnrollment).join(Student).filter(
+        Student.first_name == "JÚLIA"
+    ).first()
+
+    assert julia_enrollment is not None
+    assert julia_enrollment.status == "Active"
