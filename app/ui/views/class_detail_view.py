@@ -464,8 +464,7 @@ class ClassDetailView(ctk.CTkFrame):
         coro = import_students_from_csv(
             filepath,
             self.class_id,
-            self.main_app.data_service,
-            self.main_app.assistant_service
+            self.main_app.data_service
         )
 
         # Run the task in the background using the standard non-blocking utility
