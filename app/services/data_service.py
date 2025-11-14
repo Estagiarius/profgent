@@ -80,7 +80,7 @@ class DataService:
             today = date.today().isoformat()
             new_student = Student(first_name=first_name, last_name=last_name, enrollment_date=today, birth_date=birth_date)
             db.add(new_student)
-            db.flush()
+            db.commit()
             db.refresh(new_student)
             return new_student
 
@@ -98,6 +98,7 @@ class DataService:
             if student:
                 student.first_name = first_name
                 student.last_name = last_name
+                db.commit()
 
     def delete_student(self, student_id: int):
         with self._get_db() as db:
@@ -106,6 +107,7 @@ class DataService:
             student = db.query(Student).filter(Student.id == student_id).first()
             if student:
                 db.delete(student)
+                db.commit()
 
     def get_student_count(self) -> int:
         with self._get_db() as db:
@@ -126,7 +128,7 @@ class DataService:
         new_course = Course(course_name=course_name, course_code=course_code)
         with self._get_db() as db:
             db.add(new_course)
-            db.flush()
+            db.commit()
             db.refresh(new_course)
             return new_course
 
@@ -156,12 +158,14 @@ class DataService:
             if course:
                 course.course_name = course_name
                 course.course_code = course_code
+                db.commit()
 
     def delete_course(self, course_id: int):
         with self._get_db() as db:
             course = db.query(Course).filter(Course.id == course_id).first()
             if course and not course.classes:
                 db.delete(course)
+                db.commit()
 
     def get_course_count(self) -> int:
         with self._get_db() as db:
@@ -173,7 +177,7 @@ class DataService:
         new_class = Class(name=name, course_id=course_id, calculation_method=calculation_method)
         with self._get_db() as db:
             db.add(new_class)
-            db.flush()
+            db.commit()
             db.refresh(new_class)
             return new_class
 
@@ -190,6 +194,7 @@ class DataService:
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 class_.name = name
+                db.commit()
 
     def delete_class(self, class_id: int):
         with self._get_db() as db:
@@ -197,6 +202,7 @@ class DataService:
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 db.delete(class_)
+                db.commit()
 
     def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active") -> ClassEnrollment | None:
         if not all([student_id, class_id, call_number is not None]): return None
@@ -205,10 +211,11 @@ class DataService:
             if existing:
                 existing.call_number = call_number
                 existing.status = status
+                db.commit()
                 return existing
             enrollment = ClassEnrollment(student_id=student_id, class_id=class_id, call_number=call_number, status=status)
             db.add(enrollment)
-            db.flush()
+            db.commit()
             db.refresh(enrollment)
             return enrollment
 
@@ -221,6 +228,7 @@ class DataService:
             enrollment = db.query(ClassEnrollment).filter(ClassEnrollment.id == enrollment_id).first()
             if enrollment:
                 enrollment.status = status
+                db.commit()
 
     def get_next_call_number(self, class_id: int) -> int:
         with self._get_db() as db:
@@ -233,7 +241,7 @@ class DataService:
         assessment = Assessment(class_id=class_id, name=name, weight=weight)
         with self._get_db() as db:
             db.add(assessment)
-            db.flush()
+            db.commit()
             db.refresh(assessment)
             return assessment
 
@@ -243,6 +251,7 @@ class DataService:
             if assessment:
                 assessment.name = name
                 assessment.weight = weight
+                db.commit()
 
     def delete_assessment(self, assessment_id: int):
         with self._get_db() as db:
@@ -250,6 +259,7 @@ class DataService:
             assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
             if assessment:
                 db.delete(assessment)
+                db.commit()
 
     # --- Analysis Methods ---
     def get_student_performance_summary(self, student_id: int, class_id: int) -> dict | None:
@@ -294,7 +304,7 @@ class DataService:
         new_lesson = Lesson(class_id=class_id, title=title, content=content, date=lesson_date)
         with self._get_db() as db:
             db.add(new_lesson)
-            db.flush()
+            db.commit()
             db.refresh(new_lesson)
             return new_lesson
 
@@ -305,12 +315,14 @@ class DataService:
                 lesson.title = title
                 lesson.content = content
                 lesson.date = lesson_date
+                db.commit()
 
     def delete_lesson(self, lesson_id: int):
         with self._get_db() as db:
             lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
             if lesson:
                 db.delete(lesson)
+                db.commit()
 
     def get_incidents_for_class(self, class_id: int) -> list[Incident]:
         with self._get_db() as db:
@@ -321,7 +333,7 @@ class DataService:
         new_incident = Incident(class_id=class_id, student_id=student_id, description=description, date=incident_date)
         with self._get_db() as db:
             db.add(new_incident)
-            db.flush()
+            db.commit()
             db.refresh(new_incident)
             return new_incident
 
@@ -331,7 +343,7 @@ class DataService:
         new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today)
         with self._get_db() as db:
             db.add(new_grade)
-            db.flush()
+            db.commit()
             db.refresh(new_grade)
             return new_grade
 
@@ -352,6 +364,7 @@ class DataService:
             grade = db.query(Grade).filter(Grade.id == grade_id).first()
             if grade:
                 db.delete(grade)
+                db.commit()
 
     def upsert_grades_for_class(self, class_id: int, grades_data: list[dict]):
         with self._get_db() as db:
@@ -366,6 +379,7 @@ class DataService:
                 else:
                     new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today().isoformat())
                     db.add(new_grade)
+            db.commit()
 
     def calculate_weighted_average(self, student_id: int, grades: list[Grade], assessments: list[Assessment]) -> float:
         total_weight = sum(a.weight for a in assessments)

@@ -25,10 +25,8 @@ def get_db_session():
     logging.info("Sessão do banco de dados aberta.")
     try:
         yield db
-        db.commit()
-        logging.info("Transação commitada com sucesso.")
     except Exception as e:
-        logging.error(f"Erro na transação. Realizando rollback. Erro: {e}", exc_info=True)
+        logging.error(f"Erro na sessão do banco de dados. Realizando rollback. Erro: {e}", exc_info=True)
         db.rollback()
         raise
     finally:
