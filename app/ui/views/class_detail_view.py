@@ -1,7 +1,6 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import csv
-import logging
 from datetime import date, datetime
 from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
@@ -446,7 +445,6 @@ class ClassDetailView(ctk.CTkFrame):
         self.populate_student_list()
 
     def import_students(self):
-        logging.info("Botão 'Importar Alunos' clicado.")
         if not self.class_id:
             messagebox.showerror("Erro", "Selecione uma turma antes de importar alunos.")
             return
@@ -456,10 +454,8 @@ class ClassDetailView(ctk.CTkFrame):
             filetypes=(("Arquivos CSV", "*.csv"), ("Todos os arquivos", "*.*"))
         )
         if not filepath:
-            logging.info("Nenhum arquivo selecionado. A importação foi cancelada.")
             return
 
-        logging.info(f"Arquivo selecionado para importação: {filepath}")
         self.import_button.configure(state="disabled", text="Importando...")
         self.enroll_student_button.configure(state="disabled")
 
@@ -475,16 +471,13 @@ class ClassDetailView(ctk.CTkFrame):
         """
         Callback function executed on the main UI thread after the import task finishes.
         """
-        logging.info("Callback _on_import_complete foi chamado.")
         self.import_button.configure(state="normal", text="Importar Alunos (.csv)")
         self.enroll_student_button.configure(state="normal")
 
-        # The result can be either the expected tuple or an exception
         if isinstance(result, Exception):
             messagebox.showerror("Erro Inesperado", f"Ocorreu um erro fatal durante a importação:\n\n{result}")
             return
 
-        # Unpack the result and show the final message
         success_count, errors = result
         self.populate_student_list()
 

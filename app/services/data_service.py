@@ -10,12 +10,9 @@ from app.models.class_enrollment import ClassEnrollment
 from app.models.assessment import Assessment
 from app.models.lesson import Lesson
 from app.models.incident import Incident
-import logging
 from app.utils.student_csv_parser import parse_student_csv
 from datetime import datetime
 from contextlib import contextmanager
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class DataService:
     def __init__(self, db_session: Session = None):
@@ -30,13 +27,11 @@ class DataService:
                 yield db
 
     def import_students_from_csv(self, class_id: int, file_content: str) -> dict:
-        logging.info("Iniciando a importação de alunos a partir do conteúdo CSV.")
         errors = []
         imported_count = 0
 
         try:
             parsed_data = parse_student_csv(file_content)
-            logging.info(f"CSV parseado. {len(parsed_data)} registros de alunos encontrados.")
 
             if not parsed_data:
                 errors.append("O arquivo CSV não contém dados de alunos válidos.")
@@ -60,7 +55,9 @@ class DataService:
                     "status_detail": student_row.get("status_detail", "")
                 })
 
-            self.batch_upsert_students_and_enroll(class_id, student_data_for_db)
+            with self._get_db() as db:
+                self._batch_upsert_students_and_enroll(db, class_id, student_data_for_db)
+
             imported_count = len({d['full_name'].lower() for d in student_data_for_db})
 
         except ValueError as ve:
@@ -70,7 +67,6 @@ class DataService:
 
         return {"imported_count": imported_count, "errors": errors}
 
-    # --- Student Methods ---
     def add_student(self, first_name: str, last_name: str, birth_date: date | None = None) -> Student | None:
         if not first_name or not last_name: return None
         with self._get_db() as db:
@@ -80,7 +76,7 @@ class DataService:
             today = date.today().isoformat()
             new_student = Student(first_name=first_name, last_name=last_name, enrollment_date=today, birth_date=birth_date)
             db.add(new_student)
-            db.commit()
+            db.flush()
             db.refresh(new_student)
             return new_student
 
@@ -98,7 +94,6 @@ class DataService:
             if student:
                 student.first_name = first_name
                 student.last_name = last_name
-                db.commit()
 
     def delete_student(self, student_id: int):
         with self._get_db() as db:
@@ -107,7 +102,6 @@ class DataService:
             student = db.query(Student).filter(Student.id == student_id).first()
             if student:
                 db.delete(student)
-                db.commit()
 
     def get_student_count(self) -> int:
         with self._get_db() as db:
@@ -122,13 +116,12 @@ class DataService:
             enrolled_student_ids = db.query(ClassEnrollment.student_id).filter(ClassEnrollment.class_id == class_id)
             return db.query(Student).filter(Student.id.notin_(enrolled_student_ids)).all()
 
-    # --- Course Methods ---
     def add_course(self, course_name: str, course_code: str) -> Course | None:
         if not course_name or not course_code: return None
         new_course = Course(course_name=course_name, course_code=course_code)
         with self._get_db() as db:
             db.add(new_course)
-            db.commit()
+            db.flush()
             db.refresh(new_course)
             return new_course
 
@@ -158,26 +151,23 @@ class DataService:
             if course:
                 course.course_name = course_name
                 course.course_code = course_code
-                db.commit()
 
     def delete_course(self, course_id: int):
         with self._get_db() as db:
             course = db.query(Course).filter(Course.id == course_id).first()
             if course and not course.classes:
                 db.delete(course)
-                db.commit()
 
     def get_course_count(self) -> int:
         with self._get_db() as db:
             return db.query(Course).count()
 
-    # --- Class (Turma) Methods ---
     def create_class(self, name: str, course_id: int, calculation_method: str = 'arithmetic') -> Class | None:
         if not name or not course_id: return None
         new_class = Class(name=name, course_id=course_id, calculation_method=calculation_method)
         with self._get_db() as db:
             db.add(new_class)
-            db.commit()
+            db.flush()
             db.refresh(new_class)
             return new_class
 
@@ -194,7 +184,6 @@ class DataService:
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 class_.name = name
-                db.commit()
 
     def delete_class(self, class_id: int):
         with self._get_db() as db:
@@ -202,7 +191,6 @@ class DataService:
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 db.delete(class_)
-                db.commit()
 
     def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active") -> ClassEnrollment | None:
         if not all([student_id, class_id, call_number is not None]): return None
@@ -211,11 +199,10 @@ class DataService:
             if existing:
                 existing.call_number = call_number
                 existing.status = status
-                db.commit()
                 return existing
             enrollment = ClassEnrollment(student_id=student_id, class_id=class_id, call_number=call_number, status=status)
             db.add(enrollment)
-            db.commit()
+            db.flush()
             db.refresh(enrollment)
             return enrollment
 
@@ -228,20 +215,21 @@ class DataService:
             enrollment = db.query(ClassEnrollment).filter(ClassEnrollment.id == enrollment_id).first()
             if enrollment:
                 enrollment.status = status
-                db.commit()
+
+    def _get_next_call_number(self, db: Session, class_id: int) -> int:
+        max_call_number = db.query(func.max(ClassEnrollment.call_number)).filter(ClassEnrollment.class_id == class_id).scalar()
+        return (max_call_number or 0) + 1
 
     def get_next_call_number(self, class_id: int) -> int:
         with self._get_db() as db:
-            max_call_number = db.query(func.max(ClassEnrollment.call_number)).filter(ClassEnrollment.class_id == class_id).scalar()
-            return (max_call_number or 0) + 1
+            return self._get_next_call_number(db, class_id)
 
-    # --- Assessment Methods ---
     def add_assessment(self, class_id: int, name: str, weight: float) -> Assessment | None:
         if not all([class_id, name, weight is not None]): return None
         assessment = Assessment(class_id=class_id, name=name, weight=weight)
         with self._get_db() as db:
             db.add(assessment)
-            db.commit()
+            db.flush()
             db.refresh(assessment)
             return assessment
 
@@ -251,7 +239,6 @@ class DataService:
             if assessment:
                 assessment.name = name
                 assessment.weight = weight
-                db.commit()
 
     def delete_assessment(self, assessment_id: int):
         with self._get_db() as db:
@@ -259,9 +246,7 @@ class DataService:
             assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
             if assessment:
                 db.delete(assessment)
-                db.commit()
 
-    # --- Analysis Methods ---
     def get_student_performance_summary(self, student_id: int, class_id: int) -> dict | None:
         with self._get_db() as db:
             enrollment = db.query(ClassEnrollment).options(joinedload(ClassEnrollment.student), joinedload(ClassEnrollment.class_).options(joinedload(Class.assessments), joinedload(Class.course))).filter(ClassEnrollment.student_id == student_id, ClassEnrollment.class_id == class_id).first()
@@ -304,7 +289,7 @@ class DataService:
         new_lesson = Lesson(class_id=class_id, title=title, content=content, date=lesson_date)
         with self._get_db() as db:
             db.add(new_lesson)
-            db.commit()
+            db.flush()
             db.refresh(new_lesson)
             return new_lesson
 
@@ -315,14 +300,12 @@ class DataService:
                 lesson.title = title
                 lesson.content = content
                 lesson.date = lesson_date
-                db.commit()
 
     def delete_lesson(self, lesson_id: int):
         with self._get_db() as db:
             lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
             if lesson:
                 db.delete(lesson)
-                db.commit()
 
     def get_incidents_for_class(self, class_id: int) -> list[Incident]:
         with self._get_db() as db:
@@ -333,7 +316,7 @@ class DataService:
         new_incident = Incident(class_id=class_id, student_id=student_id, description=description, date=incident_date)
         with self._get_db() as db:
             db.add(new_incident)
-            db.commit()
+            db.flush()
             db.refresh(new_incident)
             return new_incident
 
@@ -343,7 +326,7 @@ class DataService:
         new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today)
         with self._get_db() as db:
             db.add(new_grade)
-            db.commit()
+            db.flush()
             db.refresh(new_grade)
             return new_grade
 
@@ -364,7 +347,6 @@ class DataService:
             grade = db.query(Grade).filter(Grade.id == grade_id).first()
             if grade:
                 db.delete(grade)
-                db.commit()
 
     def upsert_grades_for_class(self, class_id: int, grades_data: list[dict]):
         with self._get_db() as db:
@@ -379,7 +361,6 @@ class DataService:
                 else:
                     new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today().isoformat())
                     db.add(new_grade)
-            db.commit()
 
     def calculate_weighted_average(self, student_id: int, grades: list[Grade], assessments: list[Assessment]) -> float:
         total_weight = sum(a.weight for a in assessments)
@@ -388,77 +369,61 @@ class DataService:
         weighted_sum = sum(student_grades.get(a.id, 0.0) * a.weight for a in assessments)
         return weighted_sum / total_weight
 
-    def batch_upsert_students_and_enroll(self, class_id: int, student_data_list: list[dict]):
-        logging.info(f"Iniciando batch upsert para {len(student_data_list)} registros na turma ID: {class_id}.")
-        with self._get_db() as db:
-            # Step 1: Upsert Students
-            # First, ensure all students exist in the Student table, creating them if they don't.
-            all_students_in_db = []
-            new_students_to_create = []
+    def _batch_upsert_students_and_enroll(self, db: Session, class_id: int, student_data_list: list[dict]):
 
-            unique_student_data = {data['full_name'].lower(): data for data in student_data_list}
-            logging.info(f"{len(unique_student_data)} alunos únicos para processar.")
+        all_students_in_db = []
+        new_students_to_create = []
 
-            for full_name_lower, data in unique_student_data.items():
-                student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == full_name_lower).first()
-                if student:
-                    if data['birth_date'] and student.birth_date != data['birth_date']:
-                        logging.info(f"Atualizando data de nascimento para o aluno: {student.first_name} {student.last_name}.")
-                        student.birth_date = data['birth_date']
-                    all_students_in_db.append(student)
-                else:
-                    new_student = Student(
-                        first_name=data['first_name'],
-                        last_name=data['last_name'],
-                        birth_date=data['birth_date'],
-                        enrollment_date=date.today().isoformat()
-                    )
-                    new_students_to_create.append(new_student)
+        unique_student_data = {data['full_name'].lower(): data for data in student_data_list}
 
-            if new_students_to_create:
-                logging.info(f"Criando {len(new_students_to_create)} novos alunos.")
-                db.add_all(new_students_to_create)
-                db.flush()
-                all_students_in_db.extend(new_students_to_create)
+        for full_name_lower, data in unique_student_data.items():
+            student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == full_name_lower).first()
+            if student:
+                if data['birth_date'] and student.birth_date != data['birth_date']:
+                    student.birth_date = data['birth_date']
+                all_students_in_db.append(student)
+            else:
+                new_student = Student(
+                    first_name=data['first_name'],
+                    last_name=data['last_name'],
+                    birth_date=data['birth_date'],
+                    enrollment_date=date.today().isoformat()
+                )
+                new_students_to_create.append(new_student)
 
-            logging.info("Upsert de alunos concluído. Iniciando upsert de matrículas.")
+        if new_students_to_create:
+            db.add_all(new_students_to_create)
+            db.flush()
+            all_students_in_db.extend(new_students_to_create)
 
-            # Step 2: Upsert Enrollments
-            # Now, handle the enrollments for this specific class.
-            student_map = {f"{s.first_name} {s.last_name}".lower(): s for s in all_students_in_db}
+        student_map = {f"{s.first_name} {s.last_name}".lower(): s for s in all_students_in_db}
 
-            # Get existing enrollments for this class to update them
-            existing_enrollments = db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).all()
-            existing_enrollment_map = {e.student_id: e for e in existing_enrollments}
+        existing_enrollments = db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).all()
+        existing_enrollment_map = {e.student_id: e for e in existing_enrollments}
 
-            next_call_number = self.get_next_call_number(class_id)
+        next_call_number = self._get_next_call_number(db, class_id)
 
-            enrollments_to_create = []
-            enrollments_to_update = 0
-            for data in unique_student_data.values():
-                student = student_map.get(data['full_name'].lower())
-                if not student:
-                    logging.warning(f"Aluno '{data['full_name']}' não encontrado no mapa de alunos após o upsert. Pulando matrícula.")
-                    continue
+        enrollments_to_create = []
+        enrollments_to_update = 0
+        for data in unique_student_data.values():
+            student = student_map.get(data['full_name'].lower())
+            if not student:
+                continue
 
-                existing_enrollment = existing_enrollment_map.get(student.id)
+            existing_enrollment = existing_enrollment_map.get(student.id)
 
-                if existing_enrollment:
-                    if existing_enrollment.status != data['status']:
-                        logging.info(f"Atualizando status da matrícula para o aluno ID: {student.id} de '{existing_enrollment.status}' para '{data['status']}'.")
-                        existing_enrollment.status = data['status']
-                        enrollments_to_update += 1
-                else:
-                    enrollments_to_create.append(ClassEnrollment(
-                        class_id=class_id,
-                        student_id=student.id,
-                        call_number=next_call_number,
-                        status=data['status']
-                    ))
-                    next_call_number += 1
+            if existing_enrollment:
+                if existing_enrollment.status != data['status']:
+                    existing_enrollment.status = data['status']
+                    enrollments_to_update += 1
+            else:
+                enrollments_to_create.append(ClassEnrollment(
+                    class_id=class_id,
+                    student_id=student.id,
+                    call_number=next_call_number,
+                    status=data['status']
+                ))
+                next_call_number += 1
 
-            if enrollments_to_create:
-                logging.info(f"Criando {len(enrollments_to_create)} novas matrículas.")
-                db.add_all(enrollments_to_create)
-
-            logging.info(f"Upsert de matrículas concluído. {len(enrollments_to_create)} matrículas criadas, {enrollments_to_update} atualizadas.")
+        if enrollments_to_create:
+            db.add_all(enrollments_to_create)
