@@ -55,11 +55,15 @@ def add_new_grade(student_name: str, class_name: str, assessment_name: str, scor
         if not student:
             return f"Error: Student '{student_name}' not found."
 
-        # This is a simplification. A real app might need a more robust way to find classes
-        all_classes = data_service.get_all_classes()
-        target_class = next((c for c in all_classes if c.name.lower() == class_name.lower()), None)
-        if not target_class:
+        all_classes_data = data_service.get_all_classes()
+        target_class_data = next((c for c in all_classes_data if c["name"].lower() == class_name.lower()), None)
+
+        if not target_class_data:
             return f"Error: Class '{class_name}' not found."
+
+        target_class = data_service.get_class_by_id(target_class_data["id"])
+        if not target_class:
+             return f"Error: Could not retrieve class details for '{class_name}'."
 
         assessment = next((a for a in target_class.assessments if a.name.lower() == assessment_name.lower()), None)
         if not assessment:
@@ -67,9 +71,10 @@ def add_new_grade(student_name: str, class_name: str, assessment_name: str, scor
 
         grade = data_service.add_grade(student.id, assessment.id, score)
         if grade:
-            return f"Successfully added grade for {student_name} in {target_class.course.course_name}."
+            # Re-fetch the class to get the course name correctly
+            final_class_info = data_service.get_class_by_id(target_class.id)
+            return f"Successfully added grade for {student_name} in {final_class_info.course.course_name}."
         else:
             return "Error: Could not add grade."
     except Exception as e:
-        # Log the error e
         return f"Error: An unexpected error occurred: {e}"

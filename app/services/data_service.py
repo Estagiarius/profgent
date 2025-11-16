@@ -171,9 +171,18 @@ class DataService:
             db.refresh(new_class)
             return new_class
 
-    def get_all_classes(self) -> list[Class]:
+    def get_all_classes(self) -> list[dict]:
         with self._get_db() as db:
-            return db.query(Class).options(joinedload(Class.course), joinedload(Class.enrollments)).order_by(Class.name).all()
+            classes = db.query(Class).options(joinedload(Class.course), joinedload(Class.enrollments)).order_by(Class.name).all()
+            return [
+                {
+                    "id": c.id,
+                    "name": c.name,
+                    "course_name": c.course.course_name,
+                    "student_count": len(c.enrollments)
+                }
+                for c in classes
+            ]
 
     def get_class_by_id(self, class_id: int) -> Class | None:
         with self._get_db() as db:
