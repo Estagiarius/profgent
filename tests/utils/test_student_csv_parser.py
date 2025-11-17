@@ -40,11 +40,11 @@ def test_import_students_from_csv_success(data_service: DataService, db_session)
     """
     # Cria uma turma de teste para a qual os alunos serão matriculados
     course = data_service.add_course("Ciência da Computação - Teste CSV", "CSV-TEST-101")
-    class_ = data_service.create_class("Turma Teste CSV", course.id)
+    class_ = data_service.create_class("Turma Teste CSV", course['id'])
     db_session.flush()
 
     # Executa a função de importação
-    result = data_service.import_students_from_csv(class_.id, MOCK_CSV_CONTENT)
+    result = data_service.import_students_from_csv(class_['id'], MOCK_CSV_CONTENT)
     db_session.commit() # Commit para garantir que a transação seja salva
 
     # Verifica o resultado da importação
@@ -109,10 +109,10 @@ Nº de chamada;Nome do Aluno;Data de Nascimento;Situação do Aluno
 63;JÚLIA NOGUEIRA RAMOS;28/09/2009;Ativo
 """
     course = data_service.add_course("Português", "PT101")
-    class_ = data_service.create_class("Turma Duplicatas", course.id)
+    class_ = data_service.create_class("Turma Duplicatas", course['id'])
     db_session.flush()
 
-    result = data_service.import_students_from_csv(class_.id, duplicate_csv)
+    result = data_service.import_students_from_csv(class_['id'], duplicate_csv)
     db_session.commit() # Commit para garantir que a transação seja salva
 
     assert result["imported_count"] == 2

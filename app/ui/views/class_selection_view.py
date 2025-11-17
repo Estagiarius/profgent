@@ -82,27 +82,26 @@ class ClassSelectionView(ctk.CTkFrame):
         EditDialog(self, "Editar Turma", fields, initial_data, save_callback)
 
     def add_class_popup(self):
-        courses = data_service.get_all_courses()
-        if not courses:
-            # TODO: Show a proper error dialog to the user
-            print("Erro: Nenhum curso disponível. Adicione um curso primeiro.")
+        courses_data = data_service.get_all_courses()
+        if not courses_data:
+            messagebox.showerror("Erro", "Nenhum curso disponível. Adicione um curso primeiro na tela de Gestão de Dados.")
             return
 
-        course_names = [c.course_name for c in courses]
+        course_names = [c["course_name"] for c in courses_data]
 
         def save_callback(data):
             class_name = data.get("name")
             selected_course_name = data.get("course")
 
             if not class_name or not selected_course_name:
-                print("Erro: O nome da turma e o curso são obrigatórios.")
+                messagebox.showerror("Erro", "O nome da turma e o curso são obrigatórios.")
                 return
 
-            selected_course = next((c for c in courses if c.course_name == selected_course_name), None)
+            selected_course = next((c for c in courses_data if c["course_name"] == selected_course_name), None)
 
             if selected_course:
-                data_service.create_class(name=class_name, course_id=selected_course.id)
-                self.populate_class_cards()  # Refresh the list
+                data_service.create_class(name=class_name, course_id=selected_course["id"])
+                self.populate_class_cards()
 
         fields = {"name": "Nome da Turma"}
         dropdowns = {"course": ("Curso", course_names)}

@@ -15,9 +15,8 @@ def add_new_student(first_name: str, last_name: str) -> str:
     try:
         student = data_service.add_student(first_name, last_name)
         if student:
-            return f"Successfully added new student: {first_name} {last_name} with ID {student.id}."
+            return f"Successfully added new student: {first_name} {last_name} with ID {student['id']}."
         else:
-            # This case might be redundant if add_student raises an exception on failure
             return f"Error: An unknown error occurred while adding student {first_name} {last_name}."
     except SQLAlchemyError as e:
         return f"Error: A database error occurred while adding the student: {e}"
@@ -37,7 +36,7 @@ def add_new_course(course_name: str, course_code: str) -> str:
     try:
         course = data_service.add_course(course_name, course_code)
         if course:
-            return f"Successfully added new course: {course_name} ({course_code}) with ID {course.id}."
+            return f"Successfully added new course: {course_name} ({course_code}) with ID {course['id']}."
         else:
             return f"Error: An unknown error occurred while adding course {course_name}."
     except SQLAlchemyError as e:
@@ -61,19 +60,19 @@ def add_new_grade(student_name: str, class_name: str, assessment_name: str, scor
         if not target_class_data:
             return f"Error: Class '{class_name}' not found."
 
-        target_class = data_service.get_class_by_id(target_class_data["id"])
-        if not target_class:
+        # The target_class_data from get_all_classes might not have nested details.
+        # Fetch the full class details to get assessments and course info.
+        full_class_details = data_service.get_class_by_id(target_class_data["id"])
+        if not full_class_details:
              return f"Error: Could not retrieve class details for '{class_name}'."
 
-        assessment = next((a for a in target_class.assessments if a.name.lower() == assessment_name.lower()), None)
+        assessment = next((a for a in full_class_details['assessments'] if a['name'].lower() == assessment_name.lower()), None)
         if not assessment:
             return f"Error: Assessment '{assessment_name}' not found in class '{class_name}'."
 
-        grade = data_service.add_grade(student.id, assessment.id, score)
+        grade = data_service.add_grade(student['id'], assessment['id'], score)
         if grade:
-            # Re-fetch the class to get the course name correctly
-            final_class_info = data_service.get_class_by_id(target_class.id)
-            return f"Successfully added grade for {student_name} in {final_class_info.course.course_name}."
+            return f"Successfully added grade for {student_name} in {full_class_details['course_name']}."
         else:
             return "Error: Could not add grade."
     except Exception as e:

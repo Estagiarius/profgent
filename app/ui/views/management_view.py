@@ -1,12 +1,14 @@
 import customtkinter as ctk
-from app.services import data_service
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.add_dialog import AddDialog
 from customtkinter import CTkInputDialog
 
 class ManagementView(ctk.CTkFrame):
-    def __init__(self, parent):
+    def __init__(self, parent, main_app):
         super().__init__(parent)
+        self.main_app = main_app
+        self.data_service = self.main_app.data_service
+
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -61,41 +63,40 @@ class ManagementView(ctk.CTkFrame):
     def _populate_students(self):
         self._clear_frame(self.students_frame)
         if self.show_active_only.get():
-            students = data_service.get_students_with_active_enrollment()
+            students = self.data_service.get_students_with_active_enrollment()
         else:
-            students = data_service.get_all_students()
+            students = self.data_service.get_all_students()
 
         for student in students:
             f = ctk.CTkFrame(self.students_frame); f.pack(fill="x", pady=5)
-            label_text = f"ID: {student.id} | {student.first_name} {student.last_name}"
+            label_text = f"ID: {student['id']} | {student['first_name']} {student['last_name']}"
             ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
-            ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda s=student.id: self.delete_student(s)).pack(side="right", padx=5)
+            ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda s_id=student['id']: self.delete_student(s_id)).pack(side="right", padx=5)
             ctk.CTkButton(f, text="Editar", command=lambda s=student: self.edit_student(s)).pack(side="right", padx=5)
 
     def _populate_courses(self):
         self._clear_frame(self.courses_frame)
-        for course in data_service.get_all_courses():
+        for course in self.data_service.get_all_courses():
             f = ctk.CTkFrame(self.courses_frame); f.pack(fill="x", pady=5)
-            ctk.CTkLabel(f, text=f"ID: {course.id} | {course.course_name} ({course.course_code})").pack(side="left", padx=10)
-            ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda c=course.id: self.delete_course(c)).pack(side="right", padx=5)
+            ctk.CTkLabel(f, text=f"ID: {course['id']} | {course['course_name']} ({course['course_code']})").pack(side="left", padx=10)
+            ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda c_id=course['id']: self.delete_course(c_id)).pack(side="right", padx=5)
             ctk.CTkButton(f, text="Editar", command=lambda c=course: self.edit_course(c)).pack(side="right", padx=5)
 
     def _populate_grades(self):
         self._clear_frame(self.grades_frame)
-        grades = data_service.get_all_grades_with_details()
+        grades = self.data_service.get_all_grades_with_details()
 
         for grade in grades:
             f = ctk.CTkFrame(self.grades_frame)
             f.pack(fill="x", pady=5)
 
-            student_name = f"{grade.student.first_name} {grade.student.last_name}"
-            course_name = grade.assessment.class_.course.course_name
-            assessment_name = grade.assessment.name
-
-            label_text = f"ID: {grade.id} | {student_name} | {course_name} | {assessment_name}: {grade.score}"
+            label_text = (
+                f"ID: {grade['id']} | {grade['student_first_name']} {grade['student_last_name']} | "
+                f"{grade['course_name']} | {grade['assessment_name']}: {grade['score']}"
+            )
 
             ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
-            ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda g=grade.id: self.delete_grade(g)).pack(side="right", padx=5)
+            ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda g_id=grade['id']: self.delete_grade(g_id)).pack(side="right", padx=5)
             # Edit functionality for grades in this view is complex due to the new structure and has been removed.
             # The Grade Grid is the primary place for editing.
 
@@ -103,30 +104,29 @@ class ManagementView(ctk.CTkFrame):
         d = CTkInputDialog(text="Digite 'DELETE' para confirmar.", title="Confirmar Exclusão"); return d.get_input() == "DELETE"
 
     def delete_student(self, sid):
-        if self._confirm_delete(): data_service.delete_student(sid); self.populate_data()
+        if self._confirm_delete(): self.data_service.delete_student(sid); self.populate_data()
     def delete_course(self, cid):
-        if self._confirm_delete(): data_service.delete_course(cid); self.populate_data()
+        if self._confirm_delete(): self.data_service.delete_course(cid); self.populate_data()
     def delete_grade(self, gid):
-        if self._confirm_delete(): data_service.delete_grade(gid); self.populate_data()
+        if self._confirm_delete(): self.data_service.delete_grade(gid); self.populate_data()
 
     def edit_student(self, s):
         def cb(id, data):
-            data_service.update_student(id, data['first_name'], data['last_name'])
+            self.data_service.update_student(id, data['first_name'], data['last_name'])
             self.populate_data()
-        EditDialog(self, "Editar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, {
-            "id": s.id, "first_name": s.first_name, "last_name": s.last_name
-        }, cb)
+        initial_data = { "id": s['id'], "first_name": s['first_name'], "last_name": s['last_name'] }
+        EditDialog(self, "Editar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, initial_data, cb)
 
     def edit_course(self, c):
-        def cb(id, data): data_service.update_course(id, data['course_name'], data['course_code']); self.populate_data()
-        EditDialog(self, "Editar Curso", {"course_name":"Nome", "course_code":"Código"}, vars(c), cb)
+        def cb(id, data): self.data_service.update_course(id, data['course_name'], data['course_code']); self.populate_data()
+        EditDialog(self, "Editar Curso", {"course_name":"Nome", "course_code":"Código"}, c, cb)
 
     def add_student_popup(self):
         def cb(data):
-            data_service.add_student(data['first_name'], data['last_name'])
+            self.data_service.add_student(data['first_name'], data['last_name'])
             self.populate_data()
         AddDialog(self, "Adicionar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, save_callback=cb)
 
     def add_course_popup(self):
-        def cb(data): data_service.add_course(data['course_name'], data['course_code']); self.populate_data()
+        def cb(data): self.data_service.add_course(data['course_name'], data['course_code']); self.populate_data()
         AddDialog(self, "Adicionar Curso", {"course_name":"Nome", "course_code":"Código"}, save_callback=cb)

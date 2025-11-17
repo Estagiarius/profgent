@@ -10,7 +10,7 @@ def test_import_bug_with_user_csv(data_service: DataService, db_session: Session
     and then passing it to the DataService.
     """
     course = data_service.add_course("Bug Repro Course", "BRC101")
-    class_ = data_service.create_class("Bug Repro Class", course.id)
+    class_ = data_service.create_class("Bug Repro Class", course['id'])
     db_session.flush()
 
     csv_content = """Alunos;11/11/2025 13:31
@@ -89,14 +89,14 @@ Nº de chamada;Nome do Aluno;Data de Nascimento;Situação do Aluno
 67;ISABELLA DE OLIVEIRA SANTOS SILVA;15/11/2009;Ativo
 """
 
-    result = data_service.import_students_from_csv(class_.id, csv_content)
+    result = data_service.import_students_from_csv(class_['id'], csv_content)
     db_session.commit()
 
     assert not result["errors"], f"Import failed with errors: {result['errors']}"
 
     expected_unique_students = 65
 
-    enrollments = data_service.get_enrollments_for_class(class_.id)
+    enrollments = data_service.get_enrollments_for_class(class_['id'])
     assert len(enrollments) == expected_unique_students, f"Expected {expected_unique_students} enrollments, but found {len(enrollments)}"
 
     student_count = data_service.get_student_count()

@@ -15,17 +15,16 @@ def get_student_grade(student_name: str, course_name: str) -> str:
     if not course:
         return f"Course '{course_name}' not found."
 
-    # A course can have multiple classes, so we need to check all of them
     student_grades_in_course = []
-    for class_ in course.classes:
-        grades_in_class = data_service.get_grades_for_class(class_.id)
-        student_grades_in_class = [g for g in grades_in_class if g.student_id == student.id]
+    for class_data in course['classes']:
+        grades_in_class = data_service.get_grades_for_class(class_data['id'])
+        student_grades_in_class = [g for g in grades_in_class if g['student_id'] == student['id']]
         student_grades_in_course.extend(student_grades_in_class)
 
     if not student_grades_in_course:
         return f"No grades found for {student_name} in {course_name}."
 
-    grade_list = "\n".join([f"- {g.assessment.name}: {g.score}" for g in student_grades_in_course])
+    grade_list = "\n".join([f"- {g['assessment_name']}: {g['score']}" for g in student_grades_in_course])
     return f"Grades for {student_name} in {course_name}:\n{grade_list}"
 
 @tool
@@ -37,11 +36,15 @@ def list_courses_for_student(student_name: str) -> str:
     if not student:
         return f"Student '{student_name}' not found."
 
-    if not student.grades:
+    # This tool's logic requires a more complex query than get_all_grades_with_details provides.
+    # We will get all grades and then process them.
+    all_grades = data_service.get_all_grades_with_details()
+    student_grades = [g for g in all_grades if g['student_id'] == student['id']]
+
+    if not student_grades:
         return f"{student_name} is not enrolled in any courses with recorded grades."
 
-    course_names = {grade.assessment.class_.course.course_name for grade in student.grades}
-
+    course_names = {g['course_name'] for g in student_grades}
     return f"Courses for {student_name}:\n" + "\n".join(f"- {name}" for name in sorted(list(course_names)))
 
 @tool
@@ -54,12 +57,12 @@ def get_class_average(course_name: str) -> str:
         return f"Course '{course_name}' not found."
 
     all_grades = []
-    for class_ in course.classes:
-        grades_in_class = data_service.get_grades_for_class(class_.id)
+    for class_data in course['classes']:
+        grades_in_class = data_service.get_grades_for_class(class_data['id'])
         all_grades.extend(grades_in_class)
 
     if not all_grades:
         return f"No grades found for the course {course_name}."
 
-    average = sum(g.score for g in all_grades) / len(all_grades)
+    average = sum(g['score'] for g in all_grades) / len(all_grades)
     return f"The class average for {course_name} is {average:.2f}."
