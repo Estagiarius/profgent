@@ -1,7 +1,6 @@
 from app.services.data_service import DataService
 from app.tools import database_tools
 from app.tools.database_tools import get_student_grade, list_courses_for_student, get_class_average
-import pytest
 
 def test_get_student_grade_found(data_service: DataService):
     """Test get_student_grade when the grade is found."""

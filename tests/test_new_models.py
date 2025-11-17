@@ -1,9 +1,7 @@
-import pytest
 from datetime import date
 from sqlalchemy.orm import Session
 from app.services.data_service import DataService
 from app.models.student import Student
-from app.models.course import Course
 from app.models.class_ import Class
 from app.models.lesson import Lesson
 from app.models.incident import Incident

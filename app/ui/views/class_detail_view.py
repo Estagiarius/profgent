@@ -1,6 +1,5 @@
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-import csv
 from datetime import date, datetime
 from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
