@@ -1,18 +1,28 @@
-import tempfile
-import os
+# Importa as classes de serviço e de sessão do banco para serem usadas nas fixtures.
 from app.services.data_service import DataService
 from sqlalchemy.orm import Session
 
+# Define a função de teste que simula o bug de importação.
 def test_import_bug_with_user_csv(data_service: DataService, db_session: Session):
     """
-    Test case that uses the user's provided CSV to confirm the final fix.
-    It simulates the orchestrator's workflow by reading the file content
-    and then passing it to the DataService.
+    Caso de teste que usa o CSV fornecido pelo usuário para confirmar a correção final.
+    Ele simula o fluxo de trabalho do orquestrador, lendo o conteúdo do arquivo
+    e passando-o para o DataService.
     """
+    # --- PREPARAÇÃO ---
+    # Cria um curso e uma turma para o teste, isolando-o de outros dados.
     course = data_service.add_course("Bug Repro Course", "BRC101")
     class_ = data_service.create_class("Bug Repro Class", course['id'])
     db_session.flush()
 
+    # --- DADOS DE TESTE ---
+    # O conteúdo exato do arquivo CSV que causava o bug.
+    # Este CSV tem várias características importantes para o teste:
+    # - Linhas de metadados no início que devem ser ignoradas.
+    # - Um cabeçalho que define as colunas.
+    # - Alunos com status variados ("ATIVO", "BAIXA - TRANSFERÊNCIA", "Transferido").
+    # - Alunos duplicados (ex: "JÚLIA NOGUEIRA RAMOS", "NICOLY ALVARES DE OLIVEIRA ROCHA"),
+    #   onde apenas a última ocorrência (a mais recente no arquivo) deve ser considerada.
     csv_content = """Alunos;11/11/2025 13:31
 
 Filtros
@@ -89,15 +99,24 @@ Nº de chamada;Nome do Aluno;Data de Nascimento;Situação do Aluno
 67;ISABELLA DE OLIVEIRA SANTOS SILVA;15/11/2009;Ativo
 """
 
+    # --- AÇÃO ---
+    # Chama o método de importação, passando o ID da turma e o conteúdo do CSV.
     result = data_service.import_students_from_csv(class_['id'], csv_content)
+    # Salva as alterações no banco de dados de teste.
     db_session.commit()
 
-    assert not result["errors"], f"Import failed with errors: {result['errors']}"
+    # --- VERIFICAÇÃO ---
+    # Garante que a importação não retornou nenhum erro.
+    assert not result["errors"], f"A importação falhou com erros: {result['errors']}"
 
+    # O CSV contém 67 linhas de dados, mas alguns alunos estão duplicados.
+    # O número esperado de alunos únicos é 65.
     expected_unique_students = 65
 
+    # Verifica se o número de matrículas criadas na turma é o esperado.
     enrollments = data_service.get_enrollments_for_class(class_['id'])
-    assert len(enrollments) == expected_unique_students, f"Expected {expected_unique_students} enrollments, but found {len(enrollments)}"
+    assert len(enrollments) == expected_unique_students, f"Esperado {expected_unique_students} matrículas, mas foram encontradas {len(enrollments)}"
 
+    # Verifica se o número total de alunos no banco de dados corresponde ao número esperado.
     student_count = data_service.get_student_count()
-    assert student_count == expected_unique_students, f"Expected {expected_unique_students} students in the DB, but found {student_count}"
+    assert student_count == expected_unique_students, f"Esperado {expected_unique_students} alunos no BD, mas foram encontrados {student_count}"

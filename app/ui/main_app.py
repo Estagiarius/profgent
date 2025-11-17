@@ -1,6 +1,10 @@
+# Importa a biblioteca 'asyncio' para gerenciar o loop de eventos assíncrono.
 import asyncio
+# Importa a biblioteca 'customtkinter' para criar os componentes da interface gráfica.
 import customtkinter as ctk
+# Importa 'Queue' para comunicação thread-safe e 'Empty' para exceções de fila vazia.
 from queue import Queue, Empty
+# Importa as classes de cada tela (view) da aplicação.
 from app.ui.views.dashboard_view import DashboardView
 from app.ui.views.assistant_view import AssistantView
 from app.ui.views.settings_view import SettingsView
@@ -8,41 +12,53 @@ from app.ui.views.management_view import ManagementView
 from app.ui.views.class_selection_view import ClassSelectionView
 from app.ui.views.class_detail_view import ClassDetailView
 
+# Importa as classes de serviço que contêm a lógica de negócios e da IA.
 from app.services.data_service import DataService
 from app.services.assistant_service import AssistantService
 
+# Define a classe principal da aplicação, que herda de ctk.CTk (a janela principal).
 class MainApp(ctk.CTk):
+    # O método construtor, que recebe as instâncias dos serviços por injeção de dependência.
     def __init__(self, data_service: DataService, assistant_service: AssistantService):
+        # Chama o construtor da classe pai (ctk.CTk).
         super().__init__()
 
+        # Armazena as instâncias dos serviços como atributos da classe.
         self.data_service = data_service
         self.assistant_service = assistant_service
 
+        # Define o título e o tamanho inicial da janela principal.
         self.title("Gestão Acadêmica")
         self.geometry("1100x800")
 
+        # Define uma função a ser chamada quando o usuário tenta fechar a janela.
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        # Obtém o loop de eventos asyncio, que será usado para tarefas em segundo plano.
         self.loop = asyncio.get_event_loop()
 
+        # Cria uma fila thread-safe para comunicação entre a thread principal da UI e as threads de trabalho.
         self.async_queue = Queue()
+        # Inicia o processo de verificação da fila.
         self._process_queue()
 
+        # Inicia o loop que integra o asyncio com o loop de eventos do tkinter.
         self.update_asyncio()
 
-        # Set grid layout 1x2
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=1)
+        # Configura o layout de grade da janela principal (1 linha, 2 colunas).
+        self.grid_rowconfigure(0, weight=1)    # A linha 0 se expande verticalmente.
+        self.grid_columnconfigure(1, weight=1) # A coluna 1 se expande horizontalmente.
 
-        # Create navigation frame
+        # Cria o frame (painel) de navegação à esquerda.
         self.navigation_frame = ctk.CTkFrame(self, corner_radius=0)
-        self.navigation_frame.grid(row=0, column=0, sticky="nsew")
-        self.navigation_frame.grid_rowconfigure(8, weight=1)
+        self.navigation_frame.grid(row=0, column=0, sticky="nsew") # Posiciona o frame na grade.
+        self.navigation_frame.grid_rowconfigure(8, weight=1) # Linha 8 do frame se expande para empurrar os botões para cima.
 
+        # Adiciona um rótulo de título ao painel de navegação.
         self.navigation_frame_label = ctk.CTkLabel(self.navigation_frame, text="Navegação",
                                                   font=ctk.CTkFont(size=20, weight="bold"))
         self.navigation_frame_label.grid(row=0, column=0, padx=20, pady=20)
 
-        # Add navigation buttons
+        # Adiciona os botões de navegação. Cada botão chama o método `show_view` com o nome da tela correspondente.
         self.dashboard_button = ctk.CTkButton(self.navigation_frame, text="Dashboard", command=lambda: self.show_view("dashboard"))
         self.dashboard_button.grid(row=1, column=0, padx=20, pady=10)
 
@@ -59,13 +75,13 @@ class MainApp(ctk.CTk):
         self.settings_button.grid(row=7, column=0, padx=20, pady=10)
 
 
-        # Create main content frame
+        # Cria o frame principal onde o conteúdo de cada tela será exibido.
         self.main_frame = ctk.CTkFrame(self, corner_radius=0)
-        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
-        self.main_frame.grid_rowconfigure(0, weight=1)
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20) # Posiciona à direita do menu.
+        self.main_frame.grid_rowconfigure(0, weight=1) # Permite que o conteúdo se expanda.
         self.main_frame.grid_columnconfigure(0, weight=1)
 
-        # Create views and store them in a dictionary
+        # Cria as instâncias de cada tela (view) e as armazena em um dicionário para fácil acesso.
         self.views = {
             "dashboard": DashboardView(self.main_frame, self),
             "management": ManagementView(self.main_frame, self),
@@ -75,76 +91,91 @@ class MainApp(ctk.CTk):
             "settings": SettingsView(self.main_frame, self)
         }
 
-        # Show the dashboard view by default
+        # Exibe a tela de dashboard por padrão ao iniciar a aplicação.
         self.show_view("dashboard")
 
+    # Método para processar a fila de tarefas assíncronas de forma contínua.
     def _process_queue(self):
         try:
-            # Get a task from the queue without blocking
+            # Tenta obter uma tarefa da fila sem bloquear a execução.
             callable, args = self.async_queue.get_nowait()
+            # Se uma tarefa for encontrada, executa a função (callback) com seus argumentos.
             callable(*args)
         except Empty:
-            pass  # Do nothing if the queue is empty
+            # Se a fila estiver vazia, não faz nada.
+            pass
         finally:
-            # Schedule the next check
+            # Agenda a próxima verificação da fila para daqui a 100 milissegundos.
             self.after(100, self._process_queue)
 
+    # Método para alternar entre as diferentes telas da aplicação.
     def show_view(self, view_name, **kwargs):
-        # Hide all views
+        # Esconde todas as telas para garantir que apenas uma esteja visível.
         for view in self.views.values():
             view.grid_forget()
 
-        # Show the requested view
+        # Obtém a tela solicitada do dicionário.
         selected_view = self.views[view_name]
+        # Exibe a tela selecionada na grade do frame principal.
         selected_view.grid(row=0, column=0, sticky="nsew")
 
-        # Trigger the 'on_show' event if the view has one
+        # Se a tela tiver um método 'on_show', chama-o. Isso permite que a tela atualize
+        # seus dados sempre que for exibida. `**kwargs` passa argumentos extras.
         if hasattr(selected_view, 'on_show'):
             selected_view.on_show(**kwargs)
 
+    # Método que integra o loop de eventos do asyncio com o do tkinter.
     def update_asyncio(self):
+        # Força o loop do asyncio a executar as tarefas pendentes e depois parar.
         self.loop.call_soon(self.loop.stop)
         self.loop.run_forever()
+        # Agenda a próxima chamada a este método, criando um loop de polling.
         self._poll_id = self.after(1, self.update_asyncio)
 
+    # Método chamado quando o usuário fecha a janela.
     def on_closing(self):
-        # The asyncio polling loop (`update_asyncio`) must continue running
-        # to allow the cleanup task to execute. We will cancel it only after
-        # the cleanup is complete.
+        # O loop de polling do asyncio (`update_asyncio`) deve continuar rodando
+        # para permitir que a tarefa de limpeza seja executada.
+        # Ele só será cancelado após a conclusão da limpeza.
 
-        # Create and schedule the final cleanup task
+        # Define e agenda a tarefa final de limpeza assíncrona.
         async def cleanup():
-            # Close the assistant service if it was initialized
+            # Fecha a conexão do serviço do assistente, se ele foi inicializado.
             if self.assistant_service and self.assistant_service.provider:
                 await self.assistant_service.close()
 
-            # Cancel any other pending asyncio tasks
+            # Cancela quaisquer outras tarefas pendentes do asyncio.
             tasks = [t for t in asyncio.all_tasks(loop=self.loop) if t is not asyncio.current_task()]
             for task in tasks:
                 task.cancel()
 
+            # Aguarda a conclusão das tarefas canceladas, se houver.
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Start the cleanup in the asyncio event loop
+        # Inicia a tarefa de limpeza no loop de eventos do asyncio.
         cleanup_task = self.loop.create_task(cleanup())
 
-        # Start a non-blocking poll to check for cleanup completion
+        # Inicia um polling não bloqueante para verificar a conclusão da limpeza.
         self._check_cleanup_done(cleanup_task)
 
+    # Método que verifica periodicamente se a tarefa de limpeza terminou.
     def _check_cleanup_done(self, task):
-        # If the cleanup task is done, it's safe to stop the polling and
-        # destroy the window. Otherwise, schedule another check.
+        # Se a tarefa de limpeza estiver concluída, é seguro parar o polling e destruir a janela.
         if task.done():
-            # Stop the asyncio polling loop
+            # Cancela o loop de polling do asyncio.
             if hasattr(self, '_poll_id'):
                 self.after_cancel(self._poll_id)
 
-            # Now, safely destroy the main window
+            # Agora, destrói a janela principal de forma segura.
             self.destroy()
+        # Se a tarefa ainda não terminou, agenda uma nova verificação para daqui a 50ms.
         else:
             self.after(50, self._check_cleanup_done, task)
 
+# Bloco que é executado se o script for rodado diretamente.
 if __name__ == "__main__":
+    # Cria uma instância da aplicação (sem os serviços, para teste simples).
     app = MainApp()
+    # Inicia o loop principal da interface gráfica.
     app.mainloop()

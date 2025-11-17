@@ -1,92 +1,126 @@
+# Importa a biblioteca 'customtkinter' para os componentes da interface.
 import customtkinter as ctk
+# Importa o serviço de dados para buscar as informações necessárias para os gráficos.
 from app.services.data_service import DataService
+# Importa a função utilitária que gera o gráfico de distribuição de notas.
 from app.utils.charts import create_grade_distribution_chart
+# Importa a biblioteca Pillow (PIL) para manipulação de imagens.
 from PIL import Image
+# Importa o módulo 'os' para interagir com o sistema de arquivos (verificar se o arquivo do gráfico existe).
 import os
 
+# Define a classe para a tela do Dashboard.
 class DashboardView(ctk.CTkFrame):
+    # Método construtor.
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
+        # Obtém a instância do DataService a partir da aplicação principal.
         self.data_service = self.main_app.data_service
+        # Lista para armazenar os cursos carregados do banco.
         self.courses = []
+        # ID do curso atualmente selecionado no dropdown.
         self.selected_course_id = None
 
+        # Configura o layout de grade da view.
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(2, weight=1) # A linha 2 (onde fica o gráfico) se expande.
 
-        # --- Title ---
+        # --- Título ---
         self.title_label = ctk.CTkLabel(self, text="Dashboard de Análises", font=ctk.CTkFont(size=20, weight="bold"))
         self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
 
-        # --- Controls Frame ---
+        # --- Frame de Controles ---
+        # Frame para agrupar o rótulo e o menu de seleção de curso.
         self.controls_frame = ctk.CTkFrame(self)
         self.controls_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
 
         self.course_label = ctk.CTkLabel(self.controls_frame, text="Selecione o Curso para Análise:")
         self.course_label.pack(side="left", padx=10, pady=10)
 
+        # Menu dropdown para selecionar o curso.
         self.course_menu = ctk.CTkOptionMenu(self.controls_frame, values=[], command=self.on_course_select)
         self.course_menu.pack(side="left", padx=10, pady=10, fill="x", expand=True)
 
-        # --- Chart Display Frame ---
+        # --- Frame de Exibição do Gráfico ---
         self.chart_frame = ctk.CTkFrame(self)
         self.chart_frame.grid(row=2, column=0, padx=20, pady=20, sticky="nsew")
 
+        # Rótulo que exibirá a imagem do gráfico ou uma mensagem de texto.
         self.chart_label = ctk.CTkLabel(self.chart_frame, text="Selecione um curso para ver a distribuição de notas.")
         self.chart_label.pack(expand=True)
+        # Referência para a imagem do gráfico para evitar que seja coletada pelo garbage collector.
         self.chart_image = None
 
+    # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs):
+        # Carrega (ou recarrega) a lista de cursos.
         self.load_courses()
+        # Atualiza o gráfico com base na seleção atual.
         self.update_chart()
 
+    # Carrega os cursos do banco de dados e preenche o menu dropdown.
     def load_courses(self):
-        """Loads courses into the dropdown menu."""
+        """Carrega os cursos no menu dropdown."""
         self.courses = self.data_service.get_all_courses()
         course_names = [c['course_name'] for c in self.courses]
 
+        # Se houver cursos...
         if course_names:
+            # Configura o menu com os nomes dos cursos.
             self.course_menu.configure(values=course_names)
+            # Se nenhum curso estiver selecionado, seleciona o primeiro da lista por padrão.
             if not self.selected_course_id:
                 self.course_menu.set(course_names[0])
                 self.on_course_select(course_names[0])
+        # Se não houver cursos...
         else:
             self.course_menu.configure(values=["Nenhum curso disponível"])
             self.course_menu.set("Nenhum curso disponível")
             self.selected_course_id = None
 
+    # Método chamado quando um curso é selecionado no menu.
     def on_course_select(self, selected_name: str):
         self.selected_course_id = None
+        # Encontra o ID do curso correspondente ao nome selecionado.
         for course in self.courses:
             if course['course_name'] == selected_name:
                 self.selected_course_id = course['id']
                 break
+        # Atualiza o gráfico com base na nova seleção.
         self.update_chart()
 
+    # Gera e exibe o gráfico para o curso selecionado.
     def update_chart(self):
-        """Generates and displays the chart for the selected course."""
+        """Gera e exibe o gráfico para o curso selecionado."""
+        # Se nenhum curso estiver selecionado, exibe uma mensagem.
         if self.selected_course_id is None:
             self.chart_label.configure(text="Nenhum curso selecionado ou disponível.", image=None)
             return
 
+        # Busca os detalhes do curso selecionado, incluindo suas turmas.
         selected_course = self.data_service.get_course_by_id(self.selected_course_id)
         if not selected_course:
             self.chart_label.configure(text=f"Não foi possível encontrar o curso com ID: {self.selected_course_id}", image=None)
             return
 
-        # Aggregate grades from all classes within the selected course
+        # Agrega as notas de todas as turmas dentro do curso selecionado.
         all_grades = []
         for class_data in selected_course['classes']:
             grades_in_class = self.data_service.get_grades_for_class(class_data['id'])
             all_grades.extend(grades_in_class)
 
-        # Generate the chart and get the path to the temporary file
+        # Chama a função utilitária para gerar o gráfico e obter o caminho do arquivo de imagem temporário.
         chart_path = create_grade_distribution_chart(all_grades, selected_course['course_name'])
 
+        # Se o arquivo de imagem do gráfico foi criado com sucesso...
         if os.path.exists(chart_path):
+            # Abre a imagem usando a biblioteca Pillow.
             img = Image.open(chart_path)
+            # Cria um objeto de imagem compatível com o customtkinter.
             self.chart_image = ctk.CTkImage(light_image=img, size=img.size)
+            # Configura o rótulo para exibir a imagem do gráfico.
             self.chart_label.configure(image=self.chart_image, text="")
+        # Se o arquivo não foi criado...
         else:
             self.chart_label.configure(image=None, text="Não foi possível gerar o gráfico.")

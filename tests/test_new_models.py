@@ -1,3 +1,4 @@
+# Importa o pytest para rodar os testes e as classes necessárias.
 import pytest
 from datetime import date
 from sqlalchemy.orm import Session
@@ -8,8 +9,11 @@ from app.models.class_ import Class
 from app.models.lesson import Lesson
 from app.models.incident import Incident
 
+# Define uma função de teste. O pytest automaticamente injetará as fixtures
+# `data_service` e `db_session` que foram definidas em `conftest.py`.
 def test_create_lesson_and_incident(data_service: DataService, db_session: Session):
-    # 1. Setup: Create prerequisite objects using the service
+    # 1. Preparação (Setup): Cria os objetos pré-requisitos (aluno, curso, turma)
+    #    usando o `data_service` para garantir que a lógica de negócios seja aplicada.
     student_dict = data_service.add_student("John", "Doe")
     assert student_dict is not None
     course_dict = data_service.add_course("Test Course", "TC101")
@@ -17,11 +21,13 @@ def test_create_lesson_and_incident(data_service: DataService, db_session: Sessi
     class_dict = data_service.create_class("Test Class", course_dict['id'])
     assert class_dict is not None
 
-    # Retrieve the actual ORM objects from the database for testing relationships
+    # Recupera os objetos ORM reais do banco de dados de teste para verificar os relacionamentos.
+    # O `data_service` retorna dicionários, mas para testar `back_populates`, precisamos dos objetos SQLAlchemy.
     student = db_session.query(Student).get(student_dict['id'])
     class_ = db_session.query(Class).get(class_dict['id'])
 
-    # 2. Create a Lesson using the test's db_session
+    # 2. Teste de Criação de Aula (Lesson)
+    # Cria uma nova instância do modelo Lesson diretamente na sessão de teste.
     new_lesson = Lesson(
         date=date.today(),
         title="Introduction to Testing",
@@ -29,15 +35,17 @@ def test_create_lesson_and_incident(data_service: DataService, db_session: Sessi
         class_id=class_.id
     )
     db_session.add(new_lesson)
-    db_session.commit()
-    db_session.refresh(new_lesson)
+    db_session.commit() # Salva a aula no banco de dados em memória.
+    db_session.refresh(new_lesson) # Atualiza o objeto `new_lesson` com dados do banco (como o ID).
 
-    # Verify Lesson creation
-    assert new_lesson.id is not None
+    # Verificação da criação da aula.
+    assert new_lesson.id is not None # Garante que um ID foi gerado.
     assert new_lesson.title == "Introduction to Testing"
+    # Garante que o relacionamento com a turma está correto.
     assert new_lesson.class_.id == class_.id
 
-    # 3. Create an Incident using the test's db_session
+    # 3. Teste de Criação de Incidente (Incident)
+    # Cria uma nova instância do modelo Incident.
     new_incident = Incident(
         date=date.today(),
         description="Student was very participative.",
@@ -48,17 +56,22 @@ def test_create_lesson_and_incident(data_service: DataService, db_session: Sessi
     db_session.commit()
     db_session.refresh(new_incident)
 
-    # Verify Incident creation
+    # Verificação da criação do incidente.
     assert new_incident.id is not None
     assert new_incident.description == "Student was very participative."
+    # Garante que os relacionamentos com a turma e o aluno estão corretos.
     assert new_incident.class_.id == class_.id
     assert new_incident.student.id == student.id
 
-    # 4. Verify back-population
+    # 4. Verificação dos Relacionamentos Inversos (back-population)
+    # Atualiza os objetos `class_` e `student` com os dados mais recentes do banco
+    # para garantir que as listas de relacionamentos (lessons, incidents) foram atualizadas.
     db_session.refresh(class_)
     db_session.refresh(student)
+    # Verifica se a aula recém-criada aparece na lista de aulas da turma.
     assert len(class_.lessons) == 1
     assert class_.lessons[0].title == "Introduction to Testing"
+    # Verifica se o incidente aparece tanto na lista de incidentes da turma quanto na do aluno.
     assert len(class_.incidents) == 1
     assert len(student.incidents) == 1
     assert student.incidents[0].description == "Student was very participative."

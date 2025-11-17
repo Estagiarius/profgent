@@ -48,17 +48,19 @@ A funcionalidade foi substituída por um parser determinístico localizado em
 `app/utils/student_csv_parser.py` que utiliza uma lógica baseada em uma lista
 de nomes compostos comuns para alcançar um resultado mais rápido e confiável.
 """
-
+# Importa o módulo 'json' para trabalhar com dados no formato JSON.
 import json
 
-# Dependências que seriam necessárias se este código estivesse ativo.
+# As dependências abaixo seriam necessárias se este código estivesse ativo.
 # from app.core.llm.base import LLMProvider
 
 
+# Define uma classe para encapsular a lógica antiga de parsing de CSV com IA.
 class LegacyAiCsvParser:
     """
     Encapsula a lógica de parsing de CSV que dependia de um provedor de IA.
     """
+    # Método construtor da classe.
     def __init__(self, provider):
         """
         Inicializa o parser com um provedor de IA.
@@ -66,74 +68,103 @@ class LegacyAiCsvParser:
         Args:
             provider (LLMProvider): Uma instância de um provedor de LLM.
         """
+        # Armazena a instância do provedor de LLM.
         self.provider = provider
 
+    # Método assíncrono para dividir um nome completo em nome e sobrenome.
     async def split_full_name(self, full_name: str) -> tuple[str, str]:
         """
         (Desativado) Divide um nome completo em nome e sobrenome usando IA.
         """
+        # Define uma função simples de fallback para dividir o nome.
         def simple_split(name):
+            # Divide o nome em palavras.
             parts = name.split()
+            # Retorna a primeira palavra como nome e o resto como sobrenome.
             return parts[0], " ".join(parts[1:])
 
+        # Se não houver provedor ou nome, usa a divisão simples.
         if not self.provider or not full_name:
             return simple_split(full_name)
 
+        # Bloco try/except para capturar possíveis erros durante a chamada da API.
         try:
+            # Cria o prompt (instrução) para a IA.
             prompt = (
-                "You are a linguistic expert specializing in Brazilian names. "
-                "Your task is to separate a full name into a first name and a last name. "
-                "The first name may be composite (e.g., 'Ana Julia', 'Maria Clara'). "
-                "Respond with only a JSON object with two keys: 'first_name' and 'last_name'.\\n\\n"
-                f'Full name: \\"{full_name}\\"'
+                "Você é um especialista linguístico especializado em nomes brasileiros. "
+                "Sua tarefa é separar um nome completo em nome e sobrenome. "
+                "O nome pode ser composto (ex: 'Ana Julia', 'Maria Clara'). "
+                "Responda apenas com um objeto JSON com duas chaves: 'first_name' e 'last_name'.\\n\\n"
+                f'Nome completo: \\"{full_name}\\"'
             )
+            # Prepara a mensagem para ser enviada ao provedor de IA.
             messages = [{"role": "user", "content": prompt}]
+            # Chama o provedor de IA para obter a resposta.
             response = await self.provider.get_chat_response(messages)
 
+            # Se a resposta tiver conteúdo.
             if response.content:
                 try:
+                    # Tenta converter a resposta de string JSON para um dicionário Python.
                     name_parts = json.loads(response.content)
+                    # Extrai o nome e o sobrenome do dicionário.
                     first_name = name_parts.get('first_name')
                     last_name = name_parts.get('last_name')
+                    # Se ambos foram extraídos com sucesso, retorna os valores.
                     if first_name and last_name:
                         return first_name, last_name
+                # Captura erros se a resposta não for um JSON válido ou não tiver as chaves esperadas.
                 except (json.JSONDecodeError, KeyError):
-                    print(f"AI response for name splitting was not valid JSON: {response.content}")
+                    print(f"A resposta da IA para a divisão do nome não era um JSON válido: {response.content}")
 
+        # Captura qualquer outra exceção que possa ocorrer.
         except Exception as e:
-            print(f"An error occurred during AI name splitting: {e}")
+            print(f"Ocorreu um erro durante a divisão de nome pela IA: {e}")
 
+        # Se a IA falhar, retorna o resultado da divisão simples como fallback.
         return simple_split(full_name)
 
+    # Método assíncrono para analisar o conteúdo completo de um CSV usando IA.
     async def parse_student_csv_with_ai(self, csv_content: str) -> list[dict]:
         """
         (Desativado) Usa uma única chamada de IA para analisar o conteúdo de um CSV.
         """
+        # Lança um erro se o provedor de IA não estiver configurado.
         if not self.provider:
-            raise RuntimeError("AI provider is not configured.")
+            raise RuntimeError("O provedor de IA não está configurado.")
 
+        # Cria o prompt para a IA (o prompt completo foi omitido por brevidade no arquivo original).
         prompt = (
-            "You are an expert data extraction assistant. Analyze the following text... " # Prompt omitido por brevidade
+            "Você é um assistente especialista em extração de dados. Analise o seguinte texto... "
             f'"""{csv_content}"""'
         )
+        # Prepara a mensagem para ser enviada.
         messages = [{"role": "user", "content": prompt}]
 
         try:
+            # Obtém a resposta da IA.
             response = await self.provider.get_chat_response(messages)
 
+            # Verifica se a resposta está vazia.
             if not response or not response.content:
-                raise RuntimeError("AI provider returned an empty response.")
+                raise RuntimeError("O provedor de IA retornou uma resposta vazia.")
 
+            # Verifica se a resposta é uma mensagem de erro do próprio provedor.
             if response.content.strip().startswith("Error:"):
-                raise RuntimeError(f"The AI provider reported an error: {response.content.strip()}")
+                raise RuntimeError(f"O provedor de IA relatou um erro: {response.content.strip()}")
 
+            # Limpa a string de resposta, removendo marcações de bloco de código que a IA às vezes adiciona.
             cleaned_json_str = response.content.strip().replace("```json", "").replace("```", "").strip()
 
+            # Verifica se a string limpa ficou vazia.
             if not cleaned_json_str:
-                raise RuntimeError("AI provider returned an empty JSON string.")
+                raise RuntimeError("O provedor de IA retornou uma string JSON vazia.")
 
+            # Converte a string JSON limpa em uma lista de dicionários Python e a retorna.
             return json.loads(cleaned_json_str)
+        # Captura erro de decodificação de JSON.
         except json.JSONDecodeError as e:
-            raise RuntimeError(f"Failed to parse CSV with AI: Invalid JSON format. Error: {e}") from e
+            raise RuntimeError(f"Falha ao analisar CSV com IA: Formato JSON inválido. Erro: {e}") from e
+        # Captura qualquer outro erro inesperado.
         except Exception as e:
-            raise RuntimeError(f"An unexpected error occurred while parsing CSV with AI: {e}") from e
+            raise RuntimeError(f"Ocorreu um erro inesperado ao analisar CSV com IA: {e}") from e
