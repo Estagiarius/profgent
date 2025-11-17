@@ -1,5 +1,4 @@
 import inspect
-import json
 from functools import wraps
 
 def tool(func):

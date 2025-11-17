@@ -1,5 +1,5 @@
 from datetime import date
-from sqlalchemy import func, select
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload, Session
 from app.data.database import get_db_session
 from app.models.student import Student

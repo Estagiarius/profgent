@@ -1,5 +1,4 @@
 import customtkinter as ctk
-from app.services.data_service import DataService
 from app.utils.charts import create_grade_distribution_chart
 from PIL import Image
 import os

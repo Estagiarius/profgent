@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Any, Callable
+from typing import Dict, Any
 from app.core.tools.tool_registry import ToolRegistry
 
 class ToolExecutor:
