@@ -6,6 +6,8 @@ from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from customtkinter import CTkInputDialog
+from app.utils.async_utils import run_async_task
+from app.utils.import_utils import async_import_students
 
 class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
@@ -175,21 +177,21 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         enrollments = data_service.get_enrollments_for_class(self.class_id)
-        class_ = data_service.get_class_by_id(self.class_id)
-        assessments = class_.assessments if class_ else []
+        class_data = data_service.get_class_by_id(self.class_id)
+        assessments = class_data['assessments'] if class_data else []
 
         # Create Header
-        headers = ["Nome do Aluno"] + [a.name for a in assessments] + ["Média Final"]
+        headers = ["Nome do Aluno"] + [a['name'] for a in assessments] + ["Média Final"]
         for col, header in enumerate(headers):
             label = ctk.CTkLabel(self.grade_grid_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
 
         # Create Rows for each student
         self.grade_entries = {} # To store the entry widgets
-        grades = data_service.get_grades_for_class(self.class_id)
+        grades = data_service.get_grades_for_class(self.class_id) # This already returns a list of dicts
 
         for row, enrollment in enumerate(enrollments, start=1):
-            student_name = f"{enrollment.student.first_name} {enrollment.student.last_name}"
+            student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
             name_label = ctk.CTkLabel(self.grade_grid_frame, text=student_name)
             name_label.grid(row=row, column=0, padx=5, pady=5, sticky="w")
 
@@ -198,14 +200,15 @@ class ClassDetailView(ctk.CTkFrame):
                 entry.grid(row=row, column=col, padx=5, pady=5)
 
                 # Find the existing grade for this student and assessment
-                existing_grade = next((g for g in grades if g.student_id == enrollment.student_id and g.assessment_id == assessment.id), None)
+                existing_grade = next((g for g in grades if g['student_id'] == enrollment['student_id'] and g['assessment_id'] == assessment['id']), None)
                 if existing_grade:
-                    entry.insert(0, str(existing_grade.score))
+                    entry.insert(0, str(existing_grade['score']))
 
-                self.grade_entries[(enrollment.student_id, assessment.id)] = entry
+                self.grade_entries[(enrollment['student_id'], assessment['id'])] = entry
 
             # Calculate and display final average
-            average = data_service.calculate_weighted_average(enrollment.student_id, grades, assessments)
+            # Note: calculate_weighted_average now expects dictionaries
+            average = data_service.calculate_weighted_average(enrollment['student_id'], grades, assessments)
             average_label = ctk.CTkLabel(self.grade_grid_frame, text=f"{average:.2f}")
             average_label.grid(row=row, column=len(assessments) + 1, padx=5, pady=5, sticky="w")
 
@@ -215,7 +218,7 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         enrollments = data_service.get_enrollments_for_class(self.class_id)
-        student_names = [f"{e.student.first_name} {e.student.last_name}" for e in enrollments]
+        student_names = [f"{e['student_first_name']} {e['student_last_name']}" for e in enrollments]
 
         if not student_names:
             # TODO: Show a proper message dialog
@@ -226,10 +229,10 @@ class ClassDetailView(ctk.CTkFrame):
             student_name = data["student"]
             description = data["description"]
 
-            selected_enrollment = next((e for e in enrollments if f"{e.student.first_name} {e.student.last_name}" == student_name), None)
+            selected_enrollment = next((e for e in enrollments if f"{e['student_first_name']} {e['student_last_name']}" == student_name), None)
 
             if selected_enrollment and description:
-                data_service.create_incident(self.class_id, selected_enrollment.student.id, description, date.today())
+                data_service.create_incident(self.class_id, selected_enrollment['student_id'], description, date.today())
                 self.populate_incident_list()
 
         fields = {"description": "Descrição"}
@@ -251,13 +254,13 @@ class ClassDetailView(ctk.CTkFrame):
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
 
         for i, incident in enumerate(incidents, start=1):
-            student_name = f"{incident.student.first_name} {incident.student.last_name}"
+            student_name = f"{incident['student_first_name']} {incident['student_last_name']}"
             ctk.CTkLabel(self.incident_list_frame, text=student_name).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.incident_list_frame, text=str(incident.date)).grid(row=i, column=1, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.incident_list_frame, text=incident.description, wraplength=400, justify="left").grid(row=i, column=2, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.incident_list_frame, text=incident['date']).grid(row=i, column=1, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.incident_list_frame, text=incident['description'], wraplength=400, justify="left").grid(row=i, column=2, padx=10, pady=5, sticky="w")
 
     def show_lesson_editor(self, lesson=None):
-        self.editing_lesson_id = lesson.id if lesson else None
+        self.editing_lesson_id = lesson['id'] if lesson else None
         self.lesson_list_view.grid_forget()
         self.lesson_editor_view.grid(row=0, column=0, sticky="nsew")
 
@@ -267,9 +270,9 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_editor_content_textbox.delete("1.0", "end")
 
         if lesson:
-            self.lesson_editor_title_entry.insert(0, lesson.title)
-            self.lesson_editor_date_entry.insert(0, lesson.date.isoformat())
-            self.lesson_editor_content_textbox.insert("1.0", lesson.content or "")
+            self.lesson_editor_title_entry.insert(0, lesson['title'])
+            self.lesson_editor_date_entry.insert(0, lesson['date']) # Already a string
+            self.lesson_editor_content_textbox.insert("1.0", lesson['content'] or "")
         else:
             self.lesson_editor_date_entry.insert(0, date.today().isoformat())
 
@@ -331,8 +334,8 @@ class ClassDetailView(ctk.CTkFrame):
         if not self.class_id:
             return
 
-        class_ = data_service.get_class_by_id(self.class_id)
-        if not class_:
+        class_data = data_service.get_class_by_id(self.class_id)
+        if not class_data:
             return
 
         headers = ["Nome da Avaliação", "Peso", "Ações"]
@@ -340,9 +343,9 @@ class ClassDetailView(ctk.CTkFrame):
             label = ctk.CTkLabel(self.assessment_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
 
-        for i, assessment in enumerate(class_.assessments, start=1):
-            ctk.CTkLabel(self.assessment_list_frame, text=assessment.name).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.assessment_list_frame, text=str(assessment.weight)).grid(row=i, column=1, padx=10, pady=5, sticky="w")
+        for i, assessment in enumerate(class_data['assessments'], start=1):
+            ctk.CTkLabel(self.assessment_list_frame, text=assessment['name']).grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.assessment_list_frame, text=str(assessment['weight'])).grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
             actions_frame = ctk.CTkFrame(self.assessment_list_frame)
             actions_frame.grid(row=i, column=2, padx=5, pady=5, sticky="e")
@@ -350,7 +353,7 @@ class ClassDetailView(ctk.CTkFrame):
             edit_button = ctk.CTkButton(actions_frame, text="Editar", command=lambda a=assessment: self.edit_assessment_popup(a))
             edit_button.pack(side="left", padx=5)
 
-            delete_button = ctk.CTkButton(actions_frame, text="Excluir", fg_color="red", command=lambda a_id=assessment.id: self.delete_assessment_action(a_id))
+            delete_button = ctk.CTkButton(actions_frame, text="Excluir", fg_color="red", command=lambda a_id=assessment['id']: self.delete_assessment_action(a_id))
             delete_button.pack(side="left", padx=5)
 
     def delete_assessment_action(self, assessment_id):
@@ -374,9 +377,9 @@ class ClassDetailView(ctk.CTkFrame):
 
         fields = {"name": "Nome da Avaliação", "weight": "Peso"}
         initial_data = {
-            "id": assessment.id,
-            "name": assessment.name,
-            "weight": str(assessment.weight)
+            "id": assessment['id'],
+            "name": assessment['name'],
+            "weight": str(assessment['weight'])
         }
         EditDialog(self, "Editar Avaliação", fields, initial_data, save_callback)
 
@@ -385,7 +388,7 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         unenrolled_students = data_service.get_unenrolled_students(self.class_id)
-        student_names = [f"{s.first_name} {s.last_name}" for s in unenrolled_students]
+        student_names = [f"{s['first_name']} {s['last_name']}" for s in unenrolled_students]
 
         if not student_names:
             # You might want to show a proper message dialog here
@@ -394,11 +397,11 @@ class ClassDetailView(ctk.CTkFrame):
 
         def save_callback(data):
             student_name = data["student"]
-            student = next((s for s in unenrolled_students if f"{s.first_name} {s.last_name}" == student_name), None)
+            student = next((s for s in unenrolled_students if f"{s['first_name']} {s['last_name']}" == student_name), None)
 
             if student:
                 next_call_number = data_service.get_next_call_number(self.class_id)
-                data_service.add_student_to_class(student.id, self.class_id, next_call_number)
+                data_service.add_student_to_class(student['id'], self.class_id, next_call_number)
                 self.populate_student_list()
 
         dropdowns = {"student": ("Aluno", student_names)}
@@ -415,7 +418,7 @@ class ClassDetailView(ctk.CTkFrame):
         enrollments = data_service.get_enrollments_for_class(self.class_id)
 
         if self.show_active_only_checkbox.get():
-            enrollments = [e for e in enrollments if e.status == 'Active']
+            enrollments = [e for e in enrollments if e['status'] == 'Active']
 
         headers = ["Nº de Chamada", "Nome do Aluno", "Data de Nascimento", "Status", "Ações"]
         for i, header in enumerate(headers):
@@ -423,17 +426,23 @@ class ClassDetailView(ctk.CTkFrame):
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
 
         for i, enrollment in enumerate(enrollments, start=1):
-            ctk.CTkLabel(self.student_list_frame, text=str(enrollment.call_number)).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.student_list_frame, text=f"{enrollment.student.first_name} {enrollment.student.last_name}").grid(row=i, column=1, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.student_list_frame, text=str(enrollment['call_number'])).grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.student_list_frame, text=f"{enrollment['student_first_name']} {enrollment['student_last_name']}").grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
-            birth_date_str = enrollment.student.birth_date.strftime("%d/%m/%Y") if enrollment.student.birth_date else ""
+            birth_date_str = ""
+            if enrollment['student_birth_date']:
+                try:
+                    birth_date = datetime.strptime(enrollment['student_birth_date'], '%Y-%m-%d')
+                    birth_date_str = birth_date.strftime("%d/%m/%Y")
+                except (ValueError, TypeError):
+                    birth_date_str = "Data Inválida" # Or handle as you see fit
             ctk.CTkLabel(self.student_list_frame, text=birth_date_str).grid(row=i, column=2, padx=10, pady=5, sticky="w")
 
-            display_status = self.status_map_rev.get(enrollment.status, enrollment.status)
+            display_status = self.status_map_rev.get(enrollment['status'], enrollment['status'])
             ctk.CTkLabel(self.student_list_frame, text=display_status).grid(row=i, column=3, padx=10, pady=5, sticky="w")
 
             status_menu = ctk.CTkOptionMenu(self.student_list_frame, values=["Ativo", "Inativo"],
-                                            command=lambda status, eid=enrollment.id: self.update_status(eid, status))
+                                            command=lambda status, eid=enrollment['id']: self.update_status(eid, status))
             status_menu.set(display_status)
             status_menu.grid(row=i, column=4, padx=10, pady=5, sticky="w")
 
@@ -444,46 +453,46 @@ class ClassDetailView(ctk.CTkFrame):
 
     def import_students(self):
         if not self.class_id:
+            messagebox.showerror("Erro", "Selecione uma turma antes de importar alunos.")
             return
 
         filepath = filedialog.askopenfilename(
-            title="Selecione um arquivo CSV",
+            title="Selecione um arquivo CSV de Alunos",
             filetypes=(("Arquivos CSV", "*.csv"), ("Todos os arquivos", "*.*"))
         )
         if not filepath:
             return
 
-        try:
-            with open(filepath, mode='r', encoding='utf-8') as file:
-                reader = csv.DictReader(file)
-                for row in reader:
-                    # Assuming CSV has columns: 'call_number', 'student_name', 'status', 'birth_date'
-                    call_number = int(row['call_number'])
-                    full_name = row['student_name'].split()
-                    first_name = full_name[0]
-                    last_name = " ".join(full_name[1:])
-                    status = row['status']
-                    birth_date_str = row.get('birth_date')
+        self.import_button.configure(state="disabled", text="Importando...")
+        self.enroll_student_button.configure(state="disabled")
 
-                    birth_date = None
-                    if birth_date_str:
-                        try:
-                            birth_date = datetime.strptime(birth_date_str, "%d/%m/%Y").date()
-                        except ValueError:
-                            print(f"Formato de data de nascimento inválido para o aluno {full_name}. Use DD/MM/AAAA.")
+        coro = async_import_students(
+            filepath,
+            self.class_id,
+            self.main_app.data_service
+        )
 
-                    # Find or create student
-                    student = data_service.get_student_by_name(f"{first_name} {last_name}")
-                    if not student:
-                        student = data_service.add_student(first_name, last_name, birth_date)
+        run_async_task(coro, self.main_app.loop, self.main_app.async_queue, self._on_import_complete)
 
-                    # Enroll student in the class
-                    data_service.add_student_to_class(student.id, self.class_id, call_number, status)
+    def _on_import_complete(self, result):
+        """
+        Callback function executed on the main UI thread after the import task finishes.
+        """
+        self.import_button.configure(state="normal", text="Importar Alunos (.csv)")
+        self.enroll_student_button.configure(state="normal")
 
-            self.populate_student_list() # Refresh the list
-        except Exception as e:
-            # Simple error handling for now
-            print(f"Erro ao importar alunos: {e}")
+        if isinstance(result, Exception):
+            messagebox.showerror("Erro Inesperado", f"Ocorreu um erro fatal durante a importação:\n\n{result}")
+            return
+
+        success_count, errors = result
+        self.populate_student_list()
+
+        if errors:
+            error_message = f"{success_count} alunos importados com sucesso, mas ocorreram os seguintes erros:\n\n" + "\n".join(errors)
+            messagebox.showwarning("Importação com Erros", error_message)
+        else:
+            messagebox.showinfo("Sucesso", f"{success_count} alunos importados com sucesso!")
 
 
     def populate_lesson_list(self):
@@ -501,8 +510,8 @@ class ClassDetailView(ctk.CTkFrame):
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
 
         for i, lesson in enumerate(lessons, start=1):
-            ctk.CTkLabel(self.lesson_list_frame, text=str(lesson.date)).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.lesson_list_frame, text=lesson.title).grid(row=i, column=1, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.lesson_list_frame, text=lesson['date']).grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.lesson_list_frame, text=lesson['title']).grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
             edit_button = ctk.CTkButton(self.lesson_list_frame, text="Editar", command=lambda l=lesson: self.show_lesson_editor(l))
             edit_button.grid(row=i, column=2, padx=10, pady=5, sticky="e")
@@ -511,8 +520,8 @@ class ClassDetailView(ctk.CTkFrame):
     def on_show(self, class_id=None):
         self.class_id = class_id
         if class_id:
-            class_ = data_service.get_class_by_id(self.class_id)
-            self.title_label.configure(text=f"Detalhes da Turma: {class_.name}")
+            class_data = data_service.get_class_by_id(self.class_id)
+            self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
             self.populate_student_list()
             self.populate_assessment_list()
             self.populate_lesson_list()

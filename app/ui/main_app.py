@@ -67,8 +67,8 @@ class MainApp(ctk.CTk):
 
         # Create views and store them in a dictionary
         self.views = {
-            "dashboard": DashboardView(self.main_frame),
-            "management": ManagementView(self.main_frame),
+            "dashboard": DashboardView(self.main_frame, self),
+            "management": ManagementView(self.main_frame, self),
             "class_selection": ClassSelectionView(self.main_frame, self),
             "class_detail": ClassDetailView(self.main_frame, self),
             "assistant": AssistantView(self.main_frame, self, assistant_service=self.assistant_service),

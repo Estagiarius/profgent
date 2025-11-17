@@ -5,9 +5,10 @@ from PIL import Image
 import os
 
 class DashboardView(ctk.CTkFrame):
-    def __init__(self, parent):
+    def __init__(self, parent, main_app):
         super().__init__(parent)
-        self.data_service = DataService()
+        self.main_app = main_app
+        self.data_service = self.main_app.data_service
         self.courses = []
         self.selected_course_id = None
 
@@ -43,7 +44,7 @@ class DashboardView(ctk.CTkFrame):
     def load_courses(self):
         """Loads courses into the dropdown menu."""
         self.courses = self.data_service.get_all_courses()
-        course_names = [c.course_name for c in self.courses]
+        course_names = [c['course_name'] for c in self.courses]
 
         if course_names:
             self.course_menu.configure(values=course_names)
@@ -58,8 +59,8 @@ class DashboardView(ctk.CTkFrame):
     def on_course_select(self, selected_name: str):
         self.selected_course_id = None
         for course in self.courses:
-            if course.course_name == selected_name:
-                self.selected_course_id = course.id
+            if course['course_name'] == selected_name:
+                self.selected_course_id = course['id']
                 break
         self.update_chart()
 
@@ -69,7 +70,6 @@ class DashboardView(ctk.CTkFrame):
             self.chart_label.configure(text="Nenhum curso selecionado ou disponível.", image=None)
             return
 
-        # Fetch a fresh, session-bound course object to prevent DetachedInstanceError
         selected_course = self.data_service.get_course_by_id(self.selected_course_id)
         if not selected_course:
             self.chart_label.configure(text=f"Não foi possível encontrar o curso com ID: {self.selected_course_id}", image=None)
@@ -77,12 +77,12 @@ class DashboardView(ctk.CTkFrame):
 
         # Aggregate grades from all classes within the selected course
         all_grades = []
-        for class_ in selected_course.classes:
-            grades_in_class = self.data_service.get_grades_for_class(class_.id)
+        for class_data in selected_course['classes']:
+            grades_in_class = self.data_service.get_grades_for_class(class_data['id'])
             all_grades.extend(grades_in_class)
 
         # Generate the chart and get the path to the temporary file
-        chart_path = create_grade_distribution_chart(all_grades, selected_course.course_name)
+        chart_path = create_grade_distribution_chart(all_grades, selected_course['course_name'])
 
         if os.path.exists(chart_path):
             img = Image.open(chart_path)

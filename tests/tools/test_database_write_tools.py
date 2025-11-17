@@ -17,7 +17,7 @@ def test_add_new_student(data_service: DataService):
     # Verify the student was actually created in the test DB
     student = data_service.get_student_by_name("Test Student")
     assert student is not None
-    assert student.first_name == "Test"
+    assert student['first_name'] == "Test"
 
 def test_add_new_course(data_service: DataService):
     """Test the add_new_course tool."""
@@ -27,22 +27,22 @@ def test_add_new_course(data_service: DataService):
     # Verify the course was created
     course = data_service.get_course_by_name("Test Course")
     assert course is not None
-    assert course.course_code == "TC101"
+    assert course['course_code'] == "TC101"
 
 def test_add_new_grade(data_service: DataService):
     """Test the add_new_grade tool."""
     # First, create the student and course to add a grade to
     student = data_service.add_student("Grade", "Student")
     course = data_service.add_course("Grading", "G101")
-    class_ = data_service.create_class("1A", course.id)
-    assessment = data_service.add_assessment(class_.id, "Final Project", 1.0)
-    data_service.add_student_to_class(student.id, class_.id, 1) # Enroll student
+    class_ = data_service.create_class("1A", course['id'])
+    assessment = data_service.add_assessment(class_['id'], "Final Project", 1.0)
+    data_service.add_student_to_class(student['id'], class_['id'], 1) # Enroll student
 
     result = add_new_grade("Grade Student", "1A", "Final Project", 99.9)
     assert "Successfully added grade" in result
 
     # Verify the grade was created
-    grades = data_service.get_grades_for_class(class_.id)
+    grades = data_service.get_grades_for_class(class_['id'])
     assert len(grades) == 1
-    assert grades[0].score == 99.9
-    assert grades[0].assessment.name == "Final Project"
+    assert grades[0]['score'] == 99.9
+    assert grades[0]['assessment_name'] == "Final Project"

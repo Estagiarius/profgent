@@ -10,12 +10,16 @@ from app.models.incident import Incident
 
 def test_create_lesson_and_incident(data_service: DataService, db_session: Session):
     # 1. Setup: Create prerequisite objects using the service
-    student = data_service.add_student("John", "Doe")
-    assert student is not None
-    course = data_service.add_course("Test Course", "TC101")
-    assert course is not None
-    class_ = data_service.create_class("Test Class", course.id)
-    assert class_ is not None
+    student_dict = data_service.add_student("John", "Doe")
+    assert student_dict is not None
+    course_dict = data_service.add_course("Test Course", "TC101")
+    assert course_dict is not None
+    class_dict = data_service.create_class("Test Class", course_dict['id'])
+    assert class_dict is not None
+
+    # Retrieve the actual ORM objects from the database for testing relationships
+    student = db_session.query(Student).get(student_dict['id'])
+    class_ = db_session.query(Class).get(class_dict['id'])
 
     # 2. Create a Lesson using the test's db_session
     new_lesson = Lesson(

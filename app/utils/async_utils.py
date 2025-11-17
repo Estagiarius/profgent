@@ -1,31 +1,32 @@
 import asyncio
 import threading
-from typing import Coroutine, Callable
-from queue import Queue
 
-def run_async_task(coro: Coroutine, queue: Queue, callback: Callable):
+def run_async_task(coro, loop, queue, callback):
     """
-    Runs a coroutine in a background thread and puts the callback and result
-    onto a queue for the main thread to process.
+    Executes a coroutine in a background thread on the main application's event loop,
+    and queues a callback to be executed on the main UI thread upon completion.
+
+    This is the standard, non-blocking way to run async tasks from the UI in this application.
 
     Args:
-        coro: The coroutine to run.
-        queue: The queue to put the result on.
-        callback: The function to be called with the result.
+        coro: The coroutine to execute.
+        loop: The main asyncio event loop of the application.
+        queue: The thread-safe queue for UI updates.
+        callback: The function to call on the main thread with the result of the coroutine.
     """
-    def thread_target():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+    def task_wrapper():
+        # This function runs in a separate thread.
+        # It submits the coroutine to the main event loop and waits for the result.
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
         try:
-            result = loop.run_until_complete(coro)
-            # Put the callback and its arguments onto the queue
+            result = future.result()
+            # Once the result is ready, put it and the callback into the thread-safe queue.
             queue.put((callback, (result,)))
         except Exception as e:
-            # It's good practice to handle potential exceptions in the async task
-            print(f"Error in background task: {e}")
-            # Optionally put the error on the queue for the UI to handle
-            # queue.put((error_callback, (e,)))
-        finally:
-            loop.close()
+            # If the async task raises an exception, queue it for the callback to handle.
+            queue.put((callback, (e,)))
 
-    threading.Thread(target=thread_target).start()
+    # Start the background thread to manage the async task.
+    thread = threading.Thread(target=task_wrapper)
+    thread.daemon = True
+    thread.start()
