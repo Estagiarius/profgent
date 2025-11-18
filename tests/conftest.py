@@ -1,11 +1,15 @@
+# Importa as bibliotecas necessárias para os testes.
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from pytest_mock import MockerFixture
 from contextlib import contextmanager
+
+# Importa a Base e os serviços/modelos da aplicação.
 from app.models.base import Base
 from app.services.data_service import DataService
-# Import all models to ensure they are registered with Base.metadata
+# É crucial importar todos os modelos aqui para garantir que a Base.metadata
+# conheça todas as tabelas antes de `create_all` ser chamado.
 from app.models.student import Student
 from app.models.course import Course
 from app.models.grade import Grade
@@ -15,58 +19,79 @@ from app.models.assessment import Assessment
 from app.models.lesson import Lesson
 from app.models.incident import Incident
 
+# Define uma 'fixture' do pytest. Fixtures são funções que fornecem um ambiente ou dados
+# consistentes para os testes. `scope="function"` significa que esta fixture será
+# executada uma vez para cada função de teste.
 @pytest.fixture(scope="function")
 def db_session() -> Session:
     """
-    Pytest fixture to create a new in-memory SQLite database session for each test function.
-    This ensures that tests are isolated from each other.
+    Fixture do Pytest que cria uma nova sessão de banco de dados SQLite em memória
+    para cada função de teste. Isso garante que os testes sejam isolados uns dos outros.
     """
+    # Cria uma 'engine' do SQLAlchemy para um banco de dados SQLite que existe apenas na memória RAM.
     engine = create_engine("sqlite:///:memory:")
+    # Cria todas as tabelas definidas nos modelos importados neste banco de dados em memória.
     Base.metadata.create_all(engine)
+    # Cria uma fábrica de sessões ligada a este banco de dados.
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     session = SessionLocal()
+    # 'yield' entrega a sessão para a função de teste que a solicitou.
+    # O código após o 'yield' é executado após o término do teste.
     yield session
+    # Fecha a sessão para liberar recursos.
     session.close()
+    # Remove todas as tabelas do banco de dados em memória, limpando o ambiente para o próximo teste.
     Base.metadata.drop_all(engine)
 
 @pytest.fixture(scope="function")
 def data_service(db_session: Session, mocker: MockerFixture) -> DataService:
     """
-    Pytest fixture to create a DataService instance where all database interactions
-    are mocked to use the isolated, in-memory test session.
+    Fixture do Pytest que cria uma instância do DataService onde todas as interações
+    com o banco de dados são 'mockadas' (simuladas) para usar a sessão de teste
+    isolada e em memória.
     """
-    # Create a context manager that yields the test session
+    # Cria um gerenciador de contexto falso que, em vez de criar uma nova sessão,
+    # simplesmente fornece a sessão de teste (`db_session`) que já foi criada.
     @contextmanager
     def mock_get_db_session():
         yield db_session
 
-    # Mock the get_db_session context manager in all relevant modules
+    # Usa o `mocker` do pytest-mock para substituir a função `get_db_session` real
+    # no módulo `data_service` pelo nosso gerenciador de contexto falso.
     mocker.patch("app.services.data_service.get_db_session", new=mock_get_db_session)
-    # The tools do not directly call get_db_session, they call the data_service,
-    # so we only need to patch it in the service layer.
+    # As 'tools' não chamam `get_db_session` diretamente, elas usam o `data_service`,
+    # então só precisamos 'mockar' a camada de serviço.
 
+    # Cria uma instância do DataService. Agora, sempre que este serviço tentar
+    # obter uma sessão de banco de dados, ele receberá a sessão de teste em memória.
     service = DataService()
     return service
 
 @pytest.fixture(scope="function")
 def assistant_service(mocker: MockerFixture) -> "AssistantService":
     """
-    Pytest fixture to create a new AssistantService instance for each test function,
-    with the provider initialization mocked out to prevent heavy loading.
+    Fixture do Pytest que cria uma nova instância do AssistantService para cada teste,
+    com a inicialização do provedor de IA 'mockada' para evitar o carregamento pesado
+    e chamadas de rede reais.
     """
-    # We need to import it here to avoid circular dependencies
+    # Importamos o AssistantService aqui dentro para evitar problemas de dependência circular.
     from app.services.assistant_service import AssistantService
 
-    # Mock the method that initializes the (potentially heavy) LLM provider
+    # 'Mocka' o método que inicializa o provedor de LLM, que pode ser pesado
+    # (carregar modelos, fazer chamadas de rede, etc.).
     mocker.patch("app.services.assistant_service.AssistantService._initialize_provider")
 
     service = AssistantService()
-    # Since initialization is mocked, we need to manually set a mock provider
-    # for any tests that might need it.
+    # Como a inicialização foi 'mockada', precisamos definir manualmente um provedor falso
+    # para quaisquer testes que possam precisar dele. `MagicMock` é um objeto flexível
+    # que simula qualquer atributo ou método que for acessado nele.
     service.provider = mocker.MagicMock()
 
     return service
 
+# Fixture com escopo de 'session' (executada apenas uma vez por sessão de teste).
 @pytest.fixture(scope="session")
 def anyio_backend():
+    # Força o pytest-anyio a usar o backend 'asyncio', evitando erros se outros
+    # backends como 'trio' não estiverem instalados.
     return "asyncio"

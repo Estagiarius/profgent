@@ -51,23 +51,34 @@ def split_full_name(full_name, compound_names_list=COMMON_COMPOUND_NAMES):
     Returns:
         tuple: Uma tupla contendo (primeiro_nome, sobrenome).
     """
+    # Se o nome completo for nulo ou vazio, retorna duas strings vazias.
     if not full_name:
         return "", ""
 
+    # Converte o nome completo para maiúsculas para uma comparação sem distinção de caso.
     full_name_upper = full_name.upper()
 
-    # Verifica se o nome começa com algum nome composto da lista
+    # Itera sobre cada nome composto na lista de nomes comuns.
     for compound_name in compound_names_list:
+        # Verifica se o nome completo (em maiúsculas) começa com o nome composto seguido de um espaço.
+        # O espaço é importante para evitar correspondências parciais (ex: "ANA" em "ANABELA").
         if full_name_upper.startswith(compound_name + " "):
-            # Encontrou um nome composto
+            # Se encontrou um nome composto correspondente, calcula onde ele termina.
             first_name_end_index = len(compound_name)
+            # Extrai o primeiro nome do nome completo original, preservando a capitalização original.
             first_name = full_name[:first_name_end_index]
+            # Extrai o restante da string como o sobrenome e remove espaços em branco extras.
             last_name = full_name[first_name_end_index:].strip()
+            # Retorna o nome e o sobrenome encontrados.
             return first_name, last_name
 
-    # Se nenhum nome composto for encontrado, usa a lógica padrão (primeira palavra)
+    # Se o loop terminar sem encontrar um nome composto, usa a lógica padrão.
+    # Divide o nome completo em palavras com base nos espaços.
     parts = full_name.split(" ")
+    # A primeira palavra é considerada o primeiro nome.
     first_name = parts[0]
+    # Todas as palavras restantes são juntadas para formar o sobrenome.
     last_name = " ".join(parts[1:]).strip()
 
+    # Retorna o resultado da divisão padrão.
     return first_name, last_name

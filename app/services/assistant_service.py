@@ -1,126 +1,182 @@
+# Importa a classe base para provedores de LLM e a estrutura de resposta do assistente.
 from app.core.llm.base import LLMProvider, AssistantResponse
+# Importa o provedor específico para a API da OpenAI.
 from app.core.llm.openai_provider import OpenAIProvider
+# Importa o provedor específico para a API da Maritaca.
 from app.core.llm.maritaca_provider import MaritacaProvider
+# Importa o provedor específico para a API do OpenRouter.
 from app.core.llm.open_router_provider import OpenRouterProvider
+# Importa o provedor específico para rodar modelos localmente com Ollama.
 from app.core.llm.ollama_provider import OllamaProvider
+# Importa a função para obter chaves de API de forma segura.
 from app.core.security.credentials import get_api_key
+# Importa a função para carregar configurações salvas.
 from app.core.config import load_setting
+# Importa o registro de ferramentas, que gerencia as ferramentas disponíveis para a IA.
 from app.core.tools.tool_registry import ToolRegistry
+# Importa o executor de ferramentas, que executa as chamadas de função da IA.
 from app.core.tools.tool_executor import ToolExecutor
 
-# --- Tool Imports ---
+# --- Importação das Ferramentas (Tools) ---
+# Importa as ferramentas de leitura do banco de dados.
 from app.tools.database_tools import get_student_grade, list_courses_for_student, get_class_average
+# Importa as ferramentas de busca na internet.
 from app.tools.internet_tools import search_internet
+# Importa as ferramentas de escrita no banco de dados.
 from app.tools.database_write_tools import add_new_student, add_new_course, add_new_grade
+# Importa as ferramentas de análise de dados.
 from app.tools.analysis_tools import get_student_performance_summary_tool, get_students_at_risk_tool
+# Importa as ferramentas com foco pedagógico.
 from app.tools.pedagogical_tools import suggest_lesson_activities_tool
 
+# Define a classe AssistantService, que orquestra toda a lógica do assistente de IA.
 class AssistantService:
+    # O método construtor, chamado ao criar uma nova instância do serviço.
     def __init__(self):
+        # Inicializa o provedor de LLM como None. Ele será configurado depois.
         self.provider: LLMProvider | None = None
+        # Inicializa a lista de mensagens, que manterá o histórico da conversa.
         self.messages: list = []
 
+        # Cria uma instância do registro de ferramentas.
         self.tool_registry = ToolRegistry()
+        # Chama o método para registrar todas as ferramentas disponíveis.
         self._register_tools()
+        # Cria uma instância do executor de ferramentas, passando o registro como dependência.
         self.tool_executor = ToolExecutor(self.tool_registry)
 
+        # Chama o método para inicializar o provedor de LLM com base nas configurações salvas.
         self._initialize_provider()
 
+    # Método privado para registrar as ferramentas que o assistente pode usar.
     def _register_tools(self):
-        # Read tools
+        # Ferramentas de leitura
         self.tool_registry.register(get_student_grade)
         self.tool_registry.register(list_courses_for_student)
         self.tool_registry.register(get_class_average)
-        # Analysis tools
+        # Ferramentas de análise
         self.tool_registry.register(get_student_performance_summary_tool)
         self.tool_registry.register(get_students_at_risk_tool)
-        # Pedagogical tools
+        # Ferramentas pedagógicas
         self.tool_registry.register(suggest_lesson_activities_tool)
-        # Internet tools
+        # Ferramentas de internet
         self.tool_registry.register(search_internet)
-        # Write tools
+        # Ferramentas de escrita
         self.tool_registry.register(add_new_student)
         self.tool_registry.register(add_new_course)
         self.tool_registry.register(add_new_grade)
 
+    # Método privado para inicializar o provedor de LLM ativo.
     def _initialize_provider(self):
-        """Initializes the active LLM provider and model based on saved settings."""
+        """Inicializa o provedor de LLM ativo e o modelo com base nas configurações salvas."""
+        # Carrega o nome do provedor ativo salvo nas configurações, com "OpenAI" como padrão.
         active_provider_name = load_setting("active_provider", "OpenAI")
+        # Define a chave para buscar o modelo específico do provedor (ex: "openai_model").
         model_config_key = f"{active_provider_name.lower()}_model"
 
+        # Se o provedor ativo for "Ollama".
         if active_provider_name == "Ollama":
+            # Carrega a URL do Ollama e o modelo selecionado.
             ollama_url = load_setting("ollama_url", "http://localhost:11434/v1")
             selected_model = load_setting(model_config_key, "llama3.1")
+            # Cria a instância do provedor Ollama.
             self.provider = OllamaProvider(base_url=ollama_url, model=selected_model)
+        # Para outros provedores que usam chave de API.
         else:
+            # Obtém a chave de API para o provedor ativo.
             api_key = get_api_key(active_provider_name)
+            # Se a chave não existir, o provedor não pode ser inicializado.
             if not api_key:
                 self.provider = None; return
 
+            # Se for "OpenAI".
             if active_provider_name == "OpenAI":
                 selected_model = load_setting(model_config_key, "gpt-4")
                 self.provider = OpenAIProvider(api_key=api_key, model=selected_model)
+            # Se for "Maritaca".
             elif active_provider_name == "Maritaca":
                 selected_model = load_setting(model_config_key, "sabia-3")
                 self.provider = MaritacaProvider(api_key=api_key, model=selected_model)
+            # Se for "OpenRouter".
             elif active_provider_name == "OpenRouter":
                 selected_model = load_setting(model_config_key, "mistralai/mistral-7b-instruct:free")
                 self.provider = OpenRouterProvider(api_key=api_key, model=selected_model)
+            # Se nenhum provedor conhecido for encontrado.
             else:
                 self.provider = None
 
+        # Se um provedor foi inicializado com sucesso.
         if self.provider:
+            # Define o "prompt de sistema", que são as instruções e regras fundamentais para a IA.
             system_prompt = (
-                "You are a specialized academic management assistant integrated into a desktop application. "
-                "Your primary function is to help users manage student, course, and grade data by using a "
-                "predefined set of tools. You must adhere to the following rules strictly:\n"
-                "1.  **Use Tools Exclusively**: You MUST use the provided tools to answer questions and perform actions. "
-                "Do not offer to perform actions that are not supported by the tools.\n"
-                "2.  **No Code Generation**: You MUST NOT generate, write, or suggest any code (e.g., Python, SQL). "
-                "Your role is to use the tools, not to be a programmer.\n"
-                "3.  **Admit Limitations**: If you cannot perform a request with the available tools, clearly state that you "
-                "cannot do it and explain the limitation. Do not invent tools or functionality.\n"
-                "4.  **Clarity and Confirmation**: After executing a tool that modifies data (e.g., adding a student), "
-                "always confirm the success of the action in a clear and friendly message based on the tool's output."
+                "Você é um assistente de gestão acadêmica especializado, integrado a um aplicativo de desktop. "
+                "Sua função principal é ajudar os usuários a gerenciar dados de alunos, cursos e notas usando um "
+                "conjunto predefinido de ferramentas. Você deve seguir as seguintes regras estritamente:\n"
+                "1.  **Use Ferramentas Exclusivamente**: Você DEVE usar as ferramentas fornecidas para responder a perguntas e realizar ações. "
+                "Não ofereça realizar ações que não são suportadas pelas ferramentas.\n"
+                "2.  **Sem Geração de Código**: Você NÃO DEVE gerar, escrever ou sugerir qualquer código (ex: Python, SQL). "
+                "Seu papel é usar as ferramentas, não ser um programador.\n"
+                "3.  **Admita Limitações**: Se você não puder atender a uma solicitação com as ferramentas disponíveis, declare claramente que "
+                "não pode fazê-lo e explique a limitação. Não invente ferramentas ou funcionalidades.\n"
+                "4.  **Clareza e Confirmação**: Após executar uma ferramenta que modifica dados (ex: adicionar um aluno), "
+                "sempre confirme o sucesso da ação em uma mensagem clara e amigável, com base na saída da ferramenta."
             )
+            # Inicia o histórico de mensagens com o prompt de sistema.
             self.messages = [{"role": "system", "content": system_prompt}]
 
+    # Método assíncrono para obter uma resposta do assistente.
     async def get_response(self, user_input: str) -> AssistantResponse:
+        # Garante que o provedor esteja atualizado com as últimas configurações.
         self._initialize_provider()
+        # Se nenhum provedor estiver configurado, retorna uma mensagem de erro.
         if not self.provider:
-            return AssistantResponse(content="AI provider not configured...")
+            return AssistantResponse(content="Provedor de IA não configurado...")
 
+        # Adiciona a mensagem do usuário ao histórico da conversa.
         self.messages.append({"role": "user", "content": user_input})
 
-        # Step 1: Get the initial response from the model
+        # Passo 1: Obter a resposta inicial do modelo.
+        # Envia os esquemas das ferramentas se o provedor suportar (OpenAI, OpenRouter, Ollama).
         tool_schemas = self.tool_registry.get_all_schemas() if self.provider.name in ["OpenAI", "OpenRouter", "Ollama"] else None
         response = await self.provider.get_chat_response(self.messages, tools=tool_schemas)
 
-        # Step 2: Check if the model wants to call a tool
+        # Passo 2: Verificar se o modelo quer chamar uma ferramenta.
         if not response.tool_calls:
-            # No tool calls, we have our final answer.
+            # Se não houver chamadas de ferramenta, temos nossa resposta final.
             if response.content:
+                # Adiciona a resposta do assistente ao histórico.
                 self.messages.append({"role": "assistant", "content": response.content})
             return response
 
-        # Step 3: Execute the tool and get the result
+        # Passo 3: Executar a ferramenta e obter o resultado.
+        # Garante que a lista de chamadas de ferramenta seja sempre uma lista.
         tool_calls_list = response.tool_calls if isinstance(response.tool_calls, list) else [response.tool_calls]
+        # Adiciona a intenção de chamada de ferramenta ao histórico.
         self.messages.append({"role": "assistant", "tool_calls": tool_calls_list})
 
+        # Lista para armazenar os resultados das ferramentas.
         tool_results = []
+        # Itera sobre cada chamada de ferramenta solicitada pelo modelo.
         for tool_call in tool_calls_list:
+            # Executa a ferramenta e armazena o resultado.
             result = self.tool_executor.execute_tool_call(tool_call)
             tool_results.append(result)
 
-        # Step 4: Append the tool results and get the final natural language response
+        # Passo 4: Adicionar os resultados das ferramentas ao histórico e obter a resposta final em linguagem natural.
         self.messages.extend(tool_results)
 
+        # Envia a conversa atualizada (com os resultados) para o modelo.
         final_response = await self.provider.get_chat_response(self.messages, tools=tool_schemas)
+        # Se houver conteúdo na resposta final, adiciona ao histórico.
         if final_response.content:
             self.messages.append({"role": "assistant", "content": final_response.content})
+        # Retorna a resposta final para a interface do usuário.
         return final_response
 
+    # Método assíncrono para fechar a conexão do provedor de LLM.
     async def close(self):
-        """Closes the underlying LLM provider's resources."""
+        """Fecha os recursos do provedor de LLM subjacente."""
+        # Se um provedor estiver ativo.
         if self.provider:
+            # Chama o método 'close' do provedor para liberar conexões de rede.
             await self.provider.close()
