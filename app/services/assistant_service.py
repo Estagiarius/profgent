@@ -68,7 +68,7 @@ class AssistantService:
 
     # Método privado para inicializar o provedor de LLM ativo.
     def _initialize_provider(self):
-        """Inicializa o provedor de LLM ativo e o modelo com base nas configurações salvas."""
+        """Initializes the active LLM provider and model based on saved settings."""
         # Carrega o nome do provedor ativo salvo nas configurações, com "OpenAI" como padrão.
         active_provider_name = load_setting("active_provider", "OpenAI")
         # Define a chave para buscar o modelo específico do provedor (ex: "openai_model").
@@ -109,17 +109,17 @@ class AssistantService:
         if self.provider:
             # Define o "prompt de sistema", que são as instruções e regras fundamentais para a IA.
             system_prompt = (
-                "Você é um assistente de gestão acadêmica especializado, integrado a um aplicativo de desktop. "
-                "Sua função principal é ajudar os usuários a gerenciar dados de alunos, cursos e notas usando um "
-                "conjunto predefinido de ferramentas. Você deve seguir as seguintes regras estritamente:\n"
-                "1.  **Use Ferramentas Exclusivamente**: Você DEVE usar as ferramentas fornecidas para responder a perguntas e realizar ações. "
-                "Não ofereça realizar ações que não são suportadas pelas ferramentas.\n"
-                "2.  **Sem Geração de Código**: Você NÃO DEVE gerar, escrever ou sugerir qualquer código (ex: Python, SQL). "
-                "Seu papel é usar as ferramentas, não ser um programador.\n"
-                "3.  **Admita Limitações**: Se você não puder atender a uma solicitação com as ferramentas disponíveis, declare claramente que "
-                "não pode fazê-lo e explique a limitação. Não invente ferramentas ou funcionalidades.\n"
-                "4.  **Clareza e Confirmação**: Após executar uma ferramenta que modifica dados (ex: adicionar um aluno), "
-                "sempre confirme o sucesso da ação em uma mensagem clara e amigável, com base na saída da ferramenta."
+                "You are a specialized academic management assistant integrated into a desktop application. "
+                "Your primary function is to help users manage student, course, and grade data by using a "
+                "predefined set of tools. You must adhere to the following rules strictly:\n"
+                "1.  **Use Tools Exclusively**: You MUST use the provided tools to answer questions and perform actions. "
+                "Do not offer to perform actions that are not supported by the tools.\n"
+                "2.  **No Code Generation**: You MUST NOT generate, write, or suggest any code (e.g., Python, SQL). "
+                "Your role is to use the tools, not to be a programmer.\n"
+                "3.  **Admit Limitations**: If you cannot perform a request with the available tools, clearly state that you "
+                "cannot do it and explain the limitation. Do not invent tools or functionality.\n"
+                "4.  **Clarity and Confirmation**: After executing a tool that modifies data (e.g., adding a student), "
+                "always confirm the success of the action in a clear and friendly message based on the tool's output."
             )
             # Inicia o histórico de mensagens com o prompt de sistema.
             self.messages = [{"role": "system", "content": system_prompt}]
@@ -130,7 +130,7 @@ class AssistantService:
         self._initialize_provider()
         # Se nenhum provedor estiver configurado, retorna uma mensagem de erro.
         if not self.provider:
-            return AssistantResponse(content="Provedor de IA não configurado...")
+            return AssistantResponse(content="AI provider not configured...")
 
         # Adiciona a mensagem do usuário ao histórico da conversa.
         self.messages.append({"role": "user", "content": user_input})
@@ -175,7 +175,7 @@ class AssistantService:
 
     # Método assíncrono para fechar a conexão do provedor de LLM.
     async def close(self):
-        """Fecha os recursos do provedor de LLM subjacente."""
+        """Closes the underlying LLM provider's resources."""
         # Se um provedor estiver ativo.
         if self.provider:
             # Chama o método 'close' do provedor para liberar conexões de rede.

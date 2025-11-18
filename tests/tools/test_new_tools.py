@@ -83,7 +83,7 @@ def test_get_students_at_risk_tool_no_students(mocker, mock_data_service):
 
     # --- VERIFICAÇÃO ---
     # Garante que a ferramenta retorna a mensagem informativa correta, em vez de um JSON vazio.
-    assert "Nenhum aluno foi identificado" in result_str
+    assert "No students were identified" in result_str
 
 # Define um teste para a ferramenta pedagógica.
 def test_suggest_lesson_activities_tool():
@@ -99,6 +99,6 @@ def test_suggest_lesson_activities_tool():
     # --- VERIFICAÇÃO ---
     # Garante que a string de saída (que é um prompt para o LLM) contém
     # os parâmetros formatados corretamente.
-    assert "2 atividades de aula criativas e envolventes" in result
+    assert "2 creative and engaging lesson activities" in result
     assert "'the solar system'" in result
-    assert "alunos de 4th grade" in result
+    assert "4th grade students" in result

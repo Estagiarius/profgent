@@ -23,7 +23,7 @@ def test_add_new_student(data_service: DataService):
 
     # --- VERIFICAÇÃO ---
     # 1. Verifica a resposta da ferramenta: Garante que a mensagem de sucesso foi retornada.
-    assert "adicionado com sucesso" in result
+    assert "Successfully added" in result
 
     # 2. Verifica o estado do banco: Confirma que o aluno foi realmente criado no banco de dados de teste.
     student = data_service.get_student_by_name("Test Student")
@@ -38,7 +38,7 @@ def test_add_new_course(data_service: DataService):
 
     # --- VERIFICAÇÃO ---
     # 1. Verifica a resposta da ferramenta.
-    assert "adicionado com sucesso" in result
+    assert "Successfully added" in result
 
     # 2. Verifica o estado do banco.
     course = data_service.get_course_by_name("Test Course")
@@ -62,7 +62,7 @@ def test_add_new_grade(data_service: DataService):
 
     # --- VERIFICAÇÃO ---
     # 1. Verifica a resposta da ferramenta.
-    assert "Nota adicionada com sucesso" in result
+    assert "Successfully added grade" in result
 
     # 2. Verifica o estado do banco, buscando a nota que acabou de ser criada.
     grades = data_service.get_grades_for_class(class_['id'])

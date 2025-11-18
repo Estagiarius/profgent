@@ -14,8 +14,8 @@ data_service = DataService()
 @tool
 def get_student_performance_summary_tool(student_name: str, class_name: str) -> str:
     """
-    Fornece um resumo detalhado do desempenho de um aluno específico em uma turma específica.
-    Use esta ferramenta para responder a perguntas sobre as notas de um aluno, média ponderada, incidentes e desempenho geral.
+    Provides a detailed performance summary for a specific student in a specific class.
+    Use this tool to answer questions about a student's grades, weighted average, incidents, and overall performance.
     """
     # Bloco try/except para capturar e tratar qualquer erro inesperado que possa ocorrer.
     try:
@@ -23,7 +23,7 @@ def get_student_performance_summary_tool(student_name: str, class_name: str) -> 
         student = data_service.get_student_by_name(student_name)
         # Se o aluno não for encontrado, retorna uma mensagem de erro clara.
         if not student:
-            return f"Erro: Aluno '{student_name}' não encontrado."
+            return f"Error: Student '{student_name}' not found."
 
         # Simplificação: Busca a turma pelo nome. Em uma aplicação real, isso poderia ser mais robusto.
         # Obtém todas as turmas.
@@ -33,14 +33,14 @@ def get_student_performance_summary_tool(student_name: str, class_name: str) -> 
 
         # Se a turma não for encontrada, retorna uma mensagem de erro.
         if not target_class:
-            return f"Erro: Turma '{class_name}' não encontrada."
+            return f"Error: Class '{class_name}' not found."
 
         # Chama o DataService para obter o resumo de desempenho do aluno na turma.
         summary = data_service.get_student_performance_summary(student['id'], target_class['id'])
 
         # Se não for possível obter o resumo, retorna um erro.
         if not summary:
-            return f"Erro: Não foi possível obter o resumo de desempenho para {student_name} em {class_name}."
+            return f"Error: Could not retrieve performance summary for {student_name} in {class_name}."
 
         # Retorna o resumo como uma string JSON formatada.
         # O LLM pode analisar (parse) esta string facilmente para usar os dados.
@@ -48,13 +48,13 @@ def get_student_performance_summary_tool(student_name: str, class_name: str) -> 
     # Captura exceções genéricas.
     except Exception as e:
         # Retorna uma mensagem de erro informando sobre a falha inesperada.
-        return f"Erro: Ocorreu um erro inesperado: {e}"
+        return f"Error: An unexpected error occurred: {e}"
 
 @tool
 def get_students_at_risk_tool(class_name: str) -> str:
     """
-    Identifica e lista alunos que estão em risco em uma turma específica com base em notas baixas ou um alto número de incidentes.
-    Use esta ferramenta para responder a perguntas como "Quais alunos precisam de ajuda?" ou "Mostre-me os alunos com problemas de desempenho."
+    Identifies and lists students who are at risk in a specific class based on low grades or a high number of incidents.
+    Use this tool to answer questions like "Which students need help?" or "Show me students with performance issues."
     """
     try:
         # Busca a turma pelo nome.
@@ -63,16 +63,16 @@ def get_students_at_risk_tool(class_name: str) -> str:
 
         # Se a turma não for encontrada, retorna um erro.
         if not target_class:
-            return f"Erro: Turma '{class_name}' não encontrada."
+            return f"Error: Class '{class_name}' not found."
 
         # Chama o DataService para obter a lista de alunos em risco.
         students_at_risk = data_service.get_students_at_risk(target_class['id'])
 
         # Se a lista estiver vazia, informa que nenhum aluno foi identificado como em risco.
         if not students_at_risk:
-            return f"Nenhum aluno foi identificado como em risco na turma {class_name}."
+            return f"No students were identified as being at risk in {class_name}."
 
         # Retorna a lista de alunos em risco como uma string JSON formatada.
         return json.dumps(students_at_risk, indent=2)
     except Exception as e:
-        return f"Erro: Ocorreu um erro inesperado: {e}"
+        return f"Error: An unexpected error occurred: {e}"

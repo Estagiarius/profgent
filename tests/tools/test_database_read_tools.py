@@ -39,7 +39,7 @@ def test_get_student_grade_not_found(data_service: DataService):
     result = get_student_grade("Jane Doe", "Nonexistent Course")
     # Verificação: Garante que a mensagem de erro correta é retornada.
     # O teste verifica primeiro o aluno, então o erro do aluno deve ser retornado.
-    assert "Aluno 'Jane Doe' não encontrado." in result
+    assert "Student 'Jane Doe' not found." in result
 
 # Define um teste para a ferramenta que lista os cursos de um aluno.
 def test_list_courses_for_student(data_service: DataService):
