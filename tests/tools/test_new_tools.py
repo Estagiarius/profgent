@@ -1,7 +1,10 @@
-# Importa as bibliotecas e funções necessárias.
+# Importa o módulo 'json' para trabalhar com strings JSON.
 import json
+# Importa o pytest para rodar os testes.
 import pytest
+# Importa MagicMock para criar objetos de simulação (mocks).
 from unittest.mock import MagicMock
+# Importa as ferramentas a serem testadas.
 from app.tools.analysis_tools import get_student_performance_summary_tool, get_students_at_risk_tool
 from app.tools.pedagogical_tools import suggest_lesson_activities_tool
 
@@ -18,7 +21,7 @@ def mock_data_service():
     mock.get_student_by_name.return_value = {"id": 1, "first_name": "John", "last_name": "Doe"}
 
     # Configura o mock para simular a busca de turmas.
-    # É importante usar um objeto MagicMock que tenha um atributo `name` real (string)
+    # É importante usar dados realistas (um dicionário com a chave 'name')
     # porque o código da ferramenta chama `.lower()` nesse atributo.
     mock_class_data = {"id": 101, "name": "Math Grade 5"}
     mock.get_all_classes.return_value = [mock_class_data]
@@ -44,8 +47,7 @@ def test_get_student_performance_summary_tool(mocker, mock_data_service):
     # Converte o resultado JSON (string) de volta para um dicionário Python.
     result_json = json.loads(result_str)
 
-    # --- VERIFICAÇÕES ---
-    # Verifica se os métodos mockados foram chamados com os argumentos corretos.
+    # Assertions
     mock_data_service.get_student_by_name.assert_called_with("John Doe")
     mock_data_service.get_all_classes.assert_called_once()
     mock_data_service.get_student_performance_summary.assert_called_with(1, 101) # Verifica se os IDs corretos foram usados.
@@ -55,17 +57,18 @@ def test_get_student_performance_summary_tool(mocker, mock_data_service):
 
 # Define uma função de teste para a ferramenta `get_students_at_risk_tool`.
 def test_get_students_at_risk_tool(mocker, mock_data_service):
+    # Faz o patch da instância do data_service.
     mocker.patch('app.tools.analysis_tools.data_service', mock_data_service)
 
     # Configura o valor de retorno esperado.
     at_risk_data = [{"student_name": "Jane Doe", "reasons": ["Low grade in Math"]}]
     mock_data_service.get_students_at_risk.return_value = at_risk_data
 
-    # --- AÇÃO ---
+    # Chama a ferramenta.
     result_str = get_students_at_risk_tool("Math Grade 5")
     result_json = json.loads(result_str)
 
-    # --- VERIFICAÇÕES ---
+    # Assertions
     mock_data_service.get_all_classes.assert_called_once()
     mock_data_service.get_students_at_risk.assert_called_with(101)
     assert len(result_json) == 1
@@ -73,32 +76,29 @@ def test_get_students_at_risk_tool(mocker, mock_data_service):
 
 # Testa o cenário onde a ferramenta de alunos em risco não encontra nenhum aluno.
 def test_get_students_at_risk_tool_no_students(mocker, mock_data_service):
+    # Faz o patch da instância do data_service.
     mocker.patch('app.tools.analysis_tools.data_service', mock_data_service)
 
     # Configura o mock para retornar uma lista vazia.
     mock_data_service.get_students_at_risk.return_value = []
 
-    # --- AÇÃO ---
+    # Chama a ferramenta.
     result_str = get_students_at_risk_tool("Math Grade 5")
 
-    # --- VERIFICAÇÃO ---
-    # Garante que a ferramenta retorna a mensagem informativa correta, em vez de um JSON vazio.
+    # Garante que a ferramenta retorna a mensagem informativa correta.
     assert "No students were identified" in result_str
 
 # Define um teste para a ferramenta pedagógica.
 def test_suggest_lesson_activities_tool():
     # Esta ferramenta não depende de serviços externos, então não precisa de mocks.
-    # Ela apenas formata uma string para o LLM.
     topic = "the solar system"
     student_level = "4th grade"
     num_suggestions = 2
 
-    # --- AÇÃO ---
+    # Chama a ferramenta.
     result = suggest_lesson_activities_tool(topic, student_level, num_suggestions)
 
-    # --- VERIFICAÇÃO ---
-    # Garante que a string de saída (que é um prompt para o LLM) contém
-    # os parâmetros formatados corretamente.
+    # Assert that the output is the expected formatted string for the LLM
     assert "2 creative and engaging lesson activities" in result
     assert "'the solar system'" in result
     assert "4th grade students" in result
