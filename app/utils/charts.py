@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import os
 import tempfile
-from app.models.grade import Grade
+from typing import List, Dict, Any
 
-def create_grade_distribution_chart(grades: list[Grade], course_name: str) -> str:
+def create_grade_distribution_chart(grades: List[Dict[str, Any]], course_name: str) -> str:
     """
     Generates a histogram of grade distribution and saves it as a temporary PNG file.
     Returns the path to the saved chart file.
@@ -17,8 +17,8 @@ def create_grade_distribution_chart(grades: list[Grade], course_name: str) -> st
     if not grades:
         ax.text(0.5, 0.5, 'Nenhuma nota disponível para este curso.', horizontalalignment='center', verticalalignment='center')
     else:
-        # Clamp scores to a maximum of 10
-        scores = [min(grade.score, 10) for grade in grades]
+        # Clamp scores to a maximum of 10, accessing the score from the dictionary
+        scores = [min(grade['score'], 10) for grade in grades]
         ax.hist(scores, bins=10, range=(0, 10), edgecolor='black')
         ax.set_xlabel('Nota')
         ax.set_ylabel('Número de Alunos')

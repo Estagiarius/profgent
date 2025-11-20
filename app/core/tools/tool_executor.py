@@ -1,6 +1,7 @@
 import json
-from typing import Dict, Any, Callable
+from typing import Dict, Any
 from app.core.tools.tool_registry import ToolRegistry
+
 
 class ToolExecutor:
     """
@@ -19,28 +20,28 @@ class ToolExecutor:
         Returns:
             A dictionary representing the result to be sent back to the LLM.
         """
-        tool_name = tool_call.function.name
+        tool_name = tool_call['function']['name']
         tool_function = self.registry.get_tool(tool_name)
 
         if not tool_function:
-            return self._create_error_result(tool_call.id, f"Tool '{tool_name}' not found.")
+            return self._create_error_result(tool_call['id'], f"Tool '{tool_name}' not found.")
 
         try:
             # Securely parse the JSON arguments string
-            arguments = json.loads(tool_call.function.arguments)
+            arguments = json.loads(tool_call['function']['arguments'])
 
             # Execute the tool function with the parsed arguments
             result = tool_function(**arguments)
 
-            return self._create_success_result(tool_call.id, tool_name, result)
+            return self._create_success_result(tool_call['id'], tool_name, result)
 
         except json.JSONDecodeError:
-            return self._create_error_result(tool_call.id, "Invalid arguments format. Expected a valid JSON string.")
+            return self._create_error_result(tool_call['id'], "Invalid arguments format. Expected a valid JSON string.")
         except TypeError as e:
-            return self._create_error_result(tool_call.id, f"Invalid arguments for tool '{tool_name}': {e}")
+            return self._create_error_result(tool_call['id'], f"Invalid arguments for tool '{tool_name}': {e}")
         except Exception as e:
             # Catch any other unexpected errors during tool execution
-            return self._create_error_result(tool_call.id, f"An unexpected error occurred: {e}")
+            return self._create_error_result(tool_call['id'], f"An unexpected error occurred: {e}")
 
     def _create_success_result(self, tool_call_id: str, tool_name: str, result: Any) -> Dict[str, Any]:
         return {

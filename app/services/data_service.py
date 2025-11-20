@@ -1,7 +1,7 @@
 # Importa a classe 'date' e 'datetime' para manipulação de datas.
 from datetime import date, datetime
-# Importa funções do SQLAlchemy como 'func' (para usar funções SQL como COUNT, MAX, etc.) e 'select'.
-from sqlalchemy import func, select
+# Importa a função 'func' do SQLAlchemy para usar funções SQL como COUNT, MAX, etc.
+from sqlalchemy import func
 # Importa 'joinedload' para carregamento otimizado de relacionamentos (evita N+1 queries) e 'Session' para type hinting.
 from sqlalchemy.orm import joinedload, Session
 # Importa o gerenciador de contexto para obter uma sessão de banco de dados.
@@ -406,7 +406,7 @@ class DataService:
                 .all()
             )
             # Converte o resultado (que é uma lista de Row objects) em uma lista de dicionários.
-            return [row._asdict() for row in grades_query]
+            return [dict(row._mapping) for row in grades_query]
 
     # Método para gerar um resumo de desempenho de um aluno em uma turma.
     def get_student_performance_summary(self, student_id: int, class_id: int) -> dict | None:

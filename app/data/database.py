@@ -6,12 +6,6 @@ from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
 # Importa a classe Base declarativa da qual todos os modelos herdam.
 from app.models.base import Base
-# Importa o modelo Student para que o SQLAlchemy o conheça.
-from app.models.student import Student
-# Importa o modelo Course.
-from app.models.course import Course
-# Importa o modelo Grade.
-from app.models.grade import Grade
 
 # Define a URL de conexão para o banco de dados SQLite.
 # O banco será um arquivo chamado 'academic_management.db' no mesmo diretório.

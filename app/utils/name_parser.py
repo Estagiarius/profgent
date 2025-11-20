@@ -36,7 +36,7 @@ COMMON_COMPOUND_NAMES = [
 ]
 
 
-def split_full_name(full_name, compound_names_list=COMMON_COMPOUND_NAMES):
+def split_full_name(full_name, compound_names_list=None):
     """
     Divide um nome completo em primeiro nome e sobrenome.
 
@@ -46,11 +46,16 @@ def split_full_name(full_name, compound_names_list=COMMON_COMPOUND_NAMES):
 
     Args:
         full_name (str): O nome completo a ser dividido.
-        compound_names_list (list): Uma lista de nomes compostos a serem considerados.
+        compound_names_list (list, optional): Uma lista de nomes compostos a serem considerados.
+                                            O padrão é a lista `COMMON_COMPOUND_NAMES`.
 
     Returns:
         tuple: Uma tupla contendo (primeiro_nome, sobrenome).
     """
+    # Define a lista padrão de nomes compostos se nenhuma for fornecida.
+    # Isso evita o problema de usar um argumento padrão mutável.
+    if compound_names_list is None:
+        compound_names_list = COMMON_COMPOUND_NAMES
     # Se o nome completo for nulo ou vazio, retorna duas strings vazias.
     if not full_name:
         return "", ""
