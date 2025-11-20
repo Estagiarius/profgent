@@ -41,6 +41,8 @@ class MainApp(ctk.CTk):
         # Inicia o processo de verificação da fila.
         self._process_queue()
 
+        # Define um ID inicial para o loop de polling do asyncio.
+        self._poll_id = None
         # Inicia o loop que integra o asyncio com o loop de eventos do tkinter.
         self.update_asyncio()
 
@@ -172,10 +174,3 @@ class MainApp(ctk.CTk):
         # Se a tarefa ainda não terminou, agenda uma nova verificação para daqui a 50ms.
         else:
             self.after(50, self._check_cleanup_done, task)
-
-# Bloco que é executado se o script for rodado diretamente.
-if __name__ == "__main__":
-    # Cria uma instância da aplicação (sem os serviços, para teste simples).
-    app = MainApp()
-    # Inicia o loop principal da interface gráfica.
-    app.mainloop()

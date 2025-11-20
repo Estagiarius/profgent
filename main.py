@@ -2,9 +2,6 @@
 from app.ui.main_app import MainApp
 # Importa o 'engine' e a 'Base' do SQLAlchemy para interagir com o banco de dados.
 from app.data.database import engine, Base
-# Importa todos os modelos para garantir que eles sejam registrados com os metadados do SQLAlchemy.
-# Isso é crucial para que o `create_all` funcione corretamente.
-from app.models import student, course, class_, class_enrollment, assessment, grade, lesson, incident
 # Importa o módulo 'os' para interagir com o sistema operacional, como verificar a existência de arquivos.
 import os
 

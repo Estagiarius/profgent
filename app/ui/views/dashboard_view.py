@@ -1,7 +1,5 @@
 # Importa a biblioteca 'customtkinter' para os componentes da interface.
 import customtkinter as ctk
-# Importa o serviço de dados para buscar as informações necessárias para os gráficos.
-from app.services.data_service import DataService
 # Importa a função utilitária que gera o gráfico de distribuição de notas.
 from app.utils.charts import create_grade_distribution_chart
 # Importa a biblioteca Pillow (PIL) para manipulação de imagens.

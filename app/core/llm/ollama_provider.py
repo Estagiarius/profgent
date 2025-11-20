@@ -3,6 +3,7 @@ from app.core.llm.base import LLMProvider, AssistantResponse
 from typing import List
 import httpx
 
+
 class OllamaProvider(LLMProvider):
     """
     An implementation of the LLMProvider for a local Ollama server,
@@ -21,28 +22,7 @@ class OllamaProvider(LLMProvider):
         return "Ollama"
 
     async def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                tools=tools,
-                tool_choice="auto" if tools else None,
-            )
-
-            message = response.choices[0].message
-            content = message.content or ""
-            tool_calls = message.tool_calls
-
-            return AssistantResponse(content=content, tool_calls=tool_calls)
-
-        except httpx.ConnectError as e:
-            error_message = f"Could not connect to Ollama server at {self.client.base_url}. Is Ollama running?"
-            print(error_message)
-            return AssistantResponse(content=error_message)
-        except Exception as e:
-            error_message = f"An error occurred with the Ollama API: {e}"
-            print(error_message)
-            return AssistantResponse(content=error_message)
+        return await self._create_chat_completion(messages=messages, tools=tools)
 
     async def list_models(self) -> List[str]:
         try:

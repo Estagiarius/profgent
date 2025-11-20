@@ -1,5 +1,3 @@
-# Importa a classe 'date' do módulo datetime para lidar com datas.
-from datetime import date
 # Importa os tipos de coluna necessários do SQLAlchemy.
 from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey
 # Importa a função 'relationship' para definir relacionamentos entre modelos.

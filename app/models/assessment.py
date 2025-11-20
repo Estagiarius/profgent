@@ -1,7 +1,5 @@
 # Importa os tipos de coluna necessários do SQLAlchemy para definir o modelo.
 from sqlalchemy import Column, Integer, String, Float, ForeignKey
-# Importa a função 'relationship' para definir relacionamentos entre modelos.
-from sqlalchemy.orm import relationship
 # Importa a classe 'Base' declarativa da qual todos os modelos devem herdar.
 from app.models.base import Base
 
