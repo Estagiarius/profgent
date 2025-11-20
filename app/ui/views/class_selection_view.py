@@ -124,7 +124,7 @@ class ClassSelectionView(ctk.CTkFrame):
         courses_data = data_service.get_all_courses()
         # Se não houver cursos, exibe um erro e impede a criação da turma.
         if not courses_data:
-            messagebox.showerror("Erro", "Nenhum curso disponível. Adicione um curso primeiro na tela de Gestão de Dados.")
+            messagebox.showerror("Erro", "Nenhuma disciplina disponível. Adicione uma disciplina primeiro na tela de Gestão de Dados.")
             return
 
         course_names = [c["course_name"] for c in courses_data]
@@ -135,7 +135,7 @@ class ClassSelectionView(ctk.CTkFrame):
             selected_course_name = data.get("course")
 
             if not class_name or not selected_course_name:
-                messagebox.showerror("Erro", "O nome da turma e o curso são obrigatórios.")
+                messagebox.showerror("Erro", "O nome da turma e a disciplina são obrigatórios.")
                 return
 
             # Encontra o objeto do curso correspondente ao nome selecionado.
@@ -149,7 +149,7 @@ class ClassSelectionView(ctk.CTkFrame):
 
         # Configuração dos campos para o diálogo de adição.
         fields = {"name": "Nome da Turma"}
-        dropdowns = {"course": ("Curso", course_names)}
+        dropdowns = {"course": ("Disciplina", course_names)}
         AddDialog(self, "Adicionar Nova Turma", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
 
     # Método chamado sempre que a view é exibida.

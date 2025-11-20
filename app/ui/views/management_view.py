@@ -23,13 +23,13 @@ class ManagementView(ctk.CTkFrame):
         self.title_label = ctk.CTkLabel(self, text="Gestão de Dados", font=ctk.CTkFont(size=20, weight="bold"))
         self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
 
-        # Cria o widget de abas para organizar a gestão de Alunos, Cursos e Notas.
+        # Cria o widget de abas para organizar a gestão de Alunos, Disciplinas e Notas.
         self.tab_view = ctk.CTkTabview(self)
         self.tab_view.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
 
         # Adiciona as abas.
         self.tab_view.add("Alunos")
-        self.tab_view.add("Cursos")
+        self.tab_view.add("Disciplinas")
         self.tab_view.add("Notas")
 
         # --- Aba de Alunos ---
@@ -52,11 +52,11 @@ class ManagementView(ctk.CTkFrame):
         self.students_frame = ctk.CTkScrollableFrame(students_tab)
         self.students_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
-        # --- Aba de Cursos ---
-        courses_tab = self.tab_view.tab("Cursos")
+        # --- Aba de Disciplinas ---
+        courses_tab = self.tab_view.tab("Disciplinas")
         courses_tab.grid_rowconfigure(1, weight=1)
         courses_tab.grid_columnconfigure(0, weight=1)
-        self.add_course_button = ctk.CTkButton(courses_tab, text="Adicionar Novo Curso", command=self.add_course_popup)
+        self.add_course_button = ctk.CTkButton(courses_tab, text="Adicionar Nova Disciplina", command=self.add_course_popup)
         self.add_course_button.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         self.courses_frame = ctk.CTkScrollableFrame(courses_tab)
         self.courses_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
@@ -93,7 +93,7 @@ class ManagementView(ctk.CTkFrame):
             ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda s_id=student['id']: self.delete_student(s_id)).pack(side="right", padx=5)
             ctk.CTkButton(f, text="Editar", command=lambda s=student: self.edit_student(s)).pack(side="right", padx=5)
 
-    # Preenche a lista de cursos na aba "Cursos".
+    # Preenche a lista de cursos na aba "Disciplinas".
     def _populate_courses(self):
         self._clear_frame(self.courses_frame)
         for course in self.data_service.get_all_courses():
@@ -146,7 +146,7 @@ class ManagementView(ctk.CTkFrame):
     # Abre o diálogo de edição para um curso.
     def edit_course(self, c):
         def cb(id, data): self.data_service.update_course(id, data['course_name'], data['course_code']); self.populate_data()
-        EditDialog(self, "Editar Curso", {"course_name":"Nome", "course_code":"Código"}, c, cb)
+        EditDialog(self, "Editar Disciplina", {"course_name":"Nome", "course_code":"Código"}, c, cb)
 
     # Abre o diálogo de adição para um novo aluno.
     def add_student_popup(self):
@@ -158,4 +158,4 @@ class ManagementView(ctk.CTkFrame):
     # Abre o diálogo de adição para um novo curso.
     def add_course_popup(self):
         def cb(data): self.data_service.add_course(data['course_name'], data['course_code']); self.populate_data()
-        AddDialog(self, "Adicionar Curso", {"course_name":"Nome", "course_code":"Código"}, save_callback=cb)
+        AddDialog(self, "Adicionar Disciplina", {"course_name":"Nome", "course_code":"Código"}, save_callback=cb)

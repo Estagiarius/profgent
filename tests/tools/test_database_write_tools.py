@@ -38,7 +38,7 @@ def test_add_new_course(data_service: DataService):
 
     # --- VERIFICAÇÃO ---
     # 1. Verifica a resposta da ferramenta.
-    assert "adicionado com sucesso" in result
+    assert "adicionada com sucesso" in result
 
     # 2. Verifica o estado do banco.
     course = data_service.get_course_by_name("Test Course")
