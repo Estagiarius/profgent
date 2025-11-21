@@ -157,14 +157,27 @@ class ClassDetailView(ctk.CTkFrame):
 
         # --- Aba do Quadro de Notas ---
         grade_grid_tab = self.tab_view.tab("Quadro de Notas")
-        grade_grid_tab.grid_rowconfigure(0, weight=1)
+        grade_grid_tab.grid_rowconfigure(1, weight=1)
         grade_grid_tab.grid_columnconfigure(0, weight=1)
 
+        # Frame para opções (filtro).
+        self.grade_options_frame = ctk.CTkFrame(grade_grid_tab)
+        self.grade_options_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+        # Checkbox para filtrar e mostrar apenas alunos ativos no quadro de notas.
+        self.show_active_only_grades_checkbox = ctk.CTkCheckBox(
+            self.grade_options_frame,
+            text="Mostrar Apenas Alunos Ativos",
+            command=self.populate_grade_grid
+        )
+        self.show_active_only_grades_checkbox.pack(side="left", padx=10, pady=5)
+        self.show_active_only_grades_checkbox.select() # Marcado por padrão.
+
         self.grade_grid_frame = ctk.CTkScrollableFrame(grade_grid_tab)
-        self.grade_grid_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        self.grade_grid_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
         self.save_grades_button = ctk.CTkButton(grade_grid_tab, text="Salvar Todas as Alterações", command=self.save_all_grades)
-        self.save_grades_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+        self.save_grades_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
     # Método para salvar todas as notas inseridas ou alteradas no quadro de notas.
     def save_all_grades(self):
@@ -213,6 +226,11 @@ class ClassDetailView(ctk.CTkFrame):
 
         # Busca os dados necessários do banco.
         enrollments = data_service.get_enrollments_for_class(self.class_id)
+
+        # Filtra por alunos ativos se o checkbox estiver marcado.
+        if self.show_active_only_grades_checkbox.get():
+            enrollments = [e for e in enrollments if e['status'] == 'Active']
+
         class_data = data_service.get_class_by_id(self.class_id)
         assessments = class_data['assessments'] if class_data else []
 
