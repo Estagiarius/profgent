@@ -7,7 +7,7 @@ from app.services import data_service
 @tool
 def get_student_grade(student_name: str, course_name: str) -> str:
     """
-    Encontra todas as notas de um aluno específico em um determinado curso.
+    Encontra todas as notas de um aluno específico em uma determinada disciplina.
     Retorna as notas como uma string ou uma mensagem de 'não encontrado'.
     """
     # Busca o aluno pelo nome usando o serviço de dados.
@@ -16,15 +16,15 @@ def get_student_grade(student_name: str, course_name: str) -> str:
     if not student:
         return f"Aluno '{student_name}' não encontrado."
 
-    # Busca o curso pelo nome.
+    # Busca o curso (disciplina) pelo nome.
     course = data_service.get_course_by_name(course_name)
-    # Se o curso não for encontrado, retorna uma mensagem de erro.
+    # Se a disciplina não for encontrada, retorna uma mensagem de erro.
     if not course:
-        return f"Curso '{course_name}' não encontrado."
+        return f"Disciplina '{course_name}' não encontrada."
 
-    # Lista para armazenar todas as notas do aluno encontradas no curso.
+    # Lista para armazenar todas as notas do aluno encontradas na disciplina.
     student_grades_in_course = []
-    # Itera sobre todas as turmas associadas ao curso.
+    # Itera sobre todas as turmas associadas à disciplina.
     for class_data in course['classes']:
         # Obtém todas as notas da turma.
         grades_in_class = data_service.get_grades_for_class(class_data['id'])
@@ -45,7 +45,7 @@ def get_student_grade(student_name: str, course_name: str) -> str:
 @tool
 def list_courses_for_student(student_name: str) -> str:
     """
-    Lista todos os cursos em que um aluno específico está matriculado.
+    Lista todas as disciplinas em que um aluno específico está matriculado.
     """
     # Busca o aluno pelo nome.
     student = data_service.get_student_by_name(student_name)
@@ -59,37 +59,37 @@ def list_courses_for_student(student_name: str) -> str:
     # Filtra para obter apenas as notas do aluno desejado.
     student_grades = [g for g in all_grades if g['student_id'] == student['id']]
 
-    # Se o aluno não tiver notas, assume-se que não está matriculado em cursos.
+    # Se o aluno não tiver notas, assume-se que não está matriculado em disciplinas.
     if not student_grades:
-        return f"{student_name} não está matriculado(a) em nenhum curso com notas registradas."
+        return f"{student_name} não está matriculado(a) em nenhuma disciplina com notas registradas."
 
-    # Usa um conjunto (set) para obter uma lista de nomes de cursos únicos.
+    # Usa um conjunto (set) para obter uma lista de nomes de disciplinas únicos.
     course_names = {g['course_name'] for g in student_grades}
-    # Formata a lista de cursos e a retorna.
-    return f"Cursos de {student_name}:\n" + "\n".join(f"- {name}" for name in sorted(list(course_names)))
+    # Formata a lista de disciplinas e a retorna.
+    return f"Disciplinas de {student_name}:\n" + "\n".join(f"- {name}" for name in sorted(list(course_names)))
 
 @tool
 def get_class_average(course_name: str) -> str:
     """
-    Calcula a nota média de todos os alunos em um curso específico.
+    Calcula a nota média de todos os alunos em uma disciplina específica.
     """
-    # Busca o curso pelo nome.
+    # Busca a disciplina pelo nome.
     course = data_service.get_course_by_name(course_name)
     # Se não encontrar, retorna um erro.
     if not course:
-        return f"Curso '{course_name}' não encontrado."
+        return f"Disciplina '{course_name}' não encontrada."
 
-    # Lista para armazenar todas as notas de todas as turmas do curso.
+    # Lista para armazenar todas as notas de todas as turmas da disciplina.
     all_grades = []
-    # Itera sobre as turmas do curso.
+    # Itera sobre as turmas da disciplina.
     for class_data in course['classes']:
         # Obtém as notas de cada turma e as adiciona à lista geral.
         grades_in_class = data_service.get_grades_for_class(class_data['id'])
         all_grades.extend(grades_in_class)
 
-    # Se não houver notas no curso, retorna uma mensagem informativa.
+    # Se não houver notas na disciplina, retorna uma mensagem informativa.
     if not all_grades:
-        return f"Nenhuma nota encontrada para o curso {course_name}."
+        return f"Nenhuma nota encontrada para a disciplina {course_name}."
 
     # Calcula a média aritmética simples das notas.
     average = sum(g['score'] for g in all_grades) / len(all_grades)

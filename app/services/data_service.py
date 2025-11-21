@@ -535,7 +535,16 @@ class DataService:
             existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
             # Itera sobre os novos dados de nota.
             for grade_info in grades_data:
-                student_id, assessment_id, score = grade_info['student_id'], grade_info['assessment_id'], grade_info['score']
+                # Garante que os IDs sejam inteiros para evitar duplicações causadas por incompatibilidade de tipos (ex: string vs int).
+                try:
+                    student_id = int(grade_info['student_id'])
+                    assessment_id = int(grade_info['assessment_id'])
+                except (ValueError, TypeError):
+                    # Se a conversão falhar, pula este registro para evitar inconsistências.
+                    continue
+
+                score = grade_info['score']
+
                 existing_grade = existing_grades_map.get((student_id, assessment_id))
                 # Se a nota já existe, atualiza o valor se for diferente.
                 if existing_grade:

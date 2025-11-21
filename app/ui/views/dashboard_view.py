@@ -33,7 +33,7 @@ class DashboardView(ctk.CTkFrame):
         self.controls_frame = ctk.CTkFrame(self)
         self.controls_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
 
-        self.course_label = ctk.CTkLabel(self.controls_frame, text="Selecione o Curso para Análise:")
+        self.course_label = ctk.CTkLabel(self.controls_frame, text="Selecione a Disciplina para Análise:")
         self.course_label.pack(side="left", padx=10, pady=10)
 
         # Menu dropdown para selecionar o curso.

@@ -38,13 +38,13 @@ def add_new_student(first_name: str, last_name: str) -> str:
 @tool
 def add_new_course(course_name: str, course_code: str) -> str:
     """
-    Adiciona um novo curso ao banco de dados.
-    Use esta ferramenta quando um usuário pedir explicitamente para adicionar ou criar um novo curso.
+    Adiciona uma nova disciplina ao banco de dados.
+    Use esta ferramenta quando um usuário pedir explicitamente para adicionar ou criar uma nova disciplina.
     Retorna uma mensagem de confirmação.
     """
     # Validação dos parâmetros de entrada.
     if not course_name or not course_code:
-        return "Erro: O nome e o código do curso são obrigatórios."
+        return "Erro: O nome e o código da disciplina são obrigatórios."
 
     try:
         # Chama o método do DataService para adicionar o curso.
@@ -52,11 +52,11 @@ def add_new_course(course_name: str, course_code: str) -> str:
         # Se o curso for criado com sucesso.
         if course:
             # Retorna uma mensagem de sucesso.
-            return f"Novo curso adicionado com sucesso: {course_name} ({course_code}) com ID {course['id']}."
+            return f"Nova disciplina adicionada com sucesso: {course_name} ({course_code}) com ID {course['id']}."
         else:
-            return f"Erro: Ocorreu um erro desconhecido ao adicionar o curso {course_name}."
+            return f"Erro: Ocorreu um erro desconhecido ao adicionar a disciplina {course_name}."
     except SQLAlchemyError as e:
-        return f"Erro: Ocorreu um erro de banco de dados ao adicionar o curso: {e}"
+        return f"Erro: Ocorreu um erro de banco de dados ao adicionar a disciplina: {e}"
     except Exception as e:
         return f"Erro: Ocorreu um erro inesperado: {e}"
 
