@@ -37,6 +37,11 @@ from app.tools.internet_tools import search_internet
 from app.tools.analysis_tools import get_student_performance_summary_tool, get_students_at_risk_tool
 # Importa as ferramentas com foco pedagógico.
 from app.tools.pedagogical_tools import suggest_lesson_activities_tool
+# Importa as ferramentas de relatórios e gráficos.
+from app.tools.report_tools import (
+    generate_grade_chart_tool, generate_class_distribution_tool,
+    export_class_grades_tool, generate_report_card_tool
+)
 
 # Define a classe AssistantService, que orquestra toda a lógica do assistente de IA.
 class AssistantService:
@@ -95,6 +100,11 @@ class AssistantService:
         self.tool_registry.register(get_students_at_risk_tool)
         # Ferramentas pedagógicas
         self.tool_registry.register(suggest_lesson_activities_tool)
+        # Ferramentas de relatórios
+        self.tool_registry.register(generate_grade_chart_tool)
+        self.tool_registry.register(generate_class_distribution_tool)
+        self.tool_registry.register(export_class_grades_tool)
+        self.tool_registry.register(generate_report_card_tool)
         # Ferramentas de internet
         self.tool_registry.register(search_internet)
         # Ferramentas de escrita e outros

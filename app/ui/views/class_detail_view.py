@@ -12,6 +12,10 @@ from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
 from app.utils.import_utils import async_import_students
+# Importa o serviço de relatórios.
+from app.services.report_service import ReportService
+import os
+from PIL import Image
 
 # Define a classe para a tela de detalhes da turma.
 class ClassDetailView(ctk.CTkFrame):
@@ -19,6 +23,7 @@ class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
+        self.report_service = ReportService()
         # ID da turma que está sendo visualizada. Inicialmente nulo.
         self.class_id = None
         # ID da aula que está sendo editada. Inicialmente nulo.
@@ -46,6 +51,7 @@ class ClassDetailView(ctk.CTkFrame):
         self.tab_view.add("Aulas")
         self.tab_view.add("Incidentes")
         self.tab_view.add("Quadro de Notas")
+        self.tab_view.add("Relatórios")
 
         # --- Aba de Alunos ---
         # Obtém a referência à aba "Alunos".
@@ -178,6 +184,108 @@ class ClassDetailView(ctk.CTkFrame):
 
         self.save_grades_button = ctk.CTkButton(grade_grid_tab, text="Salvar Todas as Alterações", command=self.save_all_grades)
         self.save_grades_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
+
+        # --- Aba de Relatórios ---
+        reports_tab = self.tab_view.tab("Relatórios")
+        reports_tab.grid_columnconfigure(0, weight=1)
+
+        # Seção de Relatórios da Turma
+        ctk.CTkLabel(reports_tab, text="Relatórios da Turma", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, padx=10, pady=(20, 10), sticky="w")
+
+        self.class_reports_frame = ctk.CTkFrame(reports_tab)
+        self.class_reports_frame.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+
+        ctk.CTkButton(self.class_reports_frame, text="Exportar Notas (CSV)", command=self.export_csv).pack(side="left", padx=10, pady=10)
+        ctk.CTkButton(self.class_reports_frame, text="Gráfico de Distribuição", command=self.show_distribution_chart).pack(side="left", padx=10, pady=10)
+
+        # Seção de Relatórios do Aluno
+        ctk.CTkLabel(reports_tab, text="Relatórios Individuais do Aluno", font=ctk.CTkFont(size=16, weight="bold")).grid(row=2, column=0, padx=10, pady=(20, 10), sticky="w")
+
+        self.student_reports_frame = ctk.CTkFrame(reports_tab)
+        self.student_reports_frame.grid(row=3, column=0, padx=10, pady=5, sticky="ew")
+
+        ctk.CTkLabel(self.student_reports_frame, text="Selecione o Aluno:").pack(side="left", padx=10)
+        self.report_student_combo = ctk.CTkComboBox(self.student_reports_frame, values=[])
+        self.report_student_combo.pack(side="left", padx=10)
+
+        ctk.CTkButton(self.student_reports_frame, text="Gerar Boletim (TXT)", command=self.generate_report_card).pack(side="left", padx=10)
+        ctk.CTkButton(self.student_reports_frame, text="Gráfico de Desempenho", command=self.show_student_chart).pack(side="left", padx=10)
+
+
+    def export_csv(self):
+        if not self.class_id: return
+        try:
+            filepath = self.report_service.export_class_grades_csv(self.class_id)
+            messagebox.showinfo("Sucesso", f"Arquivo exportado em:\n{filepath}")
+            # Tenta abrir a pasta do arquivo
+            if os.name == 'nt':
+                os.startfile(os.path.dirname(filepath))
+            else:
+                os.system(f'xdg-open "{os.path.dirname(filepath)}"')
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao exportar CSV: {e}")
+
+    def show_distribution_chart(self):
+        if not self.class_id: return
+        try:
+            filepath = self.report_service.generate_class_grade_distribution(self.class_id)
+            self._show_image_popup("Distribuição de Notas", filepath)
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao gerar gráfico: {e}")
+
+    def generate_report_card(self):
+        if not self.class_id: return
+        student_name = self.report_student_combo.get()
+        if not student_name:
+             messagebox.showwarning("Aviso", "Selecione um aluno primeiro.")
+             return
+
+        try:
+            # Recupera o ID do aluno baseado no nome selecionado
+            enrollments = data_service.get_enrollments_for_class(self.class_id)
+            target_enrollment = next((e for e in enrollments if f"{e['student_first_name']} {e['student_last_name']}" == student_name), None)
+
+            if target_enrollment:
+                filepath = self.report_service.generate_student_report_card(target_enrollment['student_id'], self.class_id)
+                messagebox.showinfo("Sucesso", f"Boletim gerado em:\n{filepath}")
+                # Tenta abrir o arquivo
+                if os.name == 'nt':
+                    os.startfile(filepath)
+                else:
+                    os.system(f'xdg-open "{filepath}"')
+        except Exception as e:
+             messagebox.showerror("Erro", f"Falha ao gerar boletim: {e}")
+
+    def show_student_chart(self):
+        if not self.class_id: return
+        student_name = self.report_student_combo.get()
+        if not student_name:
+             messagebox.showwarning("Aviso", "Selecione um aluno primeiro.")
+             return
+
+        try:
+            enrollments = data_service.get_enrollments_for_class(self.class_id)
+            target_enrollment = next((e for e in enrollments if f"{e['student_first_name']} {e['student_last_name']}" == student_name), None)
+
+            if target_enrollment:
+                filepath = self.report_service.generate_student_grade_chart(target_enrollment['student_id'], self.class_id)
+                self._show_image_popup(f"Desempenho - {student_name}", filepath)
+        except Exception as e:
+             messagebox.showerror("Erro", f"Falha ao gerar gráfico: {e}")
+
+    def _show_image_popup(self, title, filepath):
+        """Exibe uma imagem em uma janela popup."""
+        top = ctk.CTkToplevel(self)
+        top.title(title)
+        top.geometry("800x600")
+
+        # Carrega a imagem usando PIL e converte para CTkImage
+        pil_image = Image.open(filepath)
+        ctk_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(780, 580))
+
+        label = ctk.CTkLabel(top, image=ctk_image, text="")
+        label.pack(padx=10, pady=10, fill="both", expand=True)
+
 
     # Método para salvar todas as notas inseridas ou alteradas no quadro de notas.
     def save_all_grades(self):
@@ -584,3 +692,12 @@ class ClassDetailView(ctk.CTkFrame):
             self.populate_lesson_list()
             self.populate_incident_list()
             self.populate_grade_grid()
+
+            # Atualiza o combobox de alunos na aba de relatórios
+            enrollments = data_service.get_enrollments_for_class(self.class_id)
+            student_names = [f"{e['student_first_name']} {e['student_last_name']}" for e in enrollments]
+            self.report_student_combo.configure(values=student_names)
+            if student_names:
+                self.report_student_combo.set(student_names[0])
+            else:
+                self.report_student_combo.set("")
