@@ -142,10 +142,15 @@ class ClassSelectionView(ctk.CTkFrame):
             selected_course = next((c for c in courses_data if c["course_name"] == selected_course_name), None)
 
             if selected_course:
-                # Chama o serviço para criar a nova turma.
-                data_service.create_class(name=class_name, course_id=selected_course["id"])
-                # Atualiza a lista de cards.
-                self.populate_class_cards()
+                try:
+                    # Chama o serviço para criar a nova turma.
+                    data_service.create_class(name=class_name, course_id=selected_course["id"])
+                    # Atualiza a lista de cards.
+                    self.populate_class_cards()
+                except ValueError as e:
+                    messagebox.showerror("Erro", str(e))
+                except Exception as e:
+                    messagebox.showerror("Erro", f"Erro ao criar turma: {e}")
 
         # Configuração dos campos para o diálogo de adição.
         fields = {"name": "Nome da Turma"}
