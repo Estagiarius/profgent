@@ -5,8 +5,15 @@ from typing import List, Dict, Any
 
 def create_grade_distribution_chart(grades: List[Dict[str, Any]], course_name: str) -> str:
     """
-    Generates a histogram of grade distribution and saves it as a temporary PNG file.
-    Returns the path to the saved chart file.
+    Gera e salva um gráfico da distribuição de notas de um curso específico. O gráfico é
+    salvo em um arquivo temporário e retorna o caminho para o arquivo salvo. Caso não haja
+    notas disponíveis, uma mensagem de aviso será exibida no gráfico.
+
+    :param grades: Lista de dicionários, onde cada dicionário representa informações
+        de notas de alunos. O campo 'score' deve conter a nota atribuída.
+    :param course_name: Nome do curso cujas notas serão analisadas.
+    :return: Caminho do arquivo temporário onde o gráfico gerado foi salvo, com extensão
+        '.png'.
     """
     # Create a temporary file path
     temp_dir = tempfile.gettempdir()

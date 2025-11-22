@@ -21,26 +21,18 @@ from app.utils.name_parser import split_full_name
 
 def parse_student_csv(file_content: str) -> List[Dict[str, Optional[str]]]:
     """
-    Analisa o conteúdo de um arquivo CSV de alunos, lidando com duplicatas.
+    Parsa o conteúdo de um arquivo CSV contendo informações de alunos, convertendo-o em uma lista
+    de dicionários com dados estruturados. O CSV deve conter colunas específicas, como "Nome do
+    Aluno", "Data de Nascimento" e "Situação do Aluno".
 
-    A função é projetada para lidar com um formato específico que inclui:
-    - Linhas de metadados no início do arquivo.
-    - Um cabeçalho que define as colunas de dados.
-    - Dados delimitados por ponto e vírgula (';').
-    - Potenciais linhas de alunos duplicadas.
+    O cabeçalho do arquivo define os campos esperados, e os dados são processados para incluir
+    informações opcionais, como o primeiro e o último nome derivados do nome completo do aluno.
+    Além disso, normaliza o status do aluno e valida o formato da data de nascimento.
 
-    Se um aluno aparecer mais de uma vez, apenas a última ocorrência será
-    considerada, garantindo que os dados mais recentes prevaleçam.
-
-    Args:
-        file_content (str): O conteúdo completo do arquivo CSV como uma string.
-
-    Returns:
-        List[Dict[str, Optional[str]]]: Uma lista de dicionários, onde cada
-        dicionário representa um aluno único com dados extraídos e normalizados.
-
-    Raises:
-        ValueError: Se o cabeçalho do CSV não for encontrado.
+    :param file_content: Conteúdo do arquivo CSV no formato de string.
+    :return: Lista de dicionários estruturados. Cada dicionário representa um aluno e contém as
+        seguintes chaves: "full_name", "birth_date", "status", "status_detail", "first_name",
+        "last_name".
     """
     # Inicializa a variável que armazenará a linha do cabeçalho.
     header_line_str = None

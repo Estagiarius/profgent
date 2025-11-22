@@ -38,19 +38,18 @@ COMMON_COMPOUND_NAMES = [
 
 def split_full_name(full_name, compound_names_list=None):
     """
-    Divide um nome completo em primeiro nome e sobrenome.
+    Divide um nome completo em primeiro nome e sobrenome. Este método leva em consideração
+    uma lista pré-definida de nomes compostos para identificar corretamente os nomes que
+    devem ser tratados como um único primeiro nome. Caso nenhum nome composto seja identificado,
+    o nome é dividido com base no primeiro espaço encontrado.
 
-    A lógica prioriza nomes compostos. Se o início do nome completo corresponder
-    a um nome composto da lista, ele será considerado o primeiro nome. Caso contrário,
-    apenas a primeira palavra será o primeiro nome.
-
-    Args:
-        full_name (str): O nome completo a ser dividido.
-        compound_names_list (list, optional): Uma lista de nomes compostos a serem considerados.
-                                            O padrão é a lista `COMMON_COMPOUND_NAMES`.
-
-    Returns:
-        tuple: Uma tupla contendo (primeiro_nome, sobrenome).
+    :param full_name: O nome completo a ser dividido.
+    :type full_name: str
+    :param compound_names_list: Uma lista opcional de nomes compostos para auxiliar
+        na divisão dos nomes. Se não fornecida, será usada uma lista padrão.
+    :type compound_names_list: list[str], optional
+    :return: Uma tupla contendo o primeiro nome e o sobrenome correspondentes.
+    :rtype: tuple[str, str]
     """
     # Define a lista padrão de nomes compostos se nenhuma for fornecida.
     # Isso evita o problema de usar um argumento padrão mutável.
