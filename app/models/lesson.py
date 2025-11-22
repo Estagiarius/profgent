@@ -7,6 +7,26 @@ from app.models.base import Base
 
 # Define a classe Lesson, que representa uma aula ou plano de aula.
 class Lesson(Base):
+    """
+    Representa o modelo correspondente à entidade 'Lesson' (aula) no banco de dados.
+
+    Esta classe mapeia a tabela 'lessons' no banco de dados e define os atributos e
+    relacionamentos associados a uma aula. Cada instância desta classe representa
+    uma linha na tabela de 'lessons'.
+
+    :ivar id: Chave primária que identifica exclusivamente uma aula.
+    :type id: int
+    :ivar date: Data da realização da aula.
+    :type date: datetime.date
+    :ivar title: Título da aula.
+    :type title: str
+    :ivar content: Conteúdo descritivo da aula. Pode ser nulo.
+    :type content: str | None
+    :ivar class_id: Chave estrangeira que associa a aula a uma turma específica.
+    :type class_id: int
+    :ivar class_: Relacionamento que conecta a aula com a respectiva instância de Class.
+    :type class_: Class
+    """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'lessons'
 

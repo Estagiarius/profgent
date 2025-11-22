@@ -7,6 +7,32 @@ from app.models.base import Base
 
 # Define a classe Student, que representa um aluno no banco de dados.
 class Student(Base):
+    """
+    Representação de um estudante no sistema.
+
+    A classe `Student` modela os alunos, incluindo informações básicas como nome,
+    sobrenome, data de nascimento, e data de matrícula. Além disso, estabelece
+    relacionamentos com outros modelos, como notas (`Grade`) e incidentes
+    (`Incident`). Esta classe pode ser usada como parte de um sistema acadêmico
+    para rastrear informações de estudantes e suas atividades.
+
+    :ivar id: Identificador único do estudante no sistema, gerado automaticamente.
+    :type id: int
+    :ivar first_name: Primeiro nome do estudante.
+    :type first_name: str
+    :ivar last_name: Sobrenome do estudante.
+    :type last_name: str
+    :ivar birth_date: Data de nascimento do estudante. Pode ser nula.
+    :type birth_date: datetime.date
+    :ivar enrollment_date: Data de matrícula do estudante. Não pode ser nula.
+    :type enrollment_date: str
+    :ivar grades: Relacionamento com as notas (`Grade`) associadas ao estudante. Um
+        estudante pode ter várias notas.
+    :type grades: List[Grade]
+    :ivar incidents: Relacionamento com os incidentes (`Incident`) associados ao
+        estudante. Um estudante pode ter vários incidentes.
+    :type incidents: List[Incident]
+    """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'students'
 

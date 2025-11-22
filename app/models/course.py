@@ -7,6 +7,24 @@ from app.models.base import Base
 
 # Define a classe Course, que representa uma disciplina ou curso (ex: Matemática, História) no banco de dados.
 class Course(Base):
+    """
+    Representa o modelo de um curso no sistema.
+
+    A classe `Course` define as propriedades e relacionamentos associadas a um curso.
+    Um curso é identificado por um código único, possui um nome exclusivo, e pode
+    estar associado a várias turmas. Esse modelo reflete a estrutura da tabela
+    'courses' no banco de dados.
+
+    :ivar id: Identificador único do curso. Gerado automaticamente como chave primária.
+    :type id: int
+    :ivar course_name: Nome exclusivo do curso. Este campo é obrigatório.
+    :type course_name: str
+    :ivar course_code: Código único associado ao curso.
+    :type course_code: str
+    :ivar classes: Lista de turmas associadas ao curso. Representado pelo relacionamento
+        com o modelo Class.
+    :type classes: List[Class]
+    """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'courses'
 

@@ -5,6 +5,23 @@ from app.models.base import Base
 
 # Define a classe Assessment, que representa uma avaliação (prova, trabalho, etc.) no banco de dados.
 class Assessment(Base):
+    """
+    Representa a classe de modelo Assessment.
+
+    A classe Assessment é utilizada para modelar uma entidade de avaliação, responsável
+    por armazenar informações como nome, peso e associação com uma determinada classe.
+    Esse modelo é utilizado no contexto de persistência de dados em um banco relacional
+    e é definido no formato de uma tabela SQL.
+
+    :ivar id: Identificador único para cada avaliação.
+    :type id: int
+    :ivar name: Nome da avaliação, obrigatório.
+    :type name: str
+    :ivar weight: Peso atribuído à avaliação, obrigatório, com valor padrão de 1.0.
+    :type weight: float
+    :ivar class_id: Identificador da classe associada, referenciando uma chave estrangeira.
+    :type class_id: int
+    """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'assessments'
 

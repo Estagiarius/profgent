@@ -7,6 +7,29 @@ from app.models.base import Base
 
 # Define a classe Grade, que representa a nota de um aluno em uma avaliação.
 class Grade(Base):
+    """
+    Representa a tabela de notas (grades) no modelo de dados.
+
+    A classe Grade modela uma nota associada a um aluno (student) e a uma avaliação
+    (assessment) específica. Cada entrada inclui informações sobre a nota obtida,
+    o aluno ao qual a nota pertence e a avaliação correspondente. Além disso,
+    inclui uma data de registro da nota.
+
+    :ivar id: Identificador único da nota. Chave primária com autoincremento.
+    :type id: int
+    :ivar student_id: Identificador do aluno associado à nota. Chave estrangeira
+        para a tabela de alunos ('students').
+    :type student_id: int
+    :ivar assessment_id: Identificador da avaliação associada à nota. Chave estrangeira
+        para a tabela de avaliações ('assessments').
+    :type assessment_id: int
+    :ivar score: Nota obtida pelo aluno na avaliação em questão. Deve ser um número
+        maior ou igual a 0.
+    :type score: float
+    :ivar date_recorded: Data em que a nota foi registrada. Representada como uma
+        string. Em aplicações reais, idealmente deveria ser do tipo DateTime.
+    :type date_recorded: str
+    """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'grades'
 
