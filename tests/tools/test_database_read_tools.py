@@ -2,7 +2,6 @@
 from app.services.data_service import DataService
 from app.tools import database_tools
 from app.tools.database_tools import get_student_grade, list_courses_for_student, get_class_average
-import pytest
 
 # Define uma função de teste para a ferramenta get_student_grade quando a nota é encontrada.
 def test_get_student_grade_found(data_service: DataService):

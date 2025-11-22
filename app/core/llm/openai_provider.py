@@ -22,7 +22,7 @@ class OpenAIProvider(LLMProvider):
     async def list_models(self) -> List[str]:
         try:
             models = await self.client.models.list()
-            return sorted([model.id for model in models if "gpt" in model.id])
+            return sorted([model.id for model in models if "gpt" in model.id])  # type: ignore
         except Exception as e:
             print(f"Error listing OpenAI models: {e}")
             return []

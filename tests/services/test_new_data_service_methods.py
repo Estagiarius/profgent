@@ -1,5 +1,4 @@
 # Importa as bibliotecas e classes necessárias para os testes.
-import pytest
 from datetime import date
 from sqlalchemy.orm import Session
 from app.services.data_service import DataService

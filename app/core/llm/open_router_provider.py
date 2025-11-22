@@ -26,7 +26,8 @@ class OpenRouterProvider(LLMProvider):
     async def list_models(self) -> List[str]:
         try:
             models = await self.client.models.list()
-            return sorted([model.id for model in models])
+            # Cast model to Any to avoid linter errors about dynamic attributes
+            return sorted([model.id for model in models])  # type: ignore
         except Exception as e:
             print(f"Error listing OpenRouter models: {e}")
             return []
