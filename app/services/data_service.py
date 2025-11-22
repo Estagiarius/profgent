@@ -163,9 +163,10 @@ class DataService:
     # Método para deletar um aluno.
     def delete_student(self, student_id: int):
         with self._get_db() as db:
-            # Deleta manualmente os registros dependentes (notas, matrículas) para evitar erros de chave estrangeira.
+            # Deleta manualmente os registros dependentes (notas, matrículas, incidentes) para evitar erros de chave estrangeira.
             db.query(Grade).filter(Grade.student_id == student_id).delete()
             db.query(ClassEnrollment).filter(ClassEnrollment.student_id == student_id).delete()
+            db.query(Incident).filter(Incident.student_id == student_id).delete()
             # Busca o aluno pelo ID.
             student = db.query(Student).filter(Student.id == student_id).first()
             # Se encontrar, deleta o aluno.
@@ -305,8 +306,10 @@ class DataService:
     # Método para deletar uma turma.
     def delete_class(self, class_id: int):
         with self._get_db() as db:
-            # Deleta as matrículas associadas antes de deletar a turma.
+            # Deleta as dependências associadas (matrículas, aulas, incidentes) antes de deletar a turma.
             db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete()
+            db.query(Lesson).filter(Lesson.class_id == class_id).delete()
+            db.query(Incident).filter(Incident.class_id == class_id).delete()
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 db.delete(class_)
@@ -536,7 +539,7 @@ class DataService:
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
         if not all([student_id, assessment_id, score is not None]): return None
         today = date.today()
-        new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today)
+        new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today.isoformat())
         with self._get_db() as db:
             db.add(new_grade)
             db.flush()
@@ -575,7 +578,7 @@ class DataService:
                         existing_grade.score = score
                 # Se a nota não existe, cria um novo registro.
                 else:
-                    new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today())
+                    new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today().isoformat())
                     db.add(new_grade)
 
     # Método para calcular a média ponderada de um aluno.
@@ -612,7 +615,7 @@ class DataService:
                 # Cria um novo objeto Student.
                 student = Student(
                     first_name=data['first_name'], last_name=data['last_name'],
-                    birth_date=data['birth_date'], enrollment_date=date.today()
+                    birth_date=data['birth_date'], enrollment_date=date.today().isoformat()
                 )
                 db.add(student)
                 db.flush()  # Garante que o ID do aluno seja gerado antes de criar a matrícula.
