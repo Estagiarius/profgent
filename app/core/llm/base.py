@@ -7,7 +7,24 @@ import httpx
 @dataclass
 class AssistantResponse:
     """
-    A standardized data structure for responses from the assistant.
+    Representa uma resposta de um assistente, contendo o conteúdo textual
+    da resposta gerada, além de possíveis chamadas de ferramentas realizadas
+    pelo assistente.
+
+    A classe organiza as informações retornadas pelo assistente em dois
+    atributos principais. O atributo `content` contém a mensagem textual
+    produzida, enquanto o atributo `tool_calls` representa uma lista de
+    chamadas de ferramentas, caso tenham ocorrido durante o processo de
+    resposta. É possível que `tool_calls` seja None, caso nenhuma chamada
+    de ferramenta tenha sido feita.
+
+    :ivar content: Conteúdo textual da resposta gerada pelo assistente.
+                   Contém o texto principal retornado.
+    :type content: str
+    :ivar tool_calls: Lista de dicionários representando chamadas de
+                      ferramentas realizadas ou None, caso não existam
+                      chamadas de ferramenta.
+    :type tool_calls: List[Dict[str, Any]] | None
     """
     content: str
     tool_calls: List[Dict[str, Any]] | None = None
@@ -15,8 +32,18 @@ class AssistantResponse:
 
 class LLMProvider(ABC):
     """
-    An abstract base class that defines the contract for all LLM providers.
+    Representa uma abstração de um provedor de modelos de linguagem.
+
+    Fornece métodos e atributos necessários para interação com modelos de linguagem
+    e manipulação de respostas em aplicações baseadas em inteligência artificial.
+
+    :ivar client: Cliente utilizado para realizar interações com o provedor.
+    :type client: Any
+    :ivar model: Modelo atualmente selecionado para geração de respostas.
+    :type model: str
     """
+    client: Any = None
+    model: str = ""
 
     @property
     @abstractmethod

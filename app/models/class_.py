@@ -8,6 +8,40 @@ from app.models.base import Base
 # Define a classe Class, que representa uma turma no banco de dados.
 # O nome do arquivo e da classe usa um underscore '_' para evitar conflito com a palavra-chave 'class' do Python.
 class Class(Base):
+    """
+    Representa uma turma associada a um curso em um sistema educacional.
+
+    Esta classe modela uma turma que pertence a um curso, com métodos de cálculo avaliativo e relacionadas
+    a componentes como avaliações, aulas, matrículas e incidentes. A associação com outros modelos, como
+    Course, Assessment ou Lesson, é feita por meio de relacionamentos SQLAlchemy.
+
+    :ivar __tablename__: Nome da tabela no banco de dados.
+    :type __tablename__: str
+    :ivar id: Identificador único da turma, número inteiro, autoincrementável.
+    :type id: int
+    :ivar name: Nome único da turma, obrigatório.
+    :type name: str
+    :ivar course_id: Identificador do curso ao qual a turma pertence, obrigatório.
+    :type course_id: int
+    :ivar calculation_method: Método de cálculo aplicado na turma.
+        Pode ser 'arithmetic' (média aritmética) ou 'weighted' (média ponderada).
+    :type calculation_method: Enum('arithmetic', 'weighted')
+    :ivar course: Relacionamento com o modelo Course via chave estrangeira.
+        Representa o curso ao qual a turma pertence.
+    :type course: Course
+    :ivar enrollments: Relacionamento com o modelo ClassEnrollment.
+        Representa as matrículas realizadas na turma.
+    :type enrollments: list[ClassEnrollment]
+    :ivar assessments: Relacionamento com o modelo Assessment.
+        Representa as avaliações associadas à turma. Associadas com `cascade="all, delete-orphan"`.
+    :type assessments: list[Assessment]
+    :ivar lessons: Relacionamento com o modelo Lesson.
+        Representa as aulas associadas à turma.
+    :type lessons: list[Lesson]
+    :ivar incidents: Relacionamento com o modelo Incident.
+        Representa os incidentes registrados na turma.
+    :type incidents: list[Incident]
+    """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'classes'
 

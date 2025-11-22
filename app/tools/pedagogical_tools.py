@@ -5,10 +5,24 @@ from app.core.tools.tool_decorator import tool
 @tool
 def suggest_lesson_activities_tool(topic: str, student_level: str, num_suggestions: int = 3) -> str:
     """
-    Gera uma lista de sugestões de atividades criativas e relevantes para um determinado tópico de aula e nível de aluno.
-    Use esta ferramenta quando um professor pedir ideias, atividades, projetos ou planos de aula sobre um assunto específico.
-    Por exemplo: "Sugira algumas atividades sobre o ciclo da água para alunos da 5ª série."
-    A saída da ferramenta é uma resposta direta do assistente ao usuário, não dados a serem interpretados.
+    Gera uma string de solicitação para criar sugestões de atividades educacionais criativas e
+    envolventes, adaptadas ao tema e nível dos alunos fornecidos.
+
+    Esta função constrói um prompt de consulta usado pelo modelo de linguagem para gerar uma
+    resposta completa. O prompt é desenvolvido para incentivar a criação de recomendações que
+    satisfazem o contexto e os parâmetros especificados.
+
+    :param topic: O tema principal ou assunto das atividades de aula.
+    :type topic: str
+    :param student_level: O nível de ensino ou faixa etária dos alunos (por exemplo,
+        "ensino fundamental", "ensino médio").
+    :type student_level: str
+    :param num_suggestions: O número desejado de sugestões de atividades a serem
+        geradas (por padrão, 3 sugestões).
+    :type num_suggestions: int
+    :return: Um prompt formatado contendo uma solicitação para o modelo, descrevendo
+        o tópico, o nível estudantil e o número de atividades solicitadas.
+    :rtype: str
     """
     # Esta ferramenta funciona como um "placeholder" (marcador de lugar) para as próprias capacidades geradoras do LLM.
     # O verdadeiro "trabalho" é feito pelo próprio LLM quando ele decide chamar esta ferramenta e formula a resposta final.

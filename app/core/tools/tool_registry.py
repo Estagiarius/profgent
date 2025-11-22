@@ -2,7 +2,20 @@ from typing import List, Dict, Any, Callable
 
 class ToolRegistry:
     """
-    A central registry for all the tools available to the AI assistant.
+    Gerenciador de ferramentas registradas.
+
+    A classe ToolRegistry é responsável por armazenar e gerenciar funções
+    ferramentas que são registradas dinamicamente. Ela também mantém os
+    esquemas JSON (schemas) dessas ferramentas para facilitar a consulta.
+    As funções ferramentas devem ser decoradas adequadamente para serem
+    válidas e registradas no esquema.
+
+    :ivar tools: Dicionário que associa o nome da ferramenta à função
+        correspondente.
+    :type tools: Dict[str, Callable]
+    :ivar schemas: Lista dos esquemas JSON de todas as ferramentas
+        registradas.
+    :type schemas: List[Dict[str, Any]]
     """
     def __init__(self):
         self.tools: Dict[str, Callable] = {}
@@ -14,12 +27,14 @@ class ToolRegistry:
 
         The function must be decorated with the @tool decorator to have a schema.
         """
-        if not hasattr(tool_func, 'schema'):
-            raise ValueError(f"Function {tool_func.__name__} is not a valid tool. Did you forget the @tool decorator?")
+        # Cast to Any to avoid linter errors about 'schema' attribute not existing on Callable
+        func: Any = tool_func
+        if not hasattr(func, 'schema'):
+            raise ValueError(f"Function {func.__name__} is not a valid tool. Did you forget the @tool decorator?")
 
-        tool_name = tool_func.schema["function"]["name"]
-        self.tools[tool_name] = tool_func
-        self.schemas.append(tool_func.schema)
+        tool_name = func.schema["function"]["name"]
+        self.tools[tool_name] = func
+        self.schemas.append(func.schema)
         print(f"Tool registered: {tool_name}")
 
     def get_tool(self, name: str) -> Callable | None:

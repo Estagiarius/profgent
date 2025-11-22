@@ -14,8 +14,23 @@ data_service = DataService()
 @tool
 def get_student_performance_summary_tool(student_name: str, class_name: str) -> str:
     """
-    Fornece um resumo detalhado do desempenho de um aluno específico em uma turma específica.
-    Use esta ferramenta para responder a perguntas sobre as notas de um aluno, média ponderada, incidentes e desempenho geral.
+    Obtém um resumo detalhado do desempenho de um aluno em uma turma específica.
+    Retorna as informações relevantes no formato JSON formatado, facilitando
+    sua análise por ferramentas automatizadas.
+
+    Este método consulta um serviço de dados para buscar o aluno pelo nome,
+    identificar a turma especificada e obter detalhes sobre o desempenho
+    acadêmico do aluno na turma. Caso ocorram erros, mensagens descritivas
+    são retornadas.
+
+    :param student_name: Nome do aluno pelo qual o desempenho será consultado.
+    :type student_name: str
+    :param class_name: Nome da turma para a qual será obtido o desempenho do aluno.
+    :type class_name: str
+    :return: Um resumo em formato JSON string contendo as informações
+             de desempenho do aluno na turma especificada ou mensagens de erro
+             detalhando falhas no processo.
+    :rtype: str
     """
     # Bloco try/except para capturar e tratar qualquer erro inesperado que possa ocorrer.
     try:
@@ -25,11 +40,8 @@ def get_student_performance_summary_tool(student_name: str, class_name: str) -> 
         if not student:
             return f"Erro: Aluno '{student_name}' não encontrado."
 
-        # Simplificação: Busca a turma pelo nome. Em uma aplicação real, isso poderia ser mais robusto.
-        # Obtém todas as turmas.
-        all_classes = data_service.get_all_classes()
-        # Procura a turma cujo nome corresponde ao fornecido (ignorando maiúsculas/minúsculas).
-        target_class = next((c for c in all_classes if c['name'].lower() == class_name.lower()), None)
+        # Busca a turma pelo nome.
+        target_class = data_service.get_class_by_name(class_name)
 
         # Se a turma não for encontrada, retorna uma mensagem de erro.
         if not target_class:
@@ -58,8 +70,7 @@ def get_students_at_risk_tool(class_name: str) -> str:
     """
     try:
         # Busca a turma pelo nome.
-        all_classes = data_service.get_all_classes()
-        target_class = next((c for c in all_classes if c['name'].lower() == class_name.lower()), None)
+        target_class = data_service.get_class_by_name(class_name)
 
         # Se a turma não for encontrada, retorna um erro.
         if not target_class:

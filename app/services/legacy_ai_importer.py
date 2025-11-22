@@ -58,7 +58,14 @@ import json
 # Define uma classe para encapsular a lógica antiga de parsing de CSV com IA.
 class LegacyAiCsvParser:
     """
-    Encapsula a lógica de parsing de CSV que dependia de um provedor de IA.
+    Classe para parsing de nomes e análise de conteúdo CSV com suporte a IA.
+
+    A classe oferece métodos para dividir nomes completos em nome e sobrenome,
+    e para analisar conteúdo de arquivo CSV utilizando um provedor de
+    Large Language Models (LLM). Há suporte para estratégias de fallback
+    em casos de erro ao utilizar o serviço de IA.
+
+    :ivar provider: Instância do provedor de IA utilizado para consultas.
     """
     # Método construtor da classe.
     def __init__(self, provider):

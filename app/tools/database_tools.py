@@ -8,8 +8,19 @@ from app.services import data_service
 @tool
 def get_student_grade(student_name: str, course_name: str) -> str:
     """
-    Encontra todas as notas de um aluno específico em uma determinada disciplina.
-    Retorna as notas como uma string ou uma mensagem de 'não encontrado'.
+    Obtém as notas de um aluno específico em um curso (disciplina) específico.
+    O método realiza múltiplas verificações, incluindo a existência de aluno e
+    curso, além de agregar as notas em todas as turmas associadas à disciplina
+    informada.
+
+    :param student_name: Nome do aluno cujo desempenho será analisado.
+    :type student_name: str
+    :param course_name: Nome do curso (disciplina) em que se deseja obter as notas.
+    :type course_name: str
+    :return: String formatada contendo todas as notas encontradas para o aluno no
+        curso especificado. Retorna mensagens de erro claras se o aluno, curso ou
+        notas não forem encontrados.
+    :rtype: str
     """
     # Busca o aluno pelo nome usando o serviço de dados.
     student = data_service.get_student_by_name(student_name)
@@ -46,7 +57,15 @@ def get_student_grade(student_name: str, course_name: str) -> str:
 @tool
 def list_courses_for_student(student_name: str) -> str:
     """
-    Lista todas as disciplinas em que um aluno específico está matriculado.
+    Lista as disciplinas nas quais o aluno com o nome especificado está matriculado,
+    baseando-se nos dados de notas registradas. Caso o aluno não seja encontrado ou não
+    haja registros de disciplinas, uma mensagem apropriada será retornada.
+
+    :param student_name: O nome do aluno cujo histórico de disciplinas será consultado.
+    :type student_name: str
+    :return: Uma string contendo a lista de disciplinas do aluno ou uma mensagem indicando
+             que o aluno não foi encontrado ou que não há disciplinas registradas.
+    :rtype: str
     """
     # Busca o aluno pelo nome.
     student = data_service.get_student_by_name(student_name)
@@ -72,7 +91,20 @@ def list_courses_for_student(student_name: str) -> str:
 @tool
 def get_class_average(course_name: str) -> str:
     """
-    Calcula a nota média de todos os alunos em uma disciplina específica.
+    Calcula a média aritmética simples de todas as notas de todas as turmas de uma
+    determinada disciplina.
+
+    Busca a disciplina pelo nome fornecido, acessa as informações relevantes de cada
+    turma associada e coleta as notas dos estudantes. Após compilar todas as notas,
+    o algoritmo calcula a média simples e retorna o resultado. Caso não encontre a
+    disciplina ou notas associadas, retornará mensagens informativas para cada
+    situação.
+
+    :param course_name: Nome da disciplina para a qual a média será calculada.
+    :type course_name: str
+    :return: String com a média formatada ou mensagem de erro/informação caso
+             a disciplina ou notas não sejam encontradas.
+    :rtype: str
     """
     # Busca a disciplina pelo nome.
     course = data_service.get_course_by_name(course_name)
@@ -100,9 +132,21 @@ def get_class_average(course_name: str) -> str:
 @tool
 def get_class_roster(class_name: str) -> str:
     """
-    Recupera a lista de alunos matriculados em uma turma específica.
-    Retorna uma lista JSON contendo nome, número da chamada e status de cada aluno.
-    Útil para chamadas ou verificação de alunos na turma.
+    Obtém a lista dos alunos matriculados em uma determinada turma.
+
+    Esta função acessa um serviço de dados para buscar todas as turmas disponíveis,
+    encontra a turma especificada pelo nome e recupera as matrículas associadas a
+    essa turma. Se a turma não for encontrada ou estiver vazia, mensagens de erro
+    ou informação relevante serão retornadas.
+
+    :param class_name: Nome da turma em formato string. O nome não diferencia
+        maiúsculas de minúsculas.
+    :type class_name: str
+    :return: Retorna um JSON formatado contendo a lista de alunos da turma
+        com os atributos "call_number", "name" e "status". Caso a turma
+        não seja encontrada ou não tenha alunos matriculados,
+        retorna uma mensagem correspondente.
+    :rtype: str
     """
     try:
         # Busca todas as turmas para encontrar o ID da turma solicitada.

@@ -7,6 +7,29 @@ from app.models.base import Base
 
 # Define a classe Incident, que representa uma ocorrência ou incidente envolvendo um aluno.
 class Incident(Base):
+    """
+    Representa um incidente registrado no contexto de uma classe escolar.
+
+    Este modelo mapeia a tabela 'incidents' no banco de dados e registra informações
+    relacionadas a incidentes específicos, como data, descrição, aluno envolvido e
+    turma associada. Ele possui relacionamentos com os modelos 'Class' e 'Student',
+    permitindo manipulação bidirecional dos dados entre essas tabelas.
+
+    :ivar id: ID único do incidente.
+    :type id: Integer
+    :ivar date: Data do incidente. Este campo é obrigatório.
+    :type date: Date
+    :ivar description: Descrição detalhada do incidente. Este campo é obrigatório.
+    :type description: Text
+    :ivar class_id: Identificador da turma associada ao incidente. Este campo é obrigatório.
+    :type class_id: Integer
+    :ivar student_id: Identificador do aluno relacionado ao incidente. Este campo é obrigatório.
+    :type student_id: Integer
+    :ivar class_: Relacionamento com o modelo 'Class', representando a turma associada.
+    :type class_: relationship
+    :ivar student: Relacionamento com o modelo 'Student', representando o aluno relacionado.
+    :type student: relationship
+    """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'incidents'
 

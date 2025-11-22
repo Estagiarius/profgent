@@ -7,6 +7,31 @@ from app.models.base import Base
 
 # Define a classe ClassEnrollment, que representa a matrícula de um aluno em uma turma.
 class ClassEnrollment(Base):
+    """
+    Representa a matrícula de um estudante em uma turma, detalhando as informações
+    relacionadas ao aluno, à turma e o status da matrícula.
+
+    Este modelo define a tabela `class_enrollments` no banco de dados e inclui
+    restrições exclusivas para garantir a consistência dos dados. Além disso,
+    estabelece relacionamentos diretos com os modelos `Student` e `Class` para
+    acesso aos dados associados.
+
+    :ivar id: Identificador único da matrícula, gerado automaticamente.
+    :ivar class_id: Identificador da turma associada à matrícula. Chave estrangeira
+        para a tabela 'classes'.
+    :ivar student_id: Identificador do estudante associado à matrícula. Chave
+        estrangeira para a tabela 'students'.
+    :ivar call_number: Número de chamada associado ao estudante nesta turma.
+    :ivar status: Status da matrícula, como "Active" ou "Inactive". Valor padrão:
+        "Active".
+    :ivar status_detail: Detalhes adicionais sobre o status da matrícula. Exemplo:
+        "Transferido". Este atributo é opcional (pode ser nulo).
+    :ivar student: Relacionamento com o modelo `Student`. Permite acesso às
+        informações do estudante associado.
+    :ivar class_: Relacionamento com o modelo `Class`. Permite acesso às
+        informações da turma associada. Este relacionamento é bidirecional, com
+        suporte à referência inversa no modelo `Class`.
+    """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'class_enrollments'
 

@@ -22,6 +22,17 @@ from contextlib import contextmanager
 
 # Define a classe DataService, que encapsula toda a lógica de acesso e manipulação de dados.
 class DataService:
+    """
+    Serviço responsável por gerenciar operações relacionadas a estudantes, incluindo
+    importação de dados, criação, atualização, exclusão e consultas.
+
+    Esse serviço abstrai a manipulação direta com o banco de dados, permitindo
+    que as operações sejam realizadas com sessões de banco de dados injetáveis
+    para facilitar testes e integração.
+
+    :ivar _db_session: Sessão injetada do banco de dados, utilizada se provida.
+    :type _db_session: Session
+    """
     # O construtor permite a injeção de uma sessão de banco de dados, útil para testes.
     def __init__(self, db_session: Session = None):
         # Armazena a sessão de banco de dados injetada, se houver.
@@ -99,7 +110,7 @@ class DataService:
                 }
             # Se não existir, cria um novo objeto Student.
             today = date.today()
-            new_student = Student(first_name=first_name, last_name=last_name, enrollment_date=today, birth_date=birth_date)
+            new_student = Student(first_name=first_name, last_name=last_name, enrollment_date=today.isoformat(), birth_date=birth_date)
             # Adiciona o novo aluno à sessão.
             db.add(new_student)
             # 'flush' envia a operação para o banco de dados para que o ID seja gerado.
@@ -246,6 +257,14 @@ class DataService:
             db.refresh(new_class)
             return {"id": new_class.id, "name": new_class.name}
 
+    # Método para buscar uma turma pelo nome.
+    def get_class_by_name(self, name: str) -> dict | None:
+        with self._get_db() as db:
+            class_ = db.query(Class).filter(func.lower(Class.name) == name.lower()).first()
+            if class_:
+                return {"id": class_.id, "name": class_.name}
+            return None
+
     # Método para buscar todas as turmas.
     def get_all_classes(self) -> list[dict]:
         with self._get_db() as db:
@@ -329,7 +348,8 @@ class DataService:
                 enrollment.status = status
 
     # Método privado para calcular o próximo número de chamada disponível em uma turma.
-    def _get_next_call_number(self, db: Session, class_id: int) -> int:
+    @staticmethod
+    def _get_next_call_number(db: Session, class_id: int) -> int:
         # Busca o maior número de chamada existente na turma.
         max_call_number = db.query(func.max(ClassEnrollment.call_number)).filter(ClassEnrollment.class_id == class_id).scalar()
         # Retorna o maior número + 1, ou 1 se a turma estiver vazia.
@@ -406,55 +426,53 @@ class DataService:
                 .all()
             )
             # Converte o resultado (que é uma lista de Row objects) em uma lista de dicionários.
-            return [dict(row._mapping) for row in grades_query]
+            return [row._asdict() for row in grades_query]
 
     # Método para gerar um resumo de desempenho de um aluno em uma turma.
     def get_student_performance_summary(self, student_id: int, class_id: int) -> dict | None:
-        with self._get_db() as db:
-            class_info = self.get_class_by_id(class_id)
-            if not class_info:
-                return None
+        class_info = self.get_class_by_id(class_id)
+        if not class_info:
+            return None
 
-            # Reutiliza outros métodos do serviço para obter os dados necessários.
-            grades = self.get_grades_for_class(class_id)
-            student_grades = [g for g in grades if g['student_id'] == student_id]
+        # Reutiliza outros métodos do serviço para obter os dados necessários.
+        grades = self.get_grades_for_class(class_id)
+        student_grades = [g for g in grades if g['student_id'] == student_id]
 
-            assessments = class_info.get('assessments', [])
+        assessments = class_info.get('assessments', [])
 
-            # Calcula a média ponderada.
-            weighted_average = self.calculate_weighted_average(student_id, student_grades, assessments)
+        # Calcula a média ponderada.
+        weighted_average = self.calculate_weighted_average(student_id, student_grades, assessments)
 
-            incidents = self.get_incidents_for_class(class_id)
-            student_incidents = [i for i in incidents if i['student_id'] == student_id]
+        incidents = self.get_incidents_for_class(class_id)
+        student_incidents = [i for i in incidents if i['student_id'] == student_id]
 
-            # Retorna um resumo com a média e a contagem de incidentes.
-            return {
-                "weighted_average": weighted_average,
-                "incident_count": len(student_incidents)
-            }
+        # Retorna um resumo com a média e a contagem de incidentes.
+        return {
+            "weighted_average": weighted_average,
+            "incident_count": len(student_incidents)
+        }
 
     # Método para identificar alunos em situação de risco (notas baixas ou muitos incidentes).
     def get_students_at_risk(self, class_id: int, grade_threshold: float = 5.0, incident_threshold: int = 2) -> list[dict]:
-        with self._get_db() as db:
-            enrollments = self.get_enrollments_for_class(class_id)
-            at_risk_students = []
-            # Itera sobre cada aluno matriculado na turma.
-            for enrollment in enrollments:
-                student_id = enrollment['student_id']
-                # Obtém o resumo de desempenho.
-                summary = self.get_student_performance_summary(student_id, class_id)
-                if summary:
-                    # Aplica a lógica para determinar se o aluno está em risco.
-                    is_at_risk = (summary['weighted_average'] < grade_threshold) or \
-                                 (summary['incident_count'] >= incident_threshold)
-                    if is_at_risk:
-                        at_risk_students.append({
-                            "student_id": student_id,
-                            "student_name": f"{enrollment['student_first_name']} {enrollment['student_last_name']}",
-                            "average_grade": summary['weighted_average'],
-                            "incident_count": summary['incident_count']
-                        })
-            return at_risk_students
+        enrollments = self.get_enrollments_for_class(class_id)
+        at_risk_students = []
+        # Itera sobre cada aluno matriculado na turma.
+        for enrollment in enrollments:
+            student_id = enrollment['student_id']
+            # Obtém o resumo de desempenho.
+            summary = self.get_student_performance_summary(student_id, class_id)
+            if summary:
+                # Aplica a lógica para determinar se o aluno está em risco.
+                is_at_risk = (summary['weighted_average'] < grade_threshold) or \
+                             (summary['incident_count'] >= incident_threshold)
+                if is_at_risk:
+                    at_risk_students.append({
+                        "student_id": student_id,
+                        "student_name": f"{enrollment['student_first_name']} {enrollment['student_last_name']}",
+                        "average_grade": summary['weighted_average'],
+                        "incident_count": summary['incident_count']
+                    })
+        return at_risk_students
 
     # Método para criar um novo registro de aula.
     def create_lesson(self, class_id: int, title: str, content: str, lesson_date: date) -> dict | None:
@@ -556,7 +574,8 @@ class DataService:
                     db.add(new_grade)
 
     # Método para calcular a média ponderada de um aluno.
-    def calculate_weighted_average(self, student_id: int, grades: list[dict], assessments: list[dict]) -> float:
+    @staticmethod
+    def calculate_weighted_average(student_id: int, grades: list[dict], assessments: list[dict]) -> float:
         # Soma o peso de todas as avaliações da turma.
         total_weight = sum(a['weight'] for a in assessments)
         if total_weight == 0: return 0.0

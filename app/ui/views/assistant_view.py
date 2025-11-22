@@ -87,10 +87,15 @@ class AssistantView(ctk.CTkFrame):
             # Reinsere o texto sem a mensagem de "Pensando...".
             if new_text: self.chat_history.insert("1.0", new_text + "\n\n")
 
+        # Verifica se ocorreu um erro durante a execução da tarefa assíncrona.
+        if isinstance(response, Exception):
+            self.add_message("Sistema", f"Ocorreu um erro: {response}")
         # Adiciona a resposta real do assistente.
-        if response.content: self.add_message("Assistente", response.content)
+        elif response.content:
+            self.add_message("Assistente", response.content)
         # Se não houver conteúdo textual (ex: a IA apenas executou uma ação), adiciona uma mensagem do sistema.
-        else: self.add_message("Sistema", "Uma ação foi realizada, mas nenhuma resposta verbal foi gerada.")
+        else:
+            self.add_message("Sistema", "Uma ação foi realizada, mas nenhuma resposta verbal foi gerada.")
 
         # Desabilita a caixa de texto novamente.
         self.chat_history.configure(state="disabled")

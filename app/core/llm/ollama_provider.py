@@ -6,8 +6,17 @@ import httpx
 
 class OllamaProvider(LLMProvider):
     """
-    An implementation of the LLMProvider for a local Ollama server,
-    using an async client.
+    Representa um provedor de LLM (Large Language Model) utilizando a API Ollama.
+
+    Esta classe serve como um wrapper para a interação com a API Ollama, permitindo realizar
+    operações como obter respostas de chat, listar modelos disponíveis, e outros. A classe é
+    altamente dependente da comunicação assíncrona com a API Ollama e utiliza um cliente
+    assíncrono para realizar as requisições.
+
+    :ivar client: Instância do cliente assíncrono para comunicação com a API Ollama.
+    :type client: AsyncOpenAI
+    :ivar model: Nome do modelo padrão utilizado pelo provedor.
+    :type model: str
     """
 
     def __init__(self, base_url: str = "http://localhost:11434/v1", model: str = "llama3.1"):

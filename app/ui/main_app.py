@@ -18,6 +18,48 @@ from app.services.assistant_service import AssistantService
 
 # Define a classe principal da aplicação, que herda de ctk.CTk (a janela principal).
 class MainApp(ctk.CTk):
+    """
+    Classe principal que gerencia a interface gráfica da aplicação de Gestão Acadêmica.
+
+    A classe MainApp é responsável por criar a janela principal da aplicação, configurar
+    os layouts, gerenciar as telas (views) e possibilitar a comunicação assíncrona entre
+    a interface do usuário e os serviços de backend.
+
+    :ivar data_service: Serviço para manipulação e acesso aos dados.
+                        Responsável por operações relacionadas a dados persistentes.
+    :type data_service: DataService
+    :ivar assistant_service: Serviço para funcionalidades de assistente inteligente
+                             baseado em IA.
+    :type assistant_service: AssistantService
+    :ivar loop: Loop de eventos asyncio, utilizado para integrar tarefas assíncronas
+                com o loop de eventos do tkinter.
+    :type loop: asyncio.AbstractEventLoop
+    :ivar async_queue: Fila thread-safe utilizada para a comunicação entre a interface
+                       gráfica e tarefas assíncronas.
+    :type async_queue: Queue
+    :ivar _poll_id: ID do evento agendado para o loop de integração do tkinter e asyncio.
+    :type _poll_id: int
+    :ivar navigation_frame: Frame principal da navegação, localizado na lateral
+                            esquerda da janela.
+    :type navigation_frame: ctk.CTkFrame
+    :ivar navigation_frame_label: Rótulo que exibe o título do painel de navegação.
+    :type navigation_frame_label: ctk.CTkLabel
+    :ivar dashboard_button: Botão de navegação para o dashboard.
+    :type dashboard_button: ctk.CTkButton
+    :ivar management_button: Botão de navegação para a gestão de dados.
+    :type management_button: ctk.CTkButton
+    :ivar class_selection_button: Botão de navegação para a seleção de turmas.
+    :type class_selection_button: ctk.CTkButton
+    :ivar assistant_button: Botão de navegação para o assistente IA.
+    :type assistant_button: ctk.CTkButton
+    :ivar settings_button: Botão de navegação para configurações.
+    :type settings_button: ctk.CTkButton
+    :ivar main_frame: Frame principal onde as diferentes telas (views) são exibidas.
+    :type main_frame: ctk.CTkFrame
+    :ivar views: Dicionário que mapeia os nomes das telas (views) às suas respectivas
+                 instâncias.
+    :type views: dict
+    """
     # O método construtor, que recebe as instâncias dos serviços por injeção de dependência.
     def __init__(self, data_service: DataService, assistant_service: AssistantService):
         # Chama o construtor da classe pai (ctk.CTk).
@@ -100,9 +142,9 @@ class MainApp(ctk.CTk):
     def _process_queue(self):
         try:
             # Tenta obter uma tarefa da fila sem bloquear a execução.
-            callable, args = self.async_queue.get_nowait()
+            callback, args = self.async_queue.get_nowait()
             # Se uma tarefa for encontrada, executa a função (callback) com seus argumentos.
-            callable(*args)
+            callback(*args)
         except Empty:
             # Se a fila estiver vazia, não faz nada.
             pass

@@ -6,16 +6,22 @@ import threading
 # Define a função que executa uma tarefa assíncrona a partir de um contexto síncrono (como a UI).
 def run_async_task(coro, loop, queue, callback):
     """
-    Executa uma coroutine em uma thread de segundo plano no loop de eventos principal da aplicação,
-    e enfileira um callback para ser executado na thread principal da UI após a conclusão.
+    Executa uma tarefa assíncrona em segundo plano utilizando uma thread separada. Este método é útil
+    para integrar loops de eventos asyncio com aplicações que utilizam arquiteturas baseadas em threads.
+    O resultado ou a exceção correspondente será enfileirado para processamento em outra thread,
+    normalmente a thread principal.
 
-    Esta é a maneira padrão e sem bloqueio de executar tarefas assíncronas a partir da UI nesta aplicação.
-
-    Args:
-        coro: A coroutine (função async) a ser executada.
-        loop: O loop de eventos asyncio principal da aplicação.
-        queue: A fila thread-safe para atualizações da UI.
-        callback: A função a ser chamada na thread principal com o resultado da coroutine.
+    :param coro: Coroutine assíncrona a ser executada no loop de eventos.
+    :type coro: Coroutine
+    :param loop: Loop de eventos asyncio onde a coroutine será executada.
+    :type loop: asyncio.AbstractEventLoop
+    :param queue: Fila thread-safe que armazena o callback e o resultado (ou exceção) da coroutine.
+    :type queue: queue.Queue
+    :param callback: Função a ser chamada na thread principal com o resultado ou a exceção
+        da execução da coroutine.
+    :type callback: Callable
+    :return: Nenhum valor é retornado diretamente pela função. O resultado do processamento
+        é passado ao callback por meio da queue.
     """
     # Define uma função interna (wrapper) que será o alvo da nossa thread de segundo plano.
     def task_wrapper():

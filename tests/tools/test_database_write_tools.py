@@ -53,7 +53,7 @@ def test_add_new_grade(data_service: DataService):
     student = data_service.add_student("Grade", "Student")
     course = data_service.add_course("Grading", "G101")
     class_ = data_service.create_class("1A", course['id'])
-    assessment = data_service.add_assessment(class_['id'], "Final Project", 1.0)
+    data_service.add_assessment(class_['id'], "Final Project", 1.0)
     data_service.add_student_to_class(student['id'], class_['id'], 1) # Matricula o aluno
 
     # --- AÇÃO ---
