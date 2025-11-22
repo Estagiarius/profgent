@@ -562,3 +562,125 @@ def change_student_status(student_name: str, class_name: str, new_status: str) -
         return f"Status de {student_name} na turma '{class_name}' alterado para '{new_status}'."
     except Exception as e:
         return f"Erro ao alterar status: {e}"
+
+# --- OPERATIONAL TOOLS (Group 5) ---
+
+@tool
+def list_lessons(class_name: str) -> str:
+    """
+    Lista todas as aulas registradas para uma determinada turma.
+
+    :param class_name: Nome da turma.
+    :return: Lista formatada das aulas com data e tópico.
+    """
+    try:
+        target_class = data_service.get_class_by_name(class_name)
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        lessons = data_service.get_lessons_for_class(target_class['id'])
+        if not lessons:
+            return f"Nenhuma aula registrada para a turma '{class_name}'."
+
+        result = [f"Aulas da turma {class_name}:"]
+        for lesson in lessons:
+            result.append(f"- Data: {lesson['date']} | Tópico: {lesson['title']}")
+
+        return "\n".join(result)
+    except Exception as e:
+        return f"Erro ao listar aulas: {e}"
+
+@tool
+def update_lesson(class_name: str, date_str: str, new_topic: str = None, new_content: str = None) -> str:
+    """
+    Atualiza os detalhes (tópico ou conteúdo) de uma aula já registrada.
+
+    :param class_name: Nome da turma.
+    :param date_str: Data da aula (DD/MM/AAAA) para identificação.
+    :param new_topic: Novo tópico da aula (opcional).
+    :param new_content: Novo conteúdo da aula (opcional).
+    """
+    if not new_topic and not new_content:
+        return "Erro: Forneça pelo menos um novo tópico ou novo conteúdo para atualizar."
+
+    try:
+        target_class = data_service.get_class_by_name(class_name)
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        try:
+            target_date = datetime.strptime(date_str, "%d/%m/%Y").date().isoformat()
+        except ValueError:
+            return f"Erro: Formato de data inválido '{date_str}'. Use DD/MM/AAAA."
+
+        lessons = data_service.get_lessons_for_class(target_class['id'])
+        # Find the lesson by date (assuming one lesson per date per class is standard usage, or picking first match)
+        target_lesson = next((l for l in lessons if l['date'] == target_date), None)
+
+        if not target_lesson:
+            return f"Erro: Nenhuma aula encontrada na data {date_str} para a turma '{class_name}'."
+
+        # Prepare updated values, keeping old ones if not provided
+        updated_topic = new_topic if new_topic else target_lesson['title']
+        updated_content = new_content if new_content else target_lesson['content']
+        updated_date_obj = datetime.strptime(target_lesson['date'], "%Y-%m-%d").date() # Keep original date
+
+        data_service.update_lesson(target_lesson['id'], updated_topic, updated_content, updated_date_obj)
+        return f"Aula de {date_str} atualizada com sucesso."
+    except Exception as e:
+        return f"Erro ao atualizar aula: {e}"
+
+@tool
+def delete_lesson_record(class_name: str, date_str: str) -> str:
+    """
+    Remove o registro de uma aula de uma turma em uma data específica.
+
+    :param class_name: Nome da turma.
+    :param date_str: Data da aula (DD/MM/AAAA).
+    """
+    try:
+        target_class = data_service.get_class_by_name(class_name)
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        try:
+            target_date = datetime.strptime(date_str, "%d/%m/%Y").date().isoformat()
+        except ValueError:
+            return f"Erro: Formato de data inválido '{date_str}'. Use DD/MM/AAAA."
+
+        lessons = data_service.get_lessons_for_class(target_class['id'])
+        target_lesson = next((l for l in lessons if l['date'] == target_date), None)
+
+        if not target_lesson:
+            return f"Erro: Nenhuma aula encontrada na data {date_str} para a turma '{class_name}'."
+
+        data_service.delete_lesson(target_lesson['id'])
+        return f"Aula de {date_str} removida com sucesso."
+    except Exception as e:
+        return f"Erro ao remover aula: {e}"
+
+@tool
+def list_incidents(class_name: str) -> str:
+    """
+    Lista o histórico de incidentes registrados para uma turma.
+
+    :param class_name: Nome da turma.
+    :return: Lista de incidentes com data, aluno e descrição.
+    """
+    try:
+        target_class = data_service.get_class_by_name(class_name)
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        incidents = data_service.get_incidents_for_class(target_class['id'])
+        if not incidents:
+            return f"Nenhum incidente registrado para a turma '{class_name}'."
+
+        result = [f"Histórico de Incidentes - {class_name}:"]
+        for inc in incidents:
+            student_name = f"{inc['student_first_name']} {inc['student_last_name']}"
+            result.append(f"- Data: {inc['date']} | Aluno: {student_name} | Descrição: {inc['description']}")
+
+        return "\n".join(result)
+    except Exception as e:
+        return f"Erro ao listar incidentes: {e}"
