@@ -428,3 +428,137 @@ def create_new_assessment(class_name: str, assessment_name: str, weight: float) 
             return "Erro: Falha ao criar a avaliação."
     except Exception as e:
         return f"Erro inesperado ao criar avaliação: {e}"
+
+# --- MAINTENANCE TOOLS (Group 2) ---
+
+@tool
+def update_student_name(current_name: str, new_first_name: str, new_last_name: str) -> str:
+    """
+    Atualiza o nome e sobrenome de um aluno existente.
+
+    :param current_name: O nome completo atual do aluno para busca.
+    :param new_first_name: O novo primeiro nome.
+    :param new_last_name: O novo sobrenome.
+    """
+    try:
+        student = data_service.get_student_by_name(current_name)
+        if not student:
+            return f"Erro: Aluno '{current_name}' não encontrado."
+
+        data_service.update_student(student['id'], new_first_name, new_last_name)
+        return f"Nome do aluno atualizado para {new_first_name} {new_last_name}."
+    except Exception as e:
+        return f"Erro ao atualizar aluno: {e}"
+
+@tool
+def update_class_name(current_name: str, new_name: str) -> str:
+    """
+    Atualiza o nome de uma turma existente.
+
+    :param current_name: O nome atual da turma.
+    :param new_name: O novo nome da turma.
+    """
+    try:
+        target_class = data_service.get_class_by_name(current_name)
+        if not target_class:
+            return f"Erro: Turma '{current_name}' não encontrada."
+
+        data_service.update_class(target_class['id'], new_name)
+        return f"Nome da turma atualizado para '{new_name}'."
+    except Exception as e:
+        return f"Erro ao atualizar turma: {e}"
+
+@tool
+def delete_student_record(student_name: str) -> str:
+    """
+    Remove permanentemente o registro de um aluno do sistema, incluindo suas notas e histórico.
+    Use com cautela.
+
+    :param student_name: Nome completo do aluno a ser removido.
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student:
+            return f"Erro: Aluno '{student_name}' não encontrado."
+
+        data_service.delete_student(student['id'])
+        return f"Registro do aluno {student_name} foi removido com sucesso."
+    except Exception as e:
+        return f"Erro ao remover aluno: {e}"
+
+@tool
+def delete_class_record(class_name: str) -> str:
+    """
+    Remove permanentemente uma turma e todos os registros associados (matrículas, aulas).
+
+    :param class_name: Nome da turma a ser removida.
+    """
+    try:
+        target_class = data_service.get_class_by_name(class_name)
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        data_service.delete_class(target_class['id'])
+        return f"Turma '{class_name}' foi removida com sucesso."
+    except Exception as e:
+        return f"Erro ao remover turma: {e}"
+
+# --- ENROLLMENT TOOLS (Group 3) ---
+
+@tool
+def enroll_existing_student(student_name: str, class_name: str) -> str:
+    """
+    Matricula um aluno JÁ EXISTENTE no sistema em uma nova turma.
+    Se o aluno não existir, use 'add_new_student' em vez disso.
+
+    :param student_name: Nome completo do aluno.
+    :param class_name: Nome da turma onde será matriculado.
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student:
+            return f"Erro: Aluno '{student_name}' não encontrado. Se for um aluno novo, use a função para adicionar aluno."
+
+        target_class = data_service.get_class_by_name(class_name)
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        next_call_number = data_service.get_next_call_number(target_class['id'])
+        enrollment = data_service.add_student_to_class(student['id'], target_class['id'], next_call_number)
+
+        if enrollment:
+            return f"Aluno {student_name} matriculado com sucesso na turma '{class_name}' (Nº {next_call_number})."
+        else:
+            return f"Erro ao matricular aluno na turma '{class_name}'."
+    except Exception as e:
+        return f"Erro inesperado na matrícula: {e}"
+
+@tool
+def change_student_status(student_name: str, class_name: str, new_status: str) -> str:
+    """
+    Altera o status de matrícula de um aluno em uma turma específica (ex: "Active", "Inactive", "Transferred").
+
+    :param student_name: Nome do aluno.
+    :param class_name: Nome da turma.
+    :param new_status: Novo status (em inglês, ex: 'Active', 'Inactive').
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student:
+            return f"Erro: Aluno '{student_name}' não encontrado."
+
+        target_class = data_service.get_class_by_name(class_name)
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        enrollments = data_service.get_enrollments_for_class(target_class['id'])
+        # Find the specific enrollment for this student
+        target_enrollment = next((e for e in enrollments if e['student_id'] == student['id']), None)
+
+        if not target_enrollment:
+            return f"Erro: Aluno {student_name} não está matriculado na turma '{class_name}'."
+
+        data_service.update_enrollment_status(target_enrollment['id'], new_status)
+        return f"Status de {student_name} na turma '{class_name}' alterado para '{new_status}'."
+    except Exception as e:
+        return f"Erro ao alterar status: {e}"
