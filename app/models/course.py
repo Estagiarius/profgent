@@ -21,9 +21,9 @@ class Course(Base):
     :type course_name: str
     :ivar course_code: Código único associado ao curso.
     :type course_code: str
-    :ivar classes: Lista de turmas associadas ao curso. Representado pelo relacionamento
-        com o modelo Class.
-    :type classes: List[Class]
+    :ivar class_subjects: Relacionamento com ClassSubject.
+        Representa as associações com turmas.
+    :type class_subjects: List[ClassSubject]
     """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'courses'

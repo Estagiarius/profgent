@@ -22,10 +22,10 @@ class Lesson(Base):
     :type title: str
     :ivar content: Conteúdo descritivo da aula. Pode ser nulo.
     :type content: str | None
-    :ivar class_id: Chave estrangeira que associa a aula a uma turma específica.
-    :type class_id: int
-    :ivar class_: Relacionamento que conecta a aula com a respectiva instância de Class.
-    :type class_: Class
+    :ivar class_subject_id: Chave estrangeira que associa a aula a uma disciplina de uma turma.
+    :type class_subject_id: int
+    :ivar class_subject: Relacionamento que conecta a aula com a respectiva instância de ClassSubject.
+    :type class_subject: ClassSubject
     """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'lessons'
@@ -46,5 +46,5 @@ class Lesson(Base):
 
     # Define uma representação em string para o objeto Lesson, útil para depuração.
     def __repr__(self):
-        # Retorna uma string formatada com o id, título da aula e o ID da turma.
-        return f"<Lesson(id={self.id}, title='{self.title}', class_id={self.class_id})>"
+        # Retorna uma string formatada com o id, título da aula e o ID da disciplina da turma.
+        return f"<Lesson(id={self.id}, title='{self.title}', class_subject_id={self.class_subject_id})>"

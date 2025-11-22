@@ -1,6 +1,5 @@
 import csv
 import os
-import json
 from datetime import datetime
 import matplotlib
 # Force Agg backend for headless/background generation to avoid GUI lockups
@@ -208,16 +207,17 @@ class ReportService:
         student_incidents = [i for i in incidents if i['student_id'] == student_id]
 
         # Build Report Content
-        lines = []
-        lines.append("="*50)
-        lines.append(f"BOLETIM ESCOLAR")
-        lines.append("="*50)
-        lines.append(f"Aluno: {student_obj['first_name']} {student_obj['last_name']}")
-        lines.append(f"Turma: {class_info['name']}")
-        lines.append(f"Data de Emissão: {datetime.now().strftime('%d/%m/%Y')}")
-        lines.append("-" * 50)
-        lines.append("DESEMPENHO POR DISCIPLINA:")
-        lines.append("")
+        lines = [
+            "=" * 50,
+            "BOLETIM ESCOLAR",
+            "=" * 50,
+            f"Aluno: {student_obj['first_name']} {student_obj['last_name']}",
+            f"Turma: {class_info['name']}",
+            f"Data de Emissão: {datetime.now().strftime('%d/%m/%Y')}",
+            "-" * 50,
+            "DESEMPENHO POR DISCIPLINA:",
+            ""
+        ]
 
         if not subjects:
             lines.append("Nenhuma disciplina cadastrada nesta turma.")
@@ -241,9 +241,11 @@ class ReportService:
             lines.append(f"  >> MÉDIA FINAL: {avg:.2f}")
             lines.append("-" * 30)
 
-        lines.append("")
-        lines.append("=" * 50)
-        lines.append(f"OCORRÊNCIAS DISCIPLINARES: {len(student_incidents)}")
+        lines.extend([
+            "",
+            "=" * 50,
+            f"OCORRÊNCIAS DISCIPLINARES: {len(student_incidents)}"
+        ])
         for inc in student_incidents:
              lines.append(f"- {inc['date']}: {inc['description']}")
 

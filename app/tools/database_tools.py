@@ -53,7 +53,6 @@ def list_courses_for_student(student_name: str) -> str:
     # Como a matrícula é por Turma, e a Turma tem várias disciplinas,
     # listar as disciplinas "do aluno" significa listar as disciplinas das turmas onde ele está matriculado.
 
-    enrollments = []
     # Precisamos iterar todas as turmas para achar as matrículas desse aluno
     # (Idealmente o DataService teria get_student_enrollments, mas vamos usar o que tem)
     classes = data_service.get_all_classes()

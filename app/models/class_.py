@@ -1,5 +1,5 @@
 # Importa os tipos de coluna necessários do SQLAlchemy para definir o modelo.
-from sqlalchemy import Column, Integer, String, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Enum
 # Importa a função 'relationship' para definir relacionamentos entre modelos.
 from sqlalchemy.orm import relationship
 # Importa a classe 'Base' declarativa da qual todos os modelos devem herdar.
@@ -21,23 +21,15 @@ class Class(Base):
     :type id: int
     :ivar name: Nome único da turma, obrigatório.
     :type name: str
-    :ivar course_id: Identificador do curso ao qual a turma pertence, obrigatório.
-    :type course_id: int
     :ivar calculation_method: Método de cálculo aplicado na turma.
         Pode ser 'arithmetic' (média aritmética) ou 'weighted' (média ponderada).
     :type calculation_method: Enum('arithmetic', 'weighted')
-    :ivar course: Relacionamento com o modelo Course via chave estrangeira.
-        Representa o curso ao qual a turma pertence.
-    :type course: Course
+    :ivar subjects: Relacionamento com ClassSubject.
+        Representa as disciplinas associadas à turma.
+    :type subjects: list[ClassSubject]
     :ivar enrollments: Relacionamento com o modelo ClassEnrollment.
         Representa as matrículas realizadas na turma.
     :type enrollments: list[ClassEnrollment]
-    :ivar assessments: Relacionamento com o modelo Assessment.
-        Representa as avaliações associadas à turma. Associadas com `cascade="all, delete-orphan"`.
-    :type assessments: list[Assessment]
-    :ivar lessons: Relacionamento com o modelo Lesson.
-        Representa as aulas associadas à turma.
-    :type lessons: list[Lesson]
     :ivar incidents: Relacionamento com o modelo Incident.
         Representa os incidentes registrados na turma.
     :type incidents: list[Incident]

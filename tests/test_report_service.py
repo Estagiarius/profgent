@@ -1,16 +1,15 @@
 import pytest
 import os
-from unittest.mock import MagicMock, patch
 from app.services.report_service import ReportService
 
 class TestReportService:
     @pytest.fixture
     def report_service(self, mocker):
         # Mock DataService within ReportService
-        with patch('app.services.report_service.DataService') as MockDataService:
-            service = ReportService()
-            service.data_service = MockDataService.return_value
-            return service
+        MockDataService = mocker.patch('app.services.report_service.DataService')
+        service = ReportService()
+        service.data_service = MockDataService.return_value
+        return service
 
     def test_generate_student_report_card(self, report_service):
         # Mock data
