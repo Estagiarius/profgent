@@ -20,10 +20,11 @@ from app.core.tools.tool_executor import ToolExecutor
 # --- Importação das Ferramentas (Tools) ---
 # Importa as ferramentas de leitura do banco de dados.
 from app.tools.database_tools import get_student_grade, list_courses_for_student, get_class_average
+from app.tools.database_read_tools import list_all_classes, get_class_roster
 # Importa as ferramentas de busca na internet.
 from app.tools.internet_tools import search_internet
 # Importa as ferramentas de escrita no banco de dados.
-from app.tools.database_write_tools import add_new_student, add_new_course, add_new_grade
+from app.tools.database_write_tools import add_new_student, add_new_course, add_new_grade, create_new_class, create_new_assessment
 # Importa as ferramentas de análise de dados.
 from app.tools.analysis_tools import get_student_performance_summary_tool, get_students_at_risk_tool
 # Importa as ferramentas com foco pedagógico.
@@ -79,6 +80,8 @@ class AssistantService:
         self.tool_registry.register(get_student_grade)
         self.tool_registry.register(list_courses_for_student)
         self.tool_registry.register(get_class_average)
+        self.tool_registry.register(list_all_classes)
+        self.tool_registry.register(get_class_roster)
         # Ferramentas de análise
         self.tool_registry.register(get_student_performance_summary_tool)
         self.tool_registry.register(get_students_at_risk_tool)
@@ -90,6 +93,8 @@ class AssistantService:
         self.tool_registry.register(add_new_student)
         self.tool_registry.register(add_new_course)
         self.tool_registry.register(add_new_grade)
+        self.tool_registry.register(create_new_class)
+        self.tool_registry.register(create_new_assessment)
 
     # Método privado para inicializar o provedor de LLM ativo.
     def _initialize_provider(self):

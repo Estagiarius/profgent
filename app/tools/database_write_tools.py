@@ -245,3 +245,68 @@ def add_new_grade(student_name: str, class_name: str, assessment_name: str, scor
             return "Erro: Não foi possível adicionar a nota."
     except Exception as e:
         return f"Erro: Ocorreu um erro inesperado: {e}"
+
+@tool
+def create_new_class(course_name: str, class_name: str) -> str:
+    """
+    Cria uma nova turma (Classe) associada a uma disciplina (Curso) existente.
+
+    Esta função verifica se a disciplina existe e se a turma já não foi criada.
+
+    :param course_name: O nome da disciplina (Curso) à qual a turma pertencerá.
+    :param class_name: O nome da nova turma a ser criada (ex: "Turma A - 2024").
+    :return: Uma mensagem de sucesso ou erro.
+    """
+    if not course_name or not class_name:
+        return "Erro: Nome da disciplina e nome da turma são obrigatórios."
+
+    try:
+        # Verifica se a disciplina existe
+        course = data_service.get_course_by_name(course_name)
+        if not course:
+            return f"Erro: Disciplina '{course_name}' não encontrada."
+
+        # Verifica se a turma já existe
+        existing_class = data_service.get_class_by_name(class_name)
+        if existing_class:
+            return f"Erro: Já existe uma turma com o nome '{class_name}'."
+
+        # Cria a turma
+        new_class = data_service.create_class(class_name, course['id'])
+        if new_class:
+            return f"Turma '{class_name}' criada com sucesso para a disciplina '{course_name}'."
+        else:
+            return "Erro: Falha ao criar a turma."
+    except Exception as e:
+        return f"Erro inesperado ao criar turma: {e}"
+
+@tool
+def create_new_assessment(class_name: str, assessment_name: str, weight: float) -> str:
+    """
+    Cria uma nova avaliação para uma turma específica.
+
+    Esta função permite definir o nome da avaliação (ex: "Prova 1") e seu peso
+    na nota final (ex: 1.0, 0.5).
+
+    :param class_name: O nome da turma para a qual a avaliação será criada.
+    :param assessment_name: O nome da avaliação.
+    :param weight: O peso da avaliação (número flutuante).
+    :return: Uma mensagem de sucesso ou erro.
+    """
+    if not class_name or not assessment_name or weight is None:
+        return "Erro: Nome da turma, nome da avaliação e peso são obrigatórios."
+
+    try:
+        # Verifica se a turma existe
+        target_class = data_service.get_class_by_name(class_name)
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        # Cria a avaliação
+        assessment = data_service.add_assessment(target_class['id'], assessment_name, weight)
+        if assessment:
+            return f"Avaliação '{assessment_name}' (Peso: {weight}) criada com sucesso para a turma '{class_name}'."
+        else:
+            return "Erro: Falha ao criar a avaliação."
+    except Exception as e:
+        return f"Erro inesperado ao criar avaliação: {e}"
