@@ -9,8 +9,24 @@ from app.core.tools.tool_decorator import tool
 @tool
 def search_internet(query: str) -> str:
     """
-    Realiza uma busca na web para uma determinada consulta e retorna um resumo do resultado principal.
-    Melhorado para ser mais robusto e fornecer resultados mais limpos.
+    Busca por resultados na internet utilizando a engine de busca DuckDuckGo, retorna
+    resumos curtos ou links correspondentes à consulta do usuário.
+
+    Esta função realiza uma requisição HTTP para a interface HTML da página de busca
+    do DuckDuckGo. Em seguida, processa o conteúdo da resposta com o BeautifulSoup
+    para identificar e extrair os títulos, resumos e links relevantes dos resultados de
+    pesquisa. Caso a estrutura da resposta HTML não seja conforme esperado, são adotados
+    métodos de fallback para garantir que ao menos links sejam retornados.
+
+    Lida com erros relacionados a rede, como ausência de conexão ou alterações na
+    estrutura HTML da página.
+
+    :param query: Texto da consulta de busca.
+    :type query: str
+    :return: Uma string contendo os resultados da consulta, que pode incluir títulos,
+        resumos, e links associados. Caso nenhum resultado seja encontrado ou haja um
+        erro, uma mensagem informativa será retornada.
+    :rtype: str
     """
     # Bloco try/except para lidar com erros de rede ou de parsing.
     try:

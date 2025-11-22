@@ -11,9 +11,18 @@ from app.services import data_service
 @tool
 def add_new_student(first_name: str, last_name: str, date_of_birth: str = None, enroll_in_class: str = None) -> str:
     """
-    Adiciona um novo aluno ao banco de dados.
-    Opcionalmente, inclui data de nascimento (DD/MM/AAAA) e matricula em uma turma existente.
-    Use esta ferramenta quando um usuário pedir explicitamente para adicionar ou criar um novo aluno.
+    Adiciona um novo aluno ao sistema, com opção de matrícula em uma turma específica,
+    realizando validações nos dados fornecidos e comunicando-se com o serviço de dados
+    para persistência da informação.
+
+    Se uma data de nascimento for fornecida, ela será validada para o formato "DD/MM/AAAA".
+    Opcionalmente, o aluno pode ser matriculado em uma turma existente no sistema.
+
+    :param first_name: Nome do aluno.
+    :param last_name: Sobrenome do aluno.
+    :param date_of_birth: Data de nascimento do aluno, no formato "DD/MM/AAAA" (opcional).
+    :param enroll_in_class: Nome da turma onde o aluno será matriculado (opcional).
+    :return: Mensagem com o resultado da operação, seja ela um sucesso ou mensagem de erro.
     """
     # Validação básica dos parâmetros de entrada.
     if not first_name or not last_name:
@@ -64,12 +73,20 @@ def add_new_student(first_name: str, last_name: str, date_of_birth: str = None, 
 @tool
 def add_new_lesson(class_name: str, topic: str, content: str, date_str: str) -> str:
     """
-    Cria um novo registro de aula (Lesson) ou plano de aula para uma turma específica.
-    Parâmetros:
-    - class_name: Nome da turma.
-    - topic: Título ou tópico da aula.
-    - content: Conteúdo detalhado ou plano de aula.
-    - date_str: Data da aula no formato DD/MM/AAAA.
+    Adiciona uma nova aula a uma turma específica, baseada no nome da turma,
+    tópico, conteúdo e data fornecidos. Retorna uma mensagem de sucesso
+    ou erro, dependendo da operação.
+
+    :param class_name: Nome da turma onde a aula será adicionada.
+    :type class_name: str
+    :param topic: Tópico da aula a ser registrada.
+    :type topic: str
+    :param content: Conteúdo da aula a ser registrada.
+    :type content: str
+    :param date_str: Data da aula no formato DD/MM/AAAA.
+    :type date_str: str
+    :return: Mensagem de confirmação ou erro relacionado ao registro da aula.
+    :rtype: str
     """
     try:
         # Busca a turma
@@ -98,12 +115,22 @@ def add_new_lesson(class_name: str, topic: str, content: str, date_str: str) -> 
 @tool
 def register_incident(student_name: str, class_name: str, description: str, date_str: str) -> str:
     """
-    Registra um novo incidente ou ocorrência para um aluno em uma turma.
-    Parâmetros:
-    - student_name: Nome do aluno.
-    - class_name: Nome da turma.
-    - description: Descrição do incidente.
-    - date_str: Data do ocorrido no formato DD/MM/AAAA.
+    Registra um incidente relacionado a um aluno em uma turma específica em uma data fornecida.
+
+    Este método realiza o registro de um incidente ao conectar-se a serviços de dados para localizar o aluno e a turma
+    especificados. Em caso de sucesso, o incidente é registrado com os detalhes fornecidos, incluindo uma
+    descrição e uma data formatada corretamente no padrão DD/MM/AAAA.
+
+    :param student_name: Nome do aluno relacionado ao incidente.
+    :type student_name: str
+    :param class_name: Nome da turma onde ocorreu o incidente.
+    :type class_name: str
+    :param description: Descrição detalhada do incidente ocorrido.
+    :type description: str
+    :param date_str: Data do incidente no formato DD/MM/AAAA.
+    :type date_str: str
+    :return: Mensagem detalhando o status do registro do incidente, seja sucesso ou erro.
+    :rtype: str
     """
     try:
         # Busca o aluno
@@ -136,9 +163,16 @@ def register_incident(student_name: str, class_name: str, description: str, date
 @tool
 def add_new_course(course_name: str, course_code: str) -> str:
     """
-    Adiciona uma nova disciplina ao banco de dados.
-    Use esta ferramenta quando um usuário pedir explicitamente para adicionar ou criar uma nova disciplina.
-    Retorna uma mensagem de confirmação.
+    Adiciona uma nova disciplina ao sistema utilizando as informações fornecidas pelo usuário. Esta função valida
+    os parâmetros de entrada e interage com o serviço responsável pelos dados para criar um novo registro de
+    disciplina. Retorna uma mensagem indicando o sucesso ou falha da operação.
+
+    :param course_name: Nome completo da disciplina a ser adicionada.
+    :type course_name: str
+    :param course_code: Código identificador único da disciplina.
+    :type course_code: str
+    :return: Uma mensagem indicando o status da operação de adição, incluindo erros caso necessário.
+    :rtype: str
     """
     # Validação dos parâmetros de entrada.
     if not course_name or not course_code:
@@ -161,7 +195,25 @@ def add_new_course(course_name: str, course_code: str) -> str:
 @tool
 def add_new_grade(student_name: str, class_name: str, assessment_name: str, score: float) -> str:
     """
-    Adiciona uma nova nota para um aluno em uma avaliação específica de uma turma.
+    Adiciona uma nova nota para um aluno em uma avaliação específica dentro de uma turma.
+
+    Essa função realiza uma série de etapas para adicionar a nota:
+    - Localiza o aluno pelo nome fornecido.
+    - Localiza a turma correspondente ao nome fornecido.
+    - Obtém os detalhes completos da turma para validar a avaliação.
+    - Localiza a avaliação pelo nome.
+    - Adiciona a nota do aluno para a avaliação identificada.
+
+    :param student_name: Nome do aluno para o qual a nota será adicionada.
+    :type student_name: str
+    :param class_name: Nome da turma onde a avaliação está cadastrada.
+    :type class_name: str
+    :param assessment_name: Nome da avaliação na qual a nota será registrada.
+    :type assessment_name: str
+    :param score: Nota atribuída ao aluno para a avaliação especificada.
+    :type score: float
+    :return: Mensagem indicando o sucesso ou erro na operação.
+    :rtype: str
     """
     try:
         # Passo 1: Encontrar o aluno pelo nome.
