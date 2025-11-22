@@ -52,6 +52,7 @@ class DashboardView(ctk.CTkFrame):
 
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs):
+        _ = kwargs
         # Carrega (ou recarrega) a lista de cursos.
         self.load_courses()
         # Atualiza o gráfico com base na seleção atual.

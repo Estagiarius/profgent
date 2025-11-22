@@ -43,7 +43,8 @@ class ToolExecutor:
             # Catch any other unexpected errors during tool execution
             return self._create_error_result(tool_call['id'], f"An unexpected error occurred: {e}")
 
-    def _create_success_result(self, tool_call_id: str, tool_name: str, result: Any) -> Dict[str, Any]:
+    @staticmethod
+    def _create_success_result(tool_call_id: str, tool_name: str, result: Any) -> Dict[str, Any]:
         return {
             "tool_call_id": tool_call_id,
             "role": "tool",
@@ -51,7 +52,8 @@ class ToolExecutor:
             "content": str(result),  # Ensure the result is a string
         }
 
-    def _create_error_result(self, tool_call_id: str, error_message: str) -> Dict[str, Any]:
+    @staticmethod
+    def _create_error_result(tool_call_id: str, error_message: str) -> Dict[str, Any]:
         # Even in case of an error, we need to return a valid tool message
         # to the model so it knows the call failed.
         return {

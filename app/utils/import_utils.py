@@ -13,7 +13,7 @@ async def async_import_students(filepath: str, class_id: int, data_service) -> t
         # Step 1: Read the file content asynchronously to not block the UI.
         loop = asyncio.get_running_loop()
         with open(filepath, mode='r', encoding='utf-8', errors='ignore') as file:
-            file_content = await loop.run_in_executor(None, file.read)
+            file_content = await loop.run_in_executor(None, file.read, -1)
 
     except Exception as e:
         return 0, [f"Erro fatal ao ler o arquivo CSV: {e}"]

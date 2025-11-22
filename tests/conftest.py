@@ -10,14 +10,14 @@ from app.models.base import Base
 from app.services.data_service import DataService
 # É crucial importar todos os modelos aqui para garantir que a Base.metadata
 # conheça todas as tabelas antes de `create_all` ser chamado.
-from app.models.student import Student
-from app.models.course import Course
-from app.models.grade import Grade
-from app.models.class_ import Class
-from app.models.class_enrollment import ClassEnrollment
-from app.models.assessment import Assessment
-from app.models.lesson import Lesson
-from app.models.incident import Incident
+from app.models.student import Student  # noqa: F401
+from app.models.course import Course  # noqa: F401
+from app.models.grade import Grade  # noqa: F401
+from app.models.class_ import Class  # noqa: F401
+from app.models.class_enrollment import ClassEnrollment  # noqa: F401
+from app.models.assessment import Assessment  # noqa: F401
+from app.models.lesson import Lesson  # noqa: F401
+from app.models.incident import Incident  # noqa: F401
 
 # Define uma 'fixture' do pytest. Fixtures são funções que fornecem um ambiente ou dados
 # consistentes para os testes. `scope="function"` significa que esta fixture será
@@ -33,8 +33,8 @@ def db_session() -> Session:
     # Cria todas as tabelas definidas nos modelos importados neste banco de dados em memória.
     Base.metadata.create_all(engine)
     # Cria uma fábrica de sessões ligada a este banco de dados.
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = SessionLocal()
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    session = session_factory()
     # 'yield' entrega a sessão para a função de teste que a solicitou.
     # O código após o 'yield' é executado após o término do teste.
     yield session

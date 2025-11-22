@@ -38,8 +38,7 @@ def add_new_student(first_name: str, last_name: str, date_of_birth: str = None, 
 
             # Lógica de matrícula opcional
             if enroll_in_class:
-                all_classes = data_service.get_all_classes()
-                target_class = next((c for c in all_classes if c['name'].lower() == enroll_in_class.lower()), None)
+                target_class = data_service.get_class_by_name(enroll_in_class)
 
                 if target_class:
                     next_call_number = data_service.get_next_call_number(target_class['id'])
@@ -74,8 +73,7 @@ def add_new_lesson(class_name: str, topic: str, content: str, date_str: str) -> 
     """
     try:
         # Busca a turma
-        all_classes = data_service.get_all_classes()
-        target_class = next((c for c in all_classes if c['name'].lower() == class_name.lower()), None)
+        target_class = data_service.get_class_by_name(class_name)
 
         if not target_class:
             return f"Erro: Turma '{class_name}' não encontrada."
@@ -114,8 +112,7 @@ def register_incident(student_name: str, class_name: str, description: str, date
             return f"Erro: Aluno '{student_name}' não encontrado."
 
         # Busca a turma
-        all_classes = data_service.get_all_classes()
-        target_class = next((c for c in all_classes if c['name'].lower() == class_name.lower()), None)
+        target_class = data_service.get_class_by_name(class_name)
         if not target_class:
             return f"Erro: Turma '{class_name}' não encontrada."
 
@@ -173,13 +170,11 @@ def add_new_grade(student_name: str, class_name: str, assessment_name: str, scor
             return f"Erro: Aluno '{student_name}' não encontrado."
 
         # Passo 2: Encontrar a turma pelo nome.
-        all_classes_data = data_service.get_all_classes()
-        target_class_data = next((c for c in all_classes_data if c["name"].lower() == class_name.lower()), None)
+        target_class_data = data_service.get_class_by_name(class_name)
         if not target_class_data:
             return f"Erro: Turma '{class_name}' não encontrada."
 
         # Passo 3: Obter detalhes completos da turma para encontrar a avaliação.
-        # A busca inicial (get_all_classes) pode não carregar dados aninhados como as avaliações.
         full_class_details = data_service.get_class_by_id(target_class_data["id"])
         if not full_class_details:
              return f"Erro: Não foi possível obter os detalhes da turma '{class_name}'."

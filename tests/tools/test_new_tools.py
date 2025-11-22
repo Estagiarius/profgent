@@ -17,10 +17,11 @@ def mock_data_service():
     # Configura o mock para simular a busca de um aluno.
     mock.get_student_by_name.return_value = {"id": 1, "first_name": "John", "last_name": "Doe"}
 
-    # Configura o mock para simular a busca de turmas.
-    # É importante usar um objeto MagicMock que tenha um atributo `name` real (string)
-    # porque o código da ferramenta chama `.lower()` nesse atributo.
+    # Configura o mock para simular a busca de turmas pelo nome.
     mock_class_data = {"id": 101, "name": "Math Grade 5"}
+    mock.get_class_by_name.return_value = mock_class_data
+
+    # Mantém get_all_classes mockado por precaução, mas as ferramentas atualizadas não devem usá-lo para busca por nome.
     mock.get_all_classes.return_value = [mock_class_data]
 
     # Retorna o objeto mockado.
@@ -47,7 +48,7 @@ def test_get_student_performance_summary_tool(mocker, mock_data_service):
     # --- VERIFICAÇÕES ---
     # Verifica se os métodos mockados foram chamados com os argumentos corretos.
     mock_data_service.get_student_by_name.assert_called_with("John Doe")
-    mock_data_service.get_all_classes.assert_called_once()
+    mock_data_service.get_class_by_name.assert_called_with("Math Grade 5")
     mock_data_service.get_student_performance_summary.assert_called_with(1, 101) # Verifica se os IDs corretos foram usados.
     # Verifica se os dados no resultado JSON estão corretos.
     assert result_json["weighted_average"] == 85.5
@@ -66,7 +67,7 @@ def test_get_students_at_risk_tool(mocker, mock_data_service):
     result_json = json.loads(result_str)
 
     # --- VERIFICAÇÕES ---
-    mock_data_service.get_all_classes.assert_called_once()
+    mock_data_service.get_class_by_name.assert_called_with("Math Grade 5")
     mock_data_service.get_students_at_risk.assert_called_with(101)
     assert len(result_json) == 1
     assert result_json[0]["student_name"] == "Jane Doe"

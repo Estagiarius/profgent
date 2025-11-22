@@ -246,6 +246,14 @@ class DataService:
             db.refresh(new_class)
             return {"id": new_class.id, "name": new_class.name}
 
+    # Método para buscar uma turma pelo nome.
+    def get_class_by_name(self, name: str) -> dict | None:
+        with self._get_db() as db:
+            class_ = db.query(Class).filter(func.lower(Class.name) == name.lower()).first()
+            if class_:
+                return {"id": class_.id, "name": class_.name}
+            return None
+
     # Método para buscar todas as turmas.
     def get_all_classes(self) -> list[dict]:
         with self._get_db() as db:
@@ -329,7 +337,8 @@ class DataService:
                 enrollment.status = status
 
     # Método privado para calcular o próximo número de chamada disponível em uma turma.
-    def _get_next_call_number(self, db: Session, class_id: int) -> int:
+    @staticmethod
+    def _get_next_call_number(db: Session, class_id: int) -> int:
         # Busca o maior número de chamada existente na turma.
         max_call_number = db.query(func.max(ClassEnrollment.call_number)).filter(ClassEnrollment.class_id == class_id).scalar()
         # Retorna o maior número + 1, ou 1 se a turma estiver vazia.
@@ -406,7 +415,7 @@ class DataService:
                 .all()
             )
             # Converte o resultado (que é uma lista de Row objects) em uma lista de dicionários.
-            return [dict(row._mapping) for row in grades_query]
+            return [row._asdict() for row in grades_query]
 
     # Método para gerar um resumo de desempenho de um aluno em uma turma.
     def get_student_performance_summary(self, student_id: int, class_id: int) -> dict | None:
@@ -556,7 +565,8 @@ class DataService:
                     db.add(new_grade)
 
     # Método para calcular a média ponderada de um aluno.
-    def calculate_weighted_average(self, student_id: int, grades: list[dict], assessments: list[dict]) -> float:
+    @staticmethod
+    def calculate_weighted_average(student_id: int, grades: list[dict], assessments: list[dict]) -> float:
         # Soma o peso de todas as avaliações da turma.
         total_weight = sum(a['weight'] for a in assessments)
         if total_weight == 0: return 0.0

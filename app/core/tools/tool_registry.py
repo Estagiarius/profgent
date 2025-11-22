@@ -14,12 +14,14 @@ class ToolRegistry:
 
         The function must be decorated with the @tool decorator to have a schema.
         """
-        if not hasattr(tool_func, 'schema'):
-            raise ValueError(f"Function {tool_func.__name__} is not a valid tool. Did you forget the @tool decorator?")
+        # Cast to Any to avoid linter errors about 'schema' attribute not existing on Callable
+        func: Any = tool_func
+        if not hasattr(func, 'schema'):
+            raise ValueError(f"Function {func.__name__} is not a valid tool. Did you forget the @tool decorator?")
 
-        tool_name = tool_func.schema["function"]["name"]
-        self.tools[tool_name] = tool_func
-        self.schemas.append(tool_func.schema)
+        tool_name = func.schema["function"]["name"]
+        self.tools[tool_name] = func
+        self.schemas.append(func.schema)
         print(f"Tool registered: {tool_name}")
 
     def get_tool(self, name: str) -> Callable | None:

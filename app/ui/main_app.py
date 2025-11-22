@@ -100,9 +100,9 @@ class MainApp(ctk.CTk):
     def _process_queue(self):
         try:
             # Tenta obter uma tarefa da fila sem bloquear a execução.
-            callable, args = self.async_queue.get_nowait()
+            callback, args = self.async_queue.get_nowait()
             # Se uma tarefa for encontrada, executa a função (callback) com seus argumentos.
-            callable(*args)
+            callback(*args)
         except Empty:
             # Se a fila estiver vazia, não faz nada.
             pass

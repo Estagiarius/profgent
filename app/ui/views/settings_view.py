@@ -126,7 +126,8 @@ class SettingsView(ctk.CTkFrame):
         run_async_task(coro, self.main_app.loop, self.main_app.async_queue, self._update_models_ui)
 
     # Coroutine que busca a lista de modelos de um provedor.
-    async def _get_models_coro(self, provider_name, ollama_base_url=None):
+    @staticmethod
+    async def _get_models_coro(provider_name, ollama_base_url=None):
         provider = None
         # Cria a instância apropriada do provedor com base no nome.
         if provider_name == "Ollama":

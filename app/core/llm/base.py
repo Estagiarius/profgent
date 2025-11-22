@@ -17,6 +17,8 @@ class LLMProvider(ABC):
     """
     An abstract base class that defines the contract for all LLM providers.
     """
+    client: Any = None
+    model: str = ""
 
     @property
     @abstractmethod
