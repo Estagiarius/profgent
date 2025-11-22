@@ -26,7 +26,8 @@ from app.tools.database_tools import (
     create_new_class, create_new_assessment,
     add_new_lesson, register_incident,
     update_student_name, update_class_name, delete_student_record, delete_class_record,
-    enroll_existing_student, change_student_status
+    enroll_existing_student, change_student_status,
+    list_lessons, update_lesson, delete_lesson_record, list_incidents
 )
 # Importa as ferramentas de busca na internet.
 from app.tools.internet_tools import search_internet
@@ -109,6 +110,11 @@ class AssistantService:
         self.tool_registry.register(delete_class_record)
         self.tool_registry.register(enroll_existing_student)
         self.tool_registry.register(change_student_status)
+        # Ferramentas operacionais (Aulas e Incidentes)
+        self.tool_registry.register(list_lessons)
+        self.tool_registry.register(update_lesson)
+        self.tool_registry.register(delete_lesson_record)
+        self.tool_registry.register(list_incidents)
 
     # Método privado para inicializar o provedor de LLM ativo.
     def _initialize_provider(self):
