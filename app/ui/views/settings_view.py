@@ -12,8 +12,54 @@ from app.core.llm.ollama_provider import OllamaProvider
 # Importa a função utilitária para executar tarefas assíncronas.
 from app.utils.async_utils import run_async_task
 
+
 # Define a classe para a tela de Configurações.
 class SettingsView(ctk.CTkFrame):
+    """
+    Uma classe que representa a interface de configuração para integração com provedores
+    de inteligência artificial. Fornece recursos para selecionar provedores, modelos, chaves
+    de API e outras configurações específicas.
+
+    Inclui lógica de interação com a interface, como salvar configurações e atualizar a lista
+    de modelos disponíveis, além de diferenciar funcionalidades baseadas no provedor ativo.
+
+    :ivar main_app: Referência para a aplicação principal. Útil para integração
+        com eventos assíncronos e outras funcionalidades compartilhadas.
+    :ivar provider_frame: Frame que contém a interface para a seleção do provedor de IA ativo.
+    :type provider_frame: ctk.CTkFrame
+    :ivar provider_var: Variável associada ao menu de seleção do provedor de IA, mantendo
+        o valor do provedor ativo.
+    :type provider_var: ctk.StringVar
+    :ivar provider_menu: Menu de opções para seleção do provedor de IA.
+    :type provider_menu: ctk.CTkOptionMenu
+    :ivar model_frame: Frame que contém a interface para a seleção ou entrada manual do modelo.
+    :type model_frame: ctk.CTkFrame
+    :ivar model_var: Variável associada ao menu de seleção de modelos, contendo o modelo atualmente selecionado.
+    :type model_var: ctk.StringVar
+    :ivar model_menu: Menu de opções para seleção de modelos disponíveis.
+    :type model_menu: ctk.CTkOptionMenu
+    :ivar model_entry: Campo de entrada para o nome do modelo, usado especialmente para provedores que permitem
+        entrada manual, como Ollama.
+    :type model_entry: ctk.CTkEntry
+    :ivar refresh_button: Botão que atualiza a lista de modelos disponíveis.
+    :type refresh_button: ctk.CTkButton
+    :ivar ollama_frame: Frame dedicado à configuração específica do servidor Ollama.
+    :type ollama_frame: ctk.CTkFrame
+    :ivar ollama_entry: Campo de entrada para a URL do servidor Ollama.
+    :type ollama_entry: ctk.CTkEntry
+    :ivar keys_frame: Frame que contém os campos para entrada das chaves de API dos provedores.
+    :type keys_frame: ctk.CTkFrame
+    :ivar openai_entry: Campo de entrada para a chave de API do OpenAI.
+    :type openai_entry: ctk.CTkEntry
+    :ivar maritaca_entry: Campo de entrada para a chave de API do Maritaca.
+    :type maritaca_entry: ctk.CTkEntry
+    :ivar openrouter_entry: Campo de entrada para a chave de API do OpenRouter.
+    :type openrouter_entry: ctk.CTkEntry
+    :ivar save_button: Botão que salva todas as configurações da tela.
+    :type save_button: ctk.CTkButton
+    :ivar feedback_label: Label para exibir mensagens de feedback sobre eventos, como salvamento de configurações.
+    :type feedback_label: ctk.CTkLabel
+    """
     # Método construtor.
     def __init__(self, parent, main_app):
         super().__init__(parent)
