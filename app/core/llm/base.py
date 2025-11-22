@@ -68,7 +68,18 @@ class LLMProvider(ABC):
 
             message = response.choices[0].message
             content = message.content or ""
-            tool_calls = message.tool_calls
+
+            # Convert tool_calls objects (Pydantic models) to dictionaries
+            tool_calls = None
+            if message.tool_calls:
+                tool_calls = []
+                for tc in message.tool_calls:
+                    if hasattr(tc, 'model_dump'):
+                        tool_calls.append(tc.model_dump())
+                    elif hasattr(tc, 'dict'):
+                        tool_calls.append(tc.dict())
+                    else:
+                        tool_calls.append(tc)
 
             return AssistantResponse(content=content, tool_calls=tool_calls)
 
