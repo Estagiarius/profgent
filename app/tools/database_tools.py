@@ -684,3 +684,138 @@ def list_incidents(class_name: str) -> str:
         return "\n".join(result)
     except Exception as e:
         return f"Erro ao listar incidentes: {e}"
+
+# --- REFINEMENT TOOLS (Group 6) ---
+
+@tool
+def list_all_courses() -> str:
+    """
+    Lista todas as disciplinas (cursos) cadastradas no sistema.
+
+    :return: Lista formatada de disciplinas com seus códigos.
+    """
+    try:
+        courses = data_service.get_all_courses()
+        if not courses:
+            return "Nenhuma disciplina cadastrada no sistema."
+
+        result = ["Disciplinas disponíveis:"]
+        for course in courses:
+            result.append(f"- {course['course_name']} (Código: {course['course_code']})")
+
+        return "\n".join(result)
+    except Exception as e:
+        return f"Erro ao listar disciplinas: {e}"
+
+@tool
+def update_course_name(current_name: str, new_name: str, new_code: str = None) -> str:
+    """
+    Atualiza o nome e/ou código de uma disciplina existente.
+
+    :param current_name: Nome atual da disciplina.
+    :param new_name: Novo nome para a disciplina.
+    :param new_code: Novo código para a disciplina (opcional).
+    """
+    try:
+        course = data_service.get_course_by_name(current_name)
+        if not course:
+            return f"Erro: Disciplina '{current_name}' não encontrada."
+
+        # If new_code is not provided, keep the old one
+        updated_code = new_code if new_code else course['course_code']
+
+        data_service.update_course(course['id'], new_name, updated_code)
+        return f"Disciplina atualizada para '{new_name}' ({updated_code})."
+    except Exception as e:
+        return f"Erro ao atualizar disciplina: {e}"
+
+@tool
+def delete_course_record(course_name: str) -> str:
+    """
+    Remove uma disciplina do sistema.
+    Atenção: Só é possível remover disciplinas que não tenham turmas associadas.
+
+    :param course_name: Nome da disciplina a ser removida.
+    """
+    try:
+        course = data_service.get_course_by_name(course_name)
+        if not course:
+            return f"Erro: Disciplina '{course_name}' não encontrada."
+
+        if course.get('classes') and len(course['classes']) > 0:
+             return f"Erro: Não é possível remover '{course_name}' pois existem turmas associadas a ela. Remova as turmas primeiro."
+
+        data_service.delete_course(course['id'])
+        return f"Disciplina '{course_name}' removida com sucesso."
+    except Exception as e:
+        return f"Erro ao remover disciplina: {e}"
+
+@tool
+def update_assessment(class_name: str, current_assessment_name: str, new_name: str = None, new_weight: float = None) -> str:
+    """
+    Atualiza o nome ou peso de uma avaliação em uma turma.
+
+    :param class_name: Nome da turma.
+    :param current_assessment_name: Nome atual da avaliação.
+    :param new_name: Novo nome da avaliação (opcional).
+    :param new_weight: Novo peso da avaliação (opcional).
+    """
+    if not new_name and new_weight is None:
+        return "Erro: Forneça pelo menos um novo nome ou novo peso para atualizar."
+
+    try:
+        # Get class details including assessments
+        class_details = data_service.get_class_by_id(
+            data_service.get_class_by_name(class_name)['id']
+        )
+        if not class_details:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        # Find the assessment
+        target_assessment = next(
+            (a for a in class_details['assessments'] if a['name'].lower() == current_assessment_name.lower()),
+            None
+        )
+
+        if not target_assessment:
+            return f"Erro: Avaliação '{current_assessment_name}' não encontrada na turma '{class_name}'."
+
+        updated_name = new_name if new_name else target_assessment['name']
+        updated_weight = new_weight if new_weight is not None else target_assessment['weight']
+
+        data_service.update_assessment(target_assessment['id'], updated_name, updated_weight)
+        return f"Avaliação atualizada: {updated_name} (Peso: {updated_weight})."
+    except Exception as e:
+        return f"Erro ao atualizar avaliação: {e}"
+
+@tool
+def delete_assessment_record(class_name: str, assessment_name: str) -> str:
+    """
+    Remove uma avaliação de uma turma.
+    Atenção: Isso também removerá todas as notas associadas a esta avaliação.
+
+    :param class_name: Nome da turma.
+    :param assessment_name: Nome da avaliação a ser removida.
+    """
+    try:
+        # Get class details including assessments
+        # Need to handle potential lookup failure if class doesn't exist first
+        class_basic = data_service.get_class_by_name(class_name)
+        if not class_basic:
+             return f"Erro: Turma '{class_name}' não encontrada."
+
+        class_details = data_service.get_class_by_id(class_basic['id'])
+
+        # Find the assessment
+        target_assessment = next(
+            (a for a in class_details['assessments'] if a['name'].lower() == assessment_name.lower()),
+            None
+        )
+
+        if not target_assessment:
+            return f"Erro: Avaliação '{assessment_name}' não encontrada na turma '{class_name}'."
+
+        data_service.delete_assessment(target_assessment['id'])
+        return f"Avaliação '{assessment_name}' removida com sucesso da turma '{class_name}'."
+    except Exception as e:
+        return f"Erro ao remover avaliação: {e}"
