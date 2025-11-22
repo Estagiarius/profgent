@@ -3,8 +3,15 @@ from functools import wraps
 
 def tool(func):
     """
-    A decorator that inspects a function and generates a JSON schema
-    for use with OpenAI's function calling API.
+    Decora uma função para gerar um esquema JSON Schema com base na assinatura e no
+    docstring da função. Este esquema pode ser utilizado para documentar ou validar
+    os parâmetros e a descrição da função decorada.
+
+    :param func: A função que será decorada.
+    :type func: Callable
+    :return: Uma função decorada, com o esquema JSON Schema gerado anexado como
+    atributo `schema`.
+    :rtype: Callable
     """
     @wraps(func)
     def wrapper(*args, **kwargs):
