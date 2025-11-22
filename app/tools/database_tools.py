@@ -1,3 +1,4 @@
+import json
 # Importa o decorador 'tool' que registra a função como uma ferramenta para a IA.
 from app.core.tools.tool_decorator import tool
 # Importa a instância compartilhada do DataService criada no __init__.py do pacote 'services'.
@@ -95,3 +96,40 @@ def get_class_average(course_name: str) -> str:
     average = sum(g['score'] for g in all_grades) / len(all_grades)
     # Retorna a média formatada com duas casas decimais.
     return f"A média da turma para {course_name} é {average:.2f}."
+
+@tool
+def get_class_roster(class_name: str) -> str:
+    """
+    Recupera a lista de alunos matriculados em uma turma específica.
+    Retorna uma lista JSON contendo nome, número da chamada e status de cada aluno.
+    Útil para chamadas ou verificação de alunos na turma.
+    """
+    try:
+        # Busca todas as turmas para encontrar o ID da turma solicitada.
+        all_classes = data_service.get_all_classes()
+        target_class = next((c for c in all_classes if c['name'].lower() == class_name.lower()), None)
+
+        # Se a turma não for encontrada, retorna um erro.
+        if not target_class:
+            return f"Erro: Turma '{class_name}' não encontrada."
+
+        # Busca as matrículas da turma.
+        enrollments = data_service.get_enrollments_for_class(target_class['id'])
+
+        # Se não houver alunos matriculados.
+        if not enrollments:
+            return f"A turma {class_name} não possui alunos matriculados."
+
+        # Formata a lista de alunos para retorno.
+        roster = []
+        for enrollment in enrollments:
+            roster.append({
+                "call_number": enrollment['call_number'],
+                "name": f"{enrollment['student_first_name']} {enrollment['student_last_name']}",
+                "status": enrollment['status']
+            })
+
+        # Retorna a lista como JSON.
+        return json.dumps(roster, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return f"Erro: Ocorreu um erro inesperado: {e}"

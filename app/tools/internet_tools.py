@@ -10,20 +10,20 @@ from app.core.tools.tool_decorator import tool
 def search_internet(query: str) -> str:
     """
     Realiza uma busca na web para uma determinada consulta e retorna um resumo do resultado principal.
+    Melhorado para ser mais robusto e fornecer resultados mais limpos.
     """
     # Bloco try/except para lidar com erros de rede ou de parsing.
     try:
-        # Para este exemplo, usaremos o DuckDuckGo como motor de busca.
-        # Uma implementação real poderia usar uma API de busca dedicada (ex: Tavily, Serper).
         # Define um cabeçalho 'User-Agent' para simular um navegador e evitar ser bloqueado.
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
         # Monta a URL de busca do DuckDuckGo com a consulta do usuário.
+        # Normaliza a query para evitar problemas com caracteres especiais
         url = f"https://html.duckduckgo.com/html/?q={query}"
 
-        # Faz a requisição GET para a URL, com os cabeçalhos e um timeout de 5 segundos.
-        response = requests.get(url, headers=headers, timeout=5)
+        # Faz a requisição GET para a URL, com os cabeçalhos e um timeout de 10 segundos (aumentado para robustez).
+        response = requests.get(url, headers=headers, timeout=10)
         # Lança uma exceção se a resposta tiver um código de status de erro (ex: 404, 500).
         response.raise_for_status()
 
@@ -31,26 +31,58 @@ def search_internet(query: str) -> str:
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # Extrai os "snippets" (resumos dos resultados) da página de resultados do DuckDuckGo.
-        # A classe 'result__a' é específica da estrutura HTML do DuckDuckGo.
-        snippets = soup.find_all('a', class_='result__a')
+        # A estrutura do DDQ HTML pode mudar, então tentamos ser mais abrangentes.
+        # A classe 'result__snippet' costuma conter o texto do resumo.
+        results = []
 
-        # Se nenhum resultado for encontrado, retorna uma mensagem.
-        if not snippets:
-            return "Nenhum resultado de busca encontrado."
+        # Tenta encontrar os containers de resultado
+        result_elements = soup.find_all('div', class_='result')
 
-        # Por simplicidade, vamos apenas resumir os primeiros snippets.
-        summary = ""
-        # Itera sobre os 3 primeiros resultados encontrados.
-        for i, snippet in enumerate(snippets[:3]):
-            # Adiciona o texto do resultado ao resumo.
-            summary += f"Resultado {i+1}: {snippet.get_text(strip=True)}\n"
+        if not result_elements:
+             # Fallback para links diretos se a estrutura de div não for encontrada
+             result_elements = soup.find_all('a', class_='result__a')
 
-        # Retorna o resumo se ele não estiver vazio.
-        return summary if summary else "Não foi possível extrair um resumo dos resultados da busca."
+        for i, element in enumerate(result_elements[:4]): # Aumentado para 4 resultados
+            title = ""
+            snippet_text = ""
+            link = ""
+
+            # Tenta extrair título e snippet de dentro do container
+            title_elem = element.find('a', class_='result__a')
+            snippet_elem = element.find('a', class_='result__snippet')
+
+            # Se encontrou o elemento 'a' diretamente (fallback)
+            if element.name == 'a':
+                title = element.get_text(strip=True)
+                link = element.get('href', '')
+                # Tenta achar o snippet adjacente ou dentro
+                snippet_elem = element.find_next('a', class_='result__snippet')
+            elif title_elem:
+                 title = title_elem.get_text(strip=True)
+                 link = title_elem.get('href', '')
+
+            if snippet_elem:
+                snippet_text = snippet_elem.get_text(strip=True)
+
+            # Se tivermos pelo menos um título ou snippet
+            if title or snippet_text:
+                results.append(f"**{title}**\n{snippet_text}\nLink: {link}\n")
+
+        # Se nenhum resultado for encontrado.
+        if not results:
+            # Tenta uma extração bruta de texto de links se a estrutura falhar
+            raw_links = soup.find_all('a', class_='result__a')
+            if raw_links:
+                for link in raw_links[:3]:
+                    results.append(f"- {link.get_text(strip=True)} ({link.get('href')})")
+            else:
+                return "Nenhum resultado de busca encontrado ou estrutura da página mudou."
+
+        return "\n".join(results)
 
     # Captura erros relacionados a requisições de rede (ex: sem conexão, timeout).
     except requests.RequestException as e:
-        return f"Erro durante a busca na web: {e}"
+        return f"Erro de conexão durante a busca na web: {e}"
     # Captura qualquer outro erro inesperado.
     except Exception as e:
         return f"Ocorreu um erro inesperado durante a busca: {e}"
