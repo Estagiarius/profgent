@@ -39,10 +39,10 @@ class Lesson(Base):
     # Define a coluna 'content' (conteúdo) como do tipo Text (texto longo), podendo ser nula.
     content = Column(Text, nullable=True)
 
-    # Define a coluna 'class_id' como uma chave estrangeira para a tabela 'classes'. Não pode ser nula.
-    class_id = Column(Integer, ForeignKey('classes.id'), nullable=False)
-    # Define o relacionamento com o modelo Class. 'back_populates' cria a referência inversa no modelo Class.
-    class_ = relationship("Class", back_populates="lessons")
+    # Define a coluna 'class_subject_id' como uma chave estrangeira para a tabela 'class_subjects'. Não pode ser nula.
+    class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False)
+    # Define o relacionamento com o modelo ClassSubject.
+    class_subject = relationship("ClassSubject", back_populates="lessons")
 
     # Define uma representação em string para o objeto Lesson, útil para depuração.
     def __repr__(self):

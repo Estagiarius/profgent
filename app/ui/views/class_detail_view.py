@@ -26,6 +26,8 @@ class ClassDetailView(ctk.CTkFrame):
         self.report_service = ReportService()
         # ID da turma que está sendo visualizada. Inicialmente nulo.
         self.class_id = None
+        # ID da disciplina selecionada atualmente.
+        self.current_subject_id = None
         # ID da aula que está sendo editada. Inicialmente nulo.
         self.editing_lesson_id = None
 
@@ -35,16 +37,27 @@ class ClassDetailView(ctk.CTkFrame):
         self.status_map_rev = {v: k for k, v in self.status_map.items()}
 
         # Configuração do layout de grade da view.
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=1) # A linha das abas se expande
         self.grid_columnconfigure(0, weight=1)
 
         # Rótulo do título principal da tela.
         self.title_label = ctk.CTkLabel(self, text="Detalhes da Turma", font=ctk.CTkFont(size=20, weight="bold"))
-        self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
+        self.title_label.grid(row=0, column=0, padx=20, pady=(20, 5), sticky="ew")
+
+        # Frame de seleção de Disciplina (Header)
+        self.subject_frame = ctk.CTkFrame(self)
+        self.subject_frame.grid(row=1, column=0, padx=20, pady=(5, 10), sticky="ew")
+
+        ctk.CTkLabel(self.subject_frame, text="Disciplina:").pack(side="left", padx=10)
+        self.subject_combo = ctk.CTkOptionMenu(self.subject_frame, command=self.on_subject_change)
+        self.subject_combo.pack(side="left", padx=10)
+
+        self.add_subject_button = ctk.CTkButton(self.subject_frame, text="Adicionar Disciplina", command=self.add_subject_popup, width=150)
+        self.add_subject_button.pack(side="right", padx=10)
 
         # Cria o widget de abas (Tabview) para organizar o conteúdo.
         self.tab_view = ctk.CTkTabview(self)
-        self.tab_view.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+        self.tab_view.grid(row=2, column=0, padx=20, pady=10, sticky="nsew")
         # Adiciona as abas.
         self.tab_view.add("Alunos")
         self.tab_view.add("Avaliações")
@@ -211,6 +224,74 @@ class ClassDetailView(ctk.CTkFrame):
         ctk.CTkButton(self.student_reports_frame, text="Gerar Boletim (TXT)", command=self.generate_report_card).pack(side="left", padx=10)
         ctk.CTkButton(self.student_reports_frame, text="Gráfico de Desempenho", command=self.show_student_chart).pack(side="left", padx=10)
 
+    # --- Métodos de Gestão de Disciplinas (Subjects) ---
+
+    def populate_subject_combo(self):
+        """Busca as disciplinas da turma e preenche o combobox."""
+        if not self.class_id: return
+
+        subjects = data_service.get_subjects_for_class(self.class_id)
+        if not subjects:
+            self.subject_combo.configure(values=["Nenhuma Disciplina"], state="disabled")
+            self.current_subject_id = None
+            self.subject_combo.set("Nenhuma Disciplina")
+        else:
+            self.subject_combo.configure(state="normal")
+            subject_names = [s['course_name'] for s in subjects]
+            self.subject_mapping = {s['course_name']: s['id'] for s in subjects}
+            self.subject_combo.configure(values=subject_names)
+
+            # Seleciona o primeiro se nada estiver selecionado
+            if not self.current_subject_id or self.current_subject_id not in self.subject_mapping.values():
+                 first_subject_name = subject_names[0]
+                 self.subject_combo.set(first_subject_name)
+                 self.current_subject_id = self.subject_mapping[first_subject_name]
+
+    def on_subject_change(self, selected_subject_name):
+        """Callback para quando a disciplina é trocada no dropdown."""
+        if selected_subject_name in self.subject_mapping:
+            self.current_subject_id = self.subject_mapping[selected_subject_name]
+            # Atualiza as abas que dependem da disciplina
+            self.populate_assessment_list()
+            self.populate_lesson_list()
+            self.populate_grade_grid()
+
+    def add_subject_popup(self):
+        if not self.class_id: return
+
+        # Pega todos os cursos disponíveis no catálogo
+        all_courses = data_service.get_all_courses()
+        if not all_courses:
+             messagebox.showerror("Erro", "Não há disciplinas cadastradas no sistema.")
+             return
+
+        # Filtra cursos que a turma já tem
+        current_subjects = data_service.get_subjects_for_class(self.class_id)
+        current_course_ids = {s['course_id'] for s in current_subjects}
+
+        available_courses = [c for c in all_courses if c['id'] not in current_course_ids]
+        if not available_courses:
+            messagebox.showinfo("Aviso", "Esta turma já possui todas as disciplinas cadastradas.")
+            return
+
+        course_names = [c['course_name'] for c in available_courses]
+
+        def save_callback(data):
+            course_name = data.get("course")
+            selected_course = next((c for c in available_courses if c['course_name'] == course_name), None)
+
+            if selected_course:
+                data_service.add_subject_to_class(self.class_id, selected_course['id'])
+                self.populate_subject_combo()
+                # Se for a primeira, seleciona ela automaticamente
+                if self.current_subject_id is None:
+                     self.subject_combo.set(course_name)
+                     self.on_subject_change(course_name)
+
+        dropdowns = {"course": ("Disciplina", course_names)}
+        AddDialog(self, "Adicionar Disciplina à Turma", fields={}, dropdowns=dropdowns, save_callback=save_callback)
+
+    # --- Fim Métodos de Gestão de Disciplinas ---
 
     def export_csv(self):
         if not self.class_id: return
@@ -289,6 +370,10 @@ class ClassDetailView(ctk.CTkFrame):
 
     # Método para salvar todas as notas inseridas ou alteradas no quadro de notas.
     def save_all_grades(self):
+        if not self.current_subject_id:
+             messagebox.showwarning("Aviso", "Selecione uma disciplina antes de salvar notas.")
+             return
+
         # Lista para armazenar os dados das notas a serem salvas (upsert).
         grades_to_upsert = []
         # Itera sobre os widgets de entrada de nota que foram criados.
@@ -317,8 +402,8 @@ class ClassDetailView(ctk.CTkFrame):
             messagebox.showinfo("Nenhuma Mudança", "Nenhuma nota nova ou modificada para salvar.")
             return
 
-        # Chama o DataService para salvar os dados em lote.
-        data_service.upsert_grades_for_class(self.class_id, grades_to_upsert)
+        # Chama o DataService para salvar os dados em lote (agora por disciplina/class_subject).
+        data_service.upsert_grades_for_subject(self.current_subject_id, grades_to_upsert)
 
         messagebox.showinfo("Sucesso", "Todas as notas foram salvas com sucesso.")
         # Atualiza o quadro de notas para recalcular e exibir as médias.
@@ -331,6 +416,9 @@ class ClassDetailView(ctk.CTkFrame):
             widget.destroy()
 
         if not self.class_id: return
+        if not self.current_subject_id:
+            ctk.CTkLabel(self.grade_grid_frame, text="Selecione ou adicione uma disciplina para ver o quadro de notas.").pack(pady=20)
+            return
 
         # Busca os dados necessários do banco.
         enrollments = data_service.get_enrollments_for_class(self.class_id)
@@ -339,8 +427,8 @@ class ClassDetailView(ctk.CTkFrame):
         if self.show_active_only_grades_checkbox.get():
             enrollments = [e for e in enrollments if e['status'] == 'Active']
 
-        class_data = data_service.get_class_by_id(self.class_id)
-        assessments = class_data['assessments'] if class_data else []
+        # Busca avaliações específicas desta disciplina
+        assessments = data_service.get_assessments_for_subject(self.current_subject_id)
 
         # Cria o cabeçalho da tabela.
         headers = ["Nome do Aluno"] + [a['name'] for a in assessments] + ["Média Final"]
@@ -351,7 +439,7 @@ class ClassDetailView(ctk.CTkFrame):
         # Cria as linhas, uma para cada aluno.
         # Dicionário para guardar a referência dos widgets de entrada de nota.
         self.grade_entries = {}
-        grades = data_service.get_grades_for_class(self.class_id)
+        grades = data_service.get_grades_for_subject(self.current_subject_id)
 
         for row, enrollment in enumerate(enrollments, start=1):
             student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
@@ -372,7 +460,7 @@ class ClassDetailView(ctk.CTkFrame):
                 # Armazena a referência do widget de entrada.
                 self.grade_entries[(enrollment['student_id'], assessment['id'])] = entry
 
-            # Calcula e exibe a média final ponderada do aluno.
+            # Calcula e exibe a média final ponderada do aluno para esta disciplina.
             average = data_service.calculate_weighted_average(enrollment['student_id'], grades, assessments)
             average_label = ctk.CTkLabel(self.grade_grid_frame, text=f"{average:.2f}")
             average_label.grid(row=row, column=len(assessments) + 1, padx=5, pady=5, sticky="w")
@@ -429,6 +517,10 @@ class ClassDetailView(ctk.CTkFrame):
 
     # Mostra a view de edição/criação de aula.
     def show_lesson_editor(self, lesson=None):
+        if not self.current_subject_id:
+             messagebox.showwarning("Aviso", "Selecione uma disciplina para adicionar aulas.")
+             return
+
         # Armazena o ID da aula se estiver em modo de edição.
         self.editing_lesson_id = lesson['id'] if lesson else None
         # Esconde a lista de aulas e mostra o editor.
@@ -474,9 +566,9 @@ class ClassDetailView(ctk.CTkFrame):
         # Se estiver editando, chama o método de atualização.
         if self.editing_lesson_id:
             data_service.update_lesson(self.editing_lesson_id, title, content, lesson_date)
-        # Caso contrário, chama o método de criação.
+        # Caso contrário, chama o método de criação (usando a disciplina atual).
         else:
-            data_service.create_lesson(self.class_id, title, content, lesson_date)
+            data_service.create_lesson(self.current_subject_id, title, content, lesson_date)
 
         # Atualiza a lista de aulas e esconde o editor.
         self.populate_lesson_list()
@@ -485,6 +577,9 @@ class ClassDetailView(ctk.CTkFrame):
     # Abre o pop-up para adicionar uma nova avaliação.
     def add_assessment_popup(self):
         if not self.class_id: return
+        if not self.current_subject_id:
+             messagebox.showwarning("Aviso", "Selecione uma disciplina para adicionar avaliações.")
+             return
 
         def save_callback(data):
             name = data.get("name")
@@ -492,7 +587,7 @@ class ClassDetailView(ctk.CTkFrame):
             if name and weight_str:
                 try:
                     weight = float(weight_str)
-                    data_service.add_assessment(self.class_id, name, weight)
+                    data_service.add_assessment(self.current_subject_id, name, weight)
                     self.populate_assessment_list()
                 except ValueError:
                     messagebox.showerror("Erro", "Peso inválido. Por favor, insira um número.")
@@ -505,15 +600,18 @@ class ClassDetailView(ctk.CTkFrame):
         for widget in self.assessment_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
-        class_data = data_service.get_class_by_id(self.class_id)
-        if not class_data: return
+        if not self.current_subject_id:
+             ctk.CTkLabel(self.assessment_list_frame, text="Selecione ou adicione uma disciplina.").pack(pady=10)
+             return
+
+        assessments = data_service.get_assessments_for_subject(self.current_subject_id)
 
         headers = ["Nome da Avaliação", "Peso", "Ações"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.assessment_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
 
-        for i, assessment in enumerate(class_data['assessments'], start=1):
+        for i, assessment in enumerate(assessments, start=1):
             ctk.CTkLabel(self.assessment_list_frame, text=assessment['name']).grid(row=i, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.assessment_list_frame, text=str(assessment['weight'])).grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
@@ -667,7 +765,11 @@ class ClassDetailView(ctk.CTkFrame):
         for widget in self.lesson_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
-        lessons = data_service.get_lessons_for_class(self.class_id)
+        if not self.current_subject_id:
+             ctk.CTkLabel(self.lesson_list_frame, text="Selecione ou adicione uma disciplina.").pack(pady=10)
+             return
+
+        lessons = data_service.get_lessons_for_subject(self.current_subject_id)
 
         headers = ["Data", "Título", "Ações"]
         for i, header in enumerate(headers):
@@ -688,10 +790,10 @@ class ClassDetailView(ctk.CTkFrame):
             class_data = data_service.get_class_by_id(self.class_id)
             self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
             self.populate_student_list()
-            self.populate_assessment_list()
-            self.populate_lesson_list()
             self.populate_incident_list()
-            self.populate_grade_grid()
+
+            # Popula o dropdown de disciplinas e dispara a atualização das outras abas
+            self.populate_subject_combo()
 
             # Atualiza o combobox de alunos na aba de relatórios
             enrollments = data_service.get_enrollments_for_class(self.class_id)

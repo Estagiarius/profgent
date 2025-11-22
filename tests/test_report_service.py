@@ -2,89 +2,78 @@ import pytest
 import os
 from unittest.mock import MagicMock, patch
 from app.services.report_service import ReportService
-import matplotlib
-from datetime import date
 
-# Ensure matplotlib uses Agg backend for tests
-matplotlib.use('Agg')
+class TestReportService:
+    @pytest.fixture
+    def report_service(self, mocker):
+        # Mock DataService within ReportService
+        with patch('app.services.report_service.DataService') as MockDataService:
+            service = ReportService()
+            service.data_service = MockDataService.return_value
+            return service
 
-@pytest.fixture
-def mock_data_service():
-    with patch('app.services.report_service.DataService') as mock_ds_class:
-        mock_ds = mock_ds_class.return_value
-
-        # Mock common returns
-        mock_ds.get_class_by_id.return_value = {
-            "id": 1,
-            "name": "Turma Teste",
-            "assessments": [
-                {"id": 101, "name": "Prova 1", "weight": 1.0},
-                {"id": 102, "name": "Prova 2", "weight": 1.0}
-            ]
-        }
-
-        mock_ds.get_all_students.return_value = [
-            {"id": 50, "first_name": "João", "last_name": "Silva"}
+    def test_generate_student_report_card(self, report_service):
+        # Mock data
+        report_service.data_service.get_class_by_id.return_value = {"id": 1, "name": "Class A"}
+        report_service.data_service.get_all_students.return_value = [{"id": 1, "first_name": "John", "last_name": "Doe"}]
+        report_service.data_service.get_subjects_for_class.return_value = [
+            {"id": 10, "course_name": "Math", "weight": 1.0}
         ]
-
-        mock_ds.get_grades_for_class.return_value = [
-            {"student_id": 50, "assessment_id": 101, "score": 8.0, "assessment_name": "Prova 1"},
-            {"student_id": 50, "assessment_id": 102, "score": 7.0, "assessment_name": "Prova 2"}
+        report_service.data_service.get_assessments_for_subject.return_value = [
+            {"id": 100, "name": "Test 1", "weight": 1.0}
         ]
-
-        mock_ds.get_enrollments_for_class.return_value = [
-            {
-                "student_id": 50, "call_number": 1,
-                "student_first_name": "João", "student_last_name": "Silva",
-                "status": "Active"
-            }
+        report_service.data_service.get_grades_for_subject.return_value = [
+            {"student_id": 1, "assessment_id": 100, "score": 9.0}
         ]
+        report_service.data_service.get_incidents_for_class.return_value = []
+        report_service.data_service.calculate_weighted_average.return_value = 9.0
 
-        mock_ds.get_incidents_for_class.return_value = []
-        mock_ds.calculate_weighted_average.return_value = 7.5
+        # Call method
+        filepath = report_service.generate_student_report_card(1, 1)
 
-        yield mock_ds
+        # Verify
+        assert os.path.exists(filepath)
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+            assert "BOLETIM ESCOLAR" in content
+            assert "John Doe" in content
+            assert "DISCIPLINA: MATH" in content
+            assert "MÉDIA FINAL: 9.00" in content
 
-@pytest.fixture
-def report_service(mock_data_service):
-    return ReportService()
+        # Cleanup
+        os.remove(filepath)
 
-def test_generate_student_grade_chart(report_service, mock_data_service):
-    # Test chart generation
-    filepath = report_service.generate_student_grade_chart(50, 1)
-    assert os.path.exists(filepath)
-    assert filepath.endswith(".png")
-    # Clean up
-    os.remove(filepath)
+    def test_generate_class_grade_distribution(self, report_service):
+        # Mock data
+        report_service.data_service.get_class_by_id.return_value = {"id": 1, "name": "Class A"}
+        report_service.data_service.get_enrollments_for_class.return_value = [{"student_id": 1}]
+        report_service.data_service.get_subjects_for_class.return_value = [{"id": 10, "course_name": "Math"}]
+        report_service.data_service.get_assessments_for_subject.return_value = [{"id": 100}]
+        report_service.data_service.get_grades_for_subject.return_value = [{"student_id": 1, "assessment_id": 100, "score": 8.0}]
+        report_service.data_service.calculate_weighted_average.return_value = 8.0
 
-def test_generate_class_distribution(report_service, mock_data_service):
-    # Test distribution chart
-    filepath = report_service.generate_class_grade_distribution(1)
-    assert os.path.exists(filepath)
-    assert filepath.endswith(".png")
-    os.remove(filepath)
+        filepath = report_service.generate_class_grade_distribution(1)
+        assert os.path.exists(filepath)
+        os.remove(filepath)
 
-def test_export_csv(report_service, mock_data_service):
-    filepath = report_service.export_class_grades_csv(1)
-    assert os.path.exists(filepath)
-    assert filepath.endswith(".csv")
+    def test_export_class_grades_csv(self, report_service):
+        # Mock data
+        report_service.data_service.get_class_by_id.return_value = {"id": 1, "name": "Class A"}
+        report_service.data_service.get_enrollments_for_class.return_value = [
+            {"student_id": 1, "call_number": 1, "student_first_name": "John", "student_last_name": "Doe"}
+        ]
+        report_service.data_service.get_subjects_for_class.return_value = [{"id": 10, "course_name": "Math"}]
+        report_service.data_service.get_assessments_for_subject.return_value = [{"id": 100, "name": "Test"}]
+        report_service.data_service.get_grades_for_subject.return_value = [{"student_id": 1, "assessment_id": 100, "score": 10.0}]
+        report_service.data_service.calculate_weighted_average.return_value = 10.0
 
-    with open(filepath, 'r', encoding='utf-8') as f:
-        content = f.read()
-        assert "João Silva" in content
-        assert "Prova 1" in content
+        filepath = report_service.export_class_grades_csv(1)
+        assert os.path.exists(filepath)
 
-    os.remove(filepath)
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+            assert "John Doe" in content
+            assert "Math" in content # Header check
+            assert "10.00" in content
 
-def test_generate_report_card(report_service, mock_data_service):
-    filepath = report_service.generate_student_report_card(50, 1)
-    assert os.path.exists(filepath)
-    assert filepath.endswith(".txt")
-
-    with open(filepath, 'r', encoding='utf-8') as f:
-        content = f.read()
-        assert "BOLETIM ESCOLAR" in content
-        assert "João Silva" in content
-        assert "MÉDIA FINAL: 7.50" in content
-
-    os.remove(filepath)
+        os.remove(filepath)

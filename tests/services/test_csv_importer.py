@@ -35,9 +35,9 @@ def test_batch_upsert_students_and_enroll_scenarios(data_service: DataService, d
     fornecida pelas fixtures de teste.
     """
     # --- PREPARAÇÃO INICIAL ---
-    # Cria um curso e uma turma de pré-requisito para os testes.
-    course = data_service.add_course("Test Course", "TC101")
-    class_ = data_service.create_class("Test Class", course['id'])
+    # Cria uma turma de pré-requisito para os testes.
+    # course = data_service.add_course("Test Course", "TC101") # Não precisa
+    class_ = data_service.create_class("Test Class")
     # `flush` envia as alterações pendentes para o banco de dados de teste.
     db_session.flush()
 

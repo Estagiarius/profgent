@@ -49,25 +49,19 @@ class Class(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     # Define a coluna 'name' como uma string que não pode ser nula e deve ser única.
     name = Column(String, nullable=False, unique=True)
-    # Define a coluna 'course_id' como um inteiro que é uma chave estrangeira, referenciando a coluna 'id' da tabela 'courses'.
-    # Este campo é obrigatório.
-    course_id = Column(Integer, ForeignKey('courses.id'), nullable=False)
     # Define a coluna 'calculation_method' usando o tipo Enum do SQLAlchemy.
     # Isso restringe os valores a 'arithmetic' (média aritmética) ou 'weighted' (média ponderada).
     # O campo é obrigatório e o valor padrão é 'arithmetic'.
     calculation_method = Column(Enum('arithmetic', 'weighted', name='calculation_methods'), nullable=False, default='arithmetic')
 
-    # Define o relacionamento com o modelo Course. 'back_populates' cria a referência inversa no modelo Course.
-    course = relationship("Course", back_populates="classes")
+    # Relacionamento com ClassSubject (Disciplinas da Turma)
+    subjects = relationship("ClassSubject", back_populates="class_", cascade="all, delete-orphan")
+
     # Define o relacionamento com ClassEnrollment (matrículas), criando a referência inversa.
-    enrollments = relationship("ClassEnrollment", back_populates="class_")
-    # Define o relacionamento com Assessment (avaliações). 'backref' é uma forma mais simples de criar a referência inversa.
-    # 'cascade="all, delete-orphan"' garante que as avaliações de uma turma sejam excluídas se a turma for excluída.
-    assessments = relationship("Assessment", backref="class_", cascade="all, delete-orphan")
-    # Define o relacionamento com Lesson (aulas).
-    lessons = relationship("Lesson", back_populates="class_")
+    enrollments = relationship("ClassEnrollment", back_populates="class_", cascade="all, delete-orphan")
+
     # Define o relacionamento com Incident (incidentes).
-    incidents = relationship("Incident", back_populates="class_")
+    incidents = relationship("Incident", back_populates="class_", cascade="all, delete-orphan")
 
     # Define uma representação em string para o objeto Class, útil para depuração.
     def __repr__(self):

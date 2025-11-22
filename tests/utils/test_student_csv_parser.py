@@ -46,8 +46,8 @@ def test_import_students_from_csv_success(data_service: DataService, db_session)
     """
     # --- PREPARAÇÃO ---
     # Cria uma turma de teste para a qual os alunos serão matriculados.
-    course = data_service.add_course("Ciência da Computação - Teste CSV", "CSV-TEST-101")
-    class_ = data_service.create_class("Turma Teste CSV", course['id'])
+    # course = data_service.add_course("Ciência da Computação - Teste CSV", "CSV-TEST-101") # Não necessário
+    class_ = data_service.create_class("Turma Teste CSV")
     db_session.flush() # Garante que a turma seja criada antes da importação.
 
     # --- AÇÃO ---
@@ -122,8 +122,8 @@ Nº de chamada;Nome do Aluno;Data de Nascimento;Situação do Aluno
 63;JÚLIA NOGUEIRA RAMOS;28/09/2009;Ativo
 """
     # Preparação
-    course = data_service.add_course("Português", "PT101")
-    class_ = data_service.create_class("Turma Duplicatas", course['id'])
+    # course = data_service.add_course("Português", "PT101")
+    class_ = data_service.create_class("Turma Duplicatas")
     db_session.flush()
 
     # Ação

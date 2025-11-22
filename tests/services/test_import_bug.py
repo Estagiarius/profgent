@@ -10,9 +10,9 @@ def test_import_bug_with_user_csv(data_service: DataService, db_session: Session
     e passando-o para o DataService.
     """
     # --- PREPARAÇÃO ---
-    # Cria um curso e uma turma para o teste, isolando-o de outros dados.
-    course = data_service.add_course("Bug Repro Course", "BRC101")
-    class_ = data_service.create_class("Bug Repro Class", course['id'])
+    # Cria uma turma para o teste, isolando-o de outros dados.
+    # course = data_service.add_course("Bug Repro Course", "BRC101") # Não precisa mais de curso para criar turma
+    class_ = data_service.create_class("Bug Repro Class")
     db_session.flush()
 
     # --- DADOS DE TESTE ---

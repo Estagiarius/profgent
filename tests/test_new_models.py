@@ -6,6 +6,7 @@ from app.models.student import Student
 from app.models.class_ import Class
 from app.models.lesson import Lesson
 from app.models.incident import Incident
+from app.models.class_subject import ClassSubject
 
 # Define uma função de teste. O pytest automaticamente injetará as fixtures
 # `data_service` e `db_session` que foram definidas em `conftest.py`.
@@ -16,13 +17,16 @@ def test_create_lesson_and_incident(data_service: DataService, db_session: Sessi
     assert student_dict is not None
     course_dict = data_service.add_course("Test Course", "TC101")
     assert course_dict is not None
-    class_dict = data_service.create_class("Test Class", course_dict['id'])
+    class_dict = data_service.create_class("Test Class") # Nova assinatura
     assert class_dict is not None
+
+    subject_dict = data_service.add_subject_to_class(class_dict['id'], course_dict['id'])
 
     # Recupera os objetos ORM reais do banco de dados de teste para verificar os relacionamentos.
     # O `data_service` retorna dicionários, mas para testar `back_populates`, precisamos dos objetos SQLAlchemy.
     student = db_session.query(Student).get(student_dict['id'])
     class_ = db_session.query(Class).get(class_dict['id'])
+    subject = db_session.query(ClassSubject).get(subject_dict['id'])
 
     # 2. Teste de Criação de Aula (Lesson)
     # Cria uma nova instância do modelo Lesson diretamente na sessão de teste.
@@ -30,7 +34,7 @@ def test_create_lesson_and_incident(data_service: DataService, db_session: Sessi
         date=date.today(),
         title="Introduction to Testing",
         content="This is the content of the lesson.",
-        class_id=class_.id
+        class_subject_id=subject.id # Agora vinculado ao ClassSubject
     )
     db_session.add(new_lesson)
     db_session.commit() # Salva a aula no banco de dados em memória.
@@ -39,8 +43,8 @@ def test_create_lesson_and_incident(data_service: DataService, db_session: Sessi
     # Verificação da criação da aula.
     assert new_lesson.id is not None # Garante que um ID foi gerado.
     assert new_lesson.title == "Introduction to Testing"
-    # Garante que o relacionamento com a turma está correto.
-    assert new_lesson.class_.id == class_.id
+    # Garante que o relacionamento com a disciplina da turma está correto.
+    assert new_lesson.class_subject.id == subject.id
 
     # 3. Teste de Criação de Incidente (Incident)
     # Cria uma nova instância do modelo Incident.
@@ -66,9 +70,12 @@ def test_create_lesson_and_incident(data_service: DataService, db_session: Sessi
     # para garantir que as listas de relacionamentos (lessons, incidents) foram atualizadas.
     db_session.refresh(class_)
     db_session.refresh(student)
-    # Verifica se a aula recém-criada aparece na lista de aulas da turma.
-    assert len(class_.lessons) == 1
-    assert class_.lessons[0].title == "Introduction to Testing"
+    db_session.refresh(subject)
+
+    # Verifica se a aula recém-criada aparece na lista de aulas da disciplina.
+    assert len(subject.lessons) == 1
+    assert subject.lessons[0].title == "Introduction to Testing"
+
     # Verifica se o incidente aparece tanto na lista de incidentes da turma quanto na do aluno.
     assert len(class_.incidents) == 1
     assert len(student.incidents) == 1
