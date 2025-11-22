@@ -250,8 +250,13 @@ class DataService:
     # Método para criar uma nova turma.
     def create_class(self, name: str, course_id: int, calculation_method: str = 'arithmetic') -> dict | None:
         if not name or not course_id: return None
-        new_class = Class(name=name, course_id=course_id, calculation_method=calculation_method)
+
         with self._get_db() as db:
+            # Verifica se já existe uma turma com o mesmo nome (case-insensitive)
+            if db.query(Class).filter(func.lower(Class.name) == func.lower(name)).first():
+                raise ValueError(f"Uma turma com o nome '{name}' já existe.")
+
+            new_class = Class(name=name, course_id=course_id, calculation_method=calculation_method)
             db.add(new_class)
             db.flush()
             db.refresh(new_class)
