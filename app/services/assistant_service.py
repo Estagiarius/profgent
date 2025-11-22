@@ -31,6 +31,31 @@ from app.tools.pedagogical_tools import suggest_lesson_activities_tool
 
 # Define a classe AssistantService, que orquestra toda a lógica do assistente de IA.
 class AssistantService:
+    """
+    Descrição da classe AssistantService.
+
+    A classe AssistantService é responsável por gerenciar um assistente de gestão acadêmica
+    integrado a um aplicativo de desktop. Ela fornece funcionalidades para lidar com um modelo
+    de linguagem natural, registro e execução de ferramentas específicas atualizando um histórico
+    de mensagens, bem como o gerenciamento do provedor de modelo utilizado.
+
+    A classe trabalha com um provedor de LLM que pode ser configurado dinamicamente, executa
+    ferramentas registradas conforme solicitações do usuário, e garante que o sistema opere de
+    forma clara e confiável conforme o comportamento esperado.
+
+    :ivar provider: Instância atual do provedor de LLM, que pode ser configurada como `None`
+        caso nenhum provedor ativo esteja devidamente configurado.
+    :type provider: LLMProvider | None
+    :ivar messages: Lista de mensagens que contém o histórico da interação, incluindo mensagens do
+        sistema, do usuário e do assistente.
+    :type messages: list
+    :ivar tool_registry: Registro que armazena todas as ferramentas disponíveis que podem ser usadas
+        pelo assistente.
+    :type tool_registry: ToolRegistry
+    :ivar tool_executor: Executor responsável por realizar chamadas das ferramentas cadastradas no
+        registro.
+    :type tool_executor: ToolExecutor
+    """
     # O método construtor, chamado ao criar uma nova instância do serviço.
     def __init__(self):
         # Inicializa o provedor de LLM como None. Ele será configurado depois.

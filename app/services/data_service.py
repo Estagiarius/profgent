@@ -22,6 +22,17 @@ from contextlib import contextmanager
 
 # Define a classe DataService, que encapsula toda a lógica de acesso e manipulação de dados.
 class DataService:
+    """
+    Serviço responsável por gerenciar operações relacionadas a estudantes, incluindo
+    importação de dados, criação, atualização, exclusão e consultas.
+
+    Esse serviço abstrai a manipulação direta com o banco de dados, permitindo
+    que as operações sejam realizadas com sessões de banco de dados injetáveis
+    para facilitar testes e integração.
+
+    :ivar _db_session: Sessão injetada do banco de dados, utilizada se provida.
+    :type _db_session: Session
+    """
     # O construtor permite a injeção de uma sessão de banco de dados, útil para testes.
     def __init__(self, db_session: Session = None):
         # Armazena a sessão de banco de dados injetada, se houver.
