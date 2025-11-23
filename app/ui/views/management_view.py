@@ -5,6 +5,7 @@ from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.add_dialog import AddDialog
 # Importa o diálogo de entrada de texto padrão para confirmação de exclusão.
 from customtkinter import CTkInputDialog
+from tkinter import messagebox
 
 # Define a classe para a tela de Gestão de Dados.
 class ManagementView(ctk.CTkFrame):
@@ -129,11 +130,28 @@ class ManagementView(ctk.CTkFrame):
 
     # Métodos de exclusão que chamam o diálogo de confirmação antes de agir.
     def delete_student(self, sid):
-        if self._confirm_delete(): self.data_service.delete_student(sid); self.populate_data()
+        if self._confirm_delete():
+            try:
+                self.data_service.delete_student(sid)
+                self.populate_data()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao excluir aluno: {e}")
+
     def delete_course(self, cid):
-        if self._confirm_delete(): self.data_service.delete_course(cid); self.populate_data()
+        if self._confirm_delete():
+            try:
+                self.data_service.delete_course(cid)
+                self.populate_data()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao excluir disciplina: {e}")
+
     def delete_grade(self, gid):
-        if self._confirm_delete(): self.data_service.delete_grade(gid); self.populate_data()
+        if self._confirm_delete():
+            try:
+                self.data_service.delete_grade(gid)
+                self.populate_data()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao excluir nota: {e}")
 
     # Abre o diálogo de edição para um aluno.
     def edit_student(self, s):
