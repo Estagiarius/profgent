@@ -668,6 +668,7 @@ class ClassDetailView(ctk.CTkFrame):
                 next_call_number = data_service.get_next_call_number(self.class_id)
                 data_service.add_student_to_class(student['id'], self.class_id, next_call_number)
                 self.populate_student_list()
+                self.populate_report_student_combo()
 
         dropdowns = {"student": ("Aluno", student_names)}
         AddDialog(self, "Matricular Novo Aluno", fields={}, dropdowns=dropdowns, save_callback=save_callback)
@@ -715,6 +716,24 @@ class ClassDetailView(ctk.CTkFrame):
         data_service.update_enrollment_status(enrollment_id, db_status)
         self.populate_student_list()
 
+    def populate_report_student_combo(self):
+        """Atualiza o combobox de alunos na aba de relatórios."""
+        if not self.class_id: return
+
+        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        student_names = [f"{e['student_first_name']} {e['student_last_name']}" for e in enrollments]
+
+        self.report_student_combo.configure(values=student_names)
+
+        current = self.report_student_combo.get()
+        if current and current in student_names:
+            return # Mantém a seleção atual se ainda for válida
+
+        if student_names:
+            self.report_student_combo.set(student_names[0])
+        else:
+            self.report_student_combo.set("")
+
     # Inicia o processo de importação de alunos via CSV.
     def import_students(self):
         if not self.class_id:
@@ -752,6 +771,7 @@ class ClassDetailView(ctk.CTkFrame):
         success_count, errors = result
         # Atualiza a lista de alunos na tela.
         self.populate_student_list()
+        self.populate_report_student_combo()
 
         # Mostra um relatório de sucesso ou de erros.
         if errors:
@@ -796,10 +816,4 @@ class ClassDetailView(ctk.CTkFrame):
             self.populate_subject_combo()
 
             # Atualiza o combobox de alunos na aba de relatórios
-            enrollments = data_service.get_enrollments_for_class(self.class_id)
-            student_names = [f"{e['student_first_name']} {e['student_last_name']}" for e in enrollments]
-            self.report_student_combo.configure(values=student_names)
-            if student_names:
-                self.report_student_combo.set(student_names[0])
-            else:
-                self.report_student_combo.set("")
+            self.populate_report_student_combo()
