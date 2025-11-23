@@ -589,8 +589,8 @@ class ClassDetailView(ctk.CTkFrame):
                     weight = float(weight_str)
                     data_service.add_assessment(self.current_subject_id, name, weight)
                     self.populate_assessment_list()
-                except ValueError:
-                    messagebox.showerror("Erro", "Peso inválido. Por favor, insira um número.")
+                except ValueError as e:
+                    messagebox.showerror("Erro", f"Erro ao adicionar avaliação: {e}")
 
         fields = {"name": "Nome da Avaliação", "weight": "Peso"}
         AddDialog(self, "Adicionar Nova Avaliação", fields=fields, save_callback=save_callback)
@@ -642,8 +642,8 @@ class ClassDetailView(ctk.CTkFrame):
                     weight = float(weight_str)
                     data_service.update_assessment(assessment_id, name, weight)
                     self.populate_assessment_list()
-                except ValueError:
-                    messagebox.showerror("Erro", "Peso inválido. Por favor, insira um número.")
+                except ValueError as e:
+                    messagebox.showerror("Erro", f"Erro ao editar avaliação: {e}")
 
         fields = {"name": "Nome da Avaliação", "weight": "Peso"}
         initial_data = {"id": assessment['id'], "name": assessment['name'], "weight": str(assessment['weight'])}

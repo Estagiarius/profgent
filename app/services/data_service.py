@@ -99,6 +99,10 @@ class DataService:
     def add_student(self, first_name: str, last_name: str, birth_date: date | None = None) -> dict | None:
         # Retorna None se o nome ou sobrenome não forem fornecidos.
         if not first_name or not last_name: return None
+
+        if birth_date and birth_date > date.today():
+            raise ValueError("Birth date cannot be in the future.")
+
         # Abre uma sessão de banco de dados.
         with self._get_db() as db:
             # Verifica se um aluno com o mesmo nome completo (ignorando maiúsculas/minúsculas) já existe.
@@ -258,10 +262,12 @@ class DataService:
         with self._get_db() as db:
             # Verifica se há associações com turmas (ClassSubject)
             subjects = db.query(ClassSubject).filter(ClassSubject.course_id == course_id).first()
-            if not subjects:
-                course = db.query(Course).filter(Course.id == course_id).first()
-                if course:
-                    db.delete(course)
+            if subjects:
+                raise ValueError("Cannot delete course because it is associated with one or more classes.")
+
+            course = db.query(Course).filter(Course.id == course_id).first()
+            if course:
+                db.delete(course)
 
     # Método para criar uma nova turma (Agora sem vincular um curso obrigatório).
     def create_class(self, name: str, calculation_method: str = 'arithmetic') -> dict | None:
@@ -397,6 +403,10 @@ class DataService:
     # Método para adicionar uma nova avaliação a uma disciplina de uma turma.
     def add_assessment(self, class_subject_id: int, name: str, weight: float) -> dict | None:
         if not all([class_subject_id, name, weight is not None]): return None
+
+        if weight < 0:
+            raise ValueError("Assessment weight must be non-negative.")
+
         assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight)
         with self._get_db() as db:
             db.add(assessment)
@@ -406,6 +416,9 @@ class DataService:
 
     # Método para atualizar uma avaliação.
     def update_assessment(self, assessment_id: int, name: str, weight: float):
+        if weight < 0:
+            raise ValueError("Assessment weight must be non-negative.")
+
         with self._get_db() as db:
             assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
             if assessment:
@@ -592,8 +605,12 @@ class DataService:
     # Método para adicionar uma nova nota.
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
         if not all([student_id, assessment_id, score is not None]): return None
+
+        if not (0 <= score <= 10):
+            raise ValueError("Score must be between 0 and 10.")
+
         today = date.today()
-        new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today)
+        new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today.isoformat())
         with self._get_db() as db:
             db.add(new_grade)
             db.flush()
@@ -625,6 +642,9 @@ class DataService:
 
                 score = grade_info['score']
 
+                if not (0 <= score <= 10):
+                    raise ValueError(f"Score must be between 0 and 10.")
+
                 existing_grade = existing_grades_map.get((student_id, assessment_id))
                 # Se a nota já existe, atualiza o valor se for diferente.
                 if existing_grade:
@@ -632,7 +652,7 @@ class DataService:
                         existing_grade.score = score
                 # Se a nota não existe, cria um novo registro.
                 else:
-                    new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today())
+                    new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today().isoformat())
                     db.add(new_grade)
 
     # Método para calcular a média ponderada de um aluno.
