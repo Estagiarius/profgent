@@ -1,3 +1,6 @@
+import matplotlib
+# Configura o backend 'Agg' antes de importar pyplot para evitar problemas com threads e GUI
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import tempfile
