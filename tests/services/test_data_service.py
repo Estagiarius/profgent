@@ -81,6 +81,7 @@ def test_delete_student(data_service: DataService, db_session):
     student = data_service.add_student("John", "Doe")
     course = data_service.add_course("History 101", "HIST101")
     class_ = data_service.create_class("1A", course['id'])
+    data_service.add_student_to_class(student['id'], class_['id'], 1)
     assessment = data_service.add_assessment(class_['id'], "Final Exam", 1.0)
     data_service.add_grade(student['id'], assessment['id'], 92.0)
     db_session.flush()
@@ -248,10 +249,10 @@ def test_grade_grid_logic(data_service: DataService, db_session):
     db_session.flush()
     grades = data_service.get_grades_for_class(class_['id'])
     # Verificação 1: Calcula a média ponderada. (8.0 * 1.0 + 0.0 * 2.0) / (1.0 + 2.0) = 8/3 = 2.67
-    avg1 = data_service.calculate_weighted_average(student1['id'], grades, assessments)
+    avg1 = data_service.calculate_average(student1['id'], grades, assessments)
     assert round(avg1, 2) == 2.67
     # Verificação 2: Aluno 2 não tem notas, a média é 0.
-    avg2 = data_service.calculate_weighted_average(student2['id'], grades, assessments)
+    avg2 = data_service.calculate_average(student2['id'], grades, assessments)
     assert avg2 == 0.0
     # Ação 2: Usa o upsert para atualizar uma nota e adicionar duas novas.
     grades_to_upsert = [
@@ -265,10 +266,10 @@ def test_grade_grid_logic(data_service: DataService, db_session):
     final_grades = data_service.get_grades_for_class(class_['id'])
     assert len(final_grades) == 3
     # Média Aluno 1: (9.0 * 1.0 + 7.0 * 2.0) / 3 = 23/3 = 7.67
-    final_avg1 = data_service.calculate_weighted_average(student1['id'], final_grades, assessments)
+    final_avg1 = data_service.calculate_average(student1['id'], final_grades, assessments)
     assert round(final_avg1, 2) == 7.67
     # Média Aluno 2: (10.0 * 1.0 + 0.0 * 2.0) / 3 = 10/3 = 3.33
-    final_avg2 = data_service.calculate_weighted_average(student2['id'], final_grades, assessments)
+    final_avg2 = data_service.calculate_average(student2['id'], final_grades, assessments)
     assert round(final_avg2, 2) == 3.33
 
 def test_update_and_delete_class(data_service: DataService, db_session):

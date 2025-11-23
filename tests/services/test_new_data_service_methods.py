@@ -54,6 +54,9 @@ def test_incident_methods(data_service: DataService):
     today = date.today()
 
     # --- TESTE DE CRIAÇÃO E LEITURA ---
+    # Preparação: Matricula o aluno (necessário para criar incidente).
+    data_service.add_student_to_class(student['id'], class_['id'], 1)
+
     # Ação: Cria um novo incidente.
     data_service.create_incident(class_['id'], student['id'], "Excellent participation.", today)
 
@@ -69,7 +72,7 @@ def test_analysis_methods(data_service: DataService):
     # Cria uma estrutura complexa de dados com vários alunos, notas e incidentes
     # para simular um cenário realista de análise de risco.
     course = data_service.add_course("Math", "MAT101")
-    class_ = data_service.create_class("Grade 6 Math", course['id'])
+    class_ = data_service.create_class("Grade 6 Math", course['id'], calculation_method='weighted')
 
     # Alunos com diferentes perfis.
     student_ok = data_service.add_student("Alice", "Aventura") # Boas notas, sem incidentes

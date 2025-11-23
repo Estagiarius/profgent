@@ -90,7 +90,10 @@ class ReportService:
         for enrollment in enrollments:
             student_id = enrollment['student_id']
             student_grades = [g for g in grades if g['student_id'] == student_id]
-            avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
+            # Se o aluno não tiver notas, não contabiliza na distribuição para não distorcer a estatística.
+            if not student_grades:
+                continue
+            avg = self.data_service.calculate_average(student_id, student_grades, assessments, class_info.get('calculation_method', 'weighted'))
             averages.append(avg)
 
         if not averages:
@@ -147,7 +150,7 @@ class ReportService:
 
             # Calculate average
             student_grades_list = [g for g in grades if g['student_id'] == student_id]
-            avg = self.data_service.calculate_weighted_average(student_id, student_grades_list, assessments)
+            avg = self.data_service.calculate_average(student_id, student_grades_list, assessments, class_info.get('calculation_method', 'weighted'))
             row.append(f"{avg:.2f}")
 
             rows.append(row)
@@ -182,7 +185,7 @@ class ReportService:
         assessments = class_info.get('assessments', [])
 
         # Calculate average
-        avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
+        avg = self.data_service.calculate_average(student_id, student_grades, assessments, class_info.get('calculation_method', 'weighted'))
 
         incidents = self.data_service.get_incidents_for_class(class_id)
         student_incidents = [i for i in incidents if i['student_id'] == student_id]

@@ -52,6 +52,11 @@ def test_list_courses_for_student(data_service: DataService):
     course2 = data_service.add_course("Art 101", "A101")
     class1 = data_service.create_class("1A", course1['id'])
     class2 = data_service.create_class("1B", course2['id'])
+
+    # Enroll student
+    data_service.add_student_to_class(student['id'], class1['id'], 1)
+    data_service.add_student_to_class(student['id'], class2['id'], 1)
+
     assessment1 = data_service.add_assessment(class1['id'], "Essay", 1.0)
     assessment2 = data_service.add_assessment(class2['id'], "Project", 1.0)
     data_service.add_grade(student['id'], assessment1['id'], 88.0)

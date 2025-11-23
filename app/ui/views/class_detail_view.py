@@ -372,8 +372,8 @@ class ClassDetailView(ctk.CTkFrame):
                 # Armazena a referência do widget de entrada.
                 self.grade_entries[(enrollment['student_id'], assessment['id'])] = entry
 
-            # Calcula e exibe a média final ponderada do aluno.
-            average = data_service.calculate_weighted_average(enrollment['student_id'], grades, assessments)
+            # Calcula e exibe a média final do aluno.
+            average = data_service.calculate_average(enrollment['student_id'], grades, assessments, class_data.get('calculation_method', 'weighted'))
             average_label = ctk.CTkLabel(self.grade_grid_frame, text=f"{average:.2f}")
             average_label.grid(row=row, column=len(assessments) + 1, padx=5, pady=5, sticky="w")
 

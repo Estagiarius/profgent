@@ -8,21 +8,10 @@ import os
 # Define a função que inicializa o banco de dados.
 def initialize_database():
     """Cria o banco de dados e as tabelas caso ainda não existam."""
-    # Obtém o caminho do arquivo do banco de dados a partir da URL do 'engine' do SQLAlchemy.
-    db_path = engine.url.database
-    # Verifica se o arquivo do banco de dados não existe no caminho especificado.
-    if not os.path.exists(db_path):
-        # Imprime uma mensagem informando que um novo banco de dados será criado.
-        print("Banco de dados não encontrado. Criando um novo banco de dados e todas as tabelas...")
-        # O objeto 'Base' contém os metadados de todas as nossas tabelas (modelos).
-        # O método 'create_all' verifica a existência das tabelas antes de criá-las, então é seguro executá-lo.
-        Base.metadata.create_all(bind=engine)
-        # Imprime uma mensagem de sucesso após a inicialização.
-        print("Banco de dados inicializado com sucesso.")
-    # Caso o arquivo do banco de dados já exista.
-    else:
-        # Imprime uma mensagem informando que a criação foi pulada.
-        print("O banco de dados já existe. A criação foi pulada.")
+    # O método 'create_all' verifica a existência das tabelas antes de criá-las, então é seguro executá-lo sempre.
+    # Isso garante que novas tabelas sejam criadas mesmo se o arquivo do banco já existir.
+    Base.metadata.create_all(bind=engine)
+    print("Banco de dados verificado/inicializado com sucesso.")
 
 
 # Importa o DataService, responsável pela lógica de manipulação de dados.

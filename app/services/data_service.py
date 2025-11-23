@@ -98,6 +98,8 @@ class DataService:
     def add_student(self, first_name: str, last_name: str, birth_date: date | None = None) -> dict | None:
         # Retorna None se o nome ou sobrenome não forem fornecidos.
         if not first_name or not last_name: return None
+        if birth_date and birth_date > date.today():
+            raise ValueError("Data de nascimento não pode ser no futuro.")
         # Abre uma sessão de banco de dados.
         with self._get_db() as db:
             # Verifica se um aluno com o mesmo nome completo (ignorando maiúsculas/minúsculas) já existe.
@@ -163,13 +165,9 @@ class DataService:
     # Método para deletar um aluno.
     def delete_student(self, student_id: int):
         with self._get_db() as db:
-            # Deleta manualmente os registros dependentes (notas, matrículas, incidentes) para evitar erros de chave estrangeira.
-            db.query(Grade).filter(Grade.student_id == student_id).delete()
-            db.query(ClassEnrollment).filter(ClassEnrollment.student_id == student_id).delete()
-            db.query(Incident).filter(Incident.student_id == student_id).delete()
             # Busca o aluno pelo ID.
             student = db.query(Student).filter(Student.id == student_id).first()
-            # Se encontrar, deleta o aluno.
+            # Se encontrar, deleta o aluno. O cascade do modelo remove dependências.
             if student:
                 db.delete(student)
 
@@ -245,7 +243,9 @@ class DataService:
         with self._get_db() as db:
             course = db.query(Course).filter(Course.id == course_id).first()
             # Só permite a exclusão se o curso não tiver turmas associadas.
-            if course and not course.classes:
+            if course:
+                if course.classes:
+                    raise ValueError("Não é possível excluir um curso que possui turmas associadas.")
                 db.delete(course)
 
     # Método para criar uma nova turma.
@@ -289,7 +289,7 @@ class DataService:
 
             class_ = query.filter(Class.id == class_id).first()
             if class_:
-                class_data = {"id": class_.id, "name": class_.name}
+                class_data = {"id": class_.id, "name": class_.name, "calculation_method": class_.calculation_method}
                 if not simplified:
                     class_data["course_name"] = class_.course.course_name
                     class_data["assessments"] = [{"id": a.id, "name": a.name, "weight": a.weight} for a in class_.assessments]
@@ -299,6 +299,9 @@ class DataService:
     # Método para atualizar uma turma.
     def update_class(self, class_id: int, name: str):
         with self._get_db() as db:
+            # Verifica se já existe outra turma com o mesmo nome.
+            if db.query(Class).filter(func.lower(Class.name) == func.lower(name)).filter(Class.id != class_id).first():
+                raise ValueError(f"Uma turma com o nome '{name}' já existe.")
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 class_.name = name
@@ -306,12 +309,9 @@ class DataService:
     # Método para deletar uma turma.
     def delete_class(self, class_id: int):
         with self._get_db() as db:
-            # Deleta as dependências associadas (matrículas, aulas, incidentes) antes de deletar a turma.
-            db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete()
-            db.query(Lesson).filter(Lesson.class_id == class_id).delete()
-            db.query(Incident).filter(Incident.class_id == class_id).delete()
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
+                # Cascade do modelo remove dependências (Enrollment, Lesson, Incident, Assessment).
                 db.delete(class_)
 
     # Método para adicionar (ou atualizar) um aluno em uma turma.
@@ -371,6 +371,7 @@ class DataService:
     # Método para adicionar uma nova avaliação a uma turma.
     def add_assessment(self, class_id: int, name: str, weight: float) -> dict | None:
         if not all([class_id, name, weight is not None]): return None
+        if weight < 0: raise ValueError("O peso da avaliação não pode ser negativo.")
         assessment = Assessment(class_id=class_id, name=name, weight=weight)
         with self._get_db() as db:
             db.add(assessment)
@@ -380,6 +381,7 @@ class DataService:
 
     # Método para atualizar uma avaliação.
     def update_assessment(self, assessment_id: int, name: str, weight: float):
+        if weight < 0: raise ValueError("O peso da avaliação não pode ser negativo.")
         with self._get_db() as db:
             assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
             if assessment:
@@ -438,6 +440,11 @@ class DataService:
 
     # Método para gerar um resumo de desempenho de um aluno em uma turma.
     def get_student_performance_summary(self, student_id: int, class_id: int) -> dict | None:
+        # Verifica se o aluno está matriculado na turma.
+        with self._get_db() as db:
+            if not db.query(ClassEnrollment).filter_by(class_id=class_id, student_id=student_id).first():
+                return None
+
         class_info = self.get_class_by_id(class_id)
         if not class_info:
             return None
@@ -449,7 +456,7 @@ class DataService:
         assessments = class_info.get('assessments', [])
 
         # Calcula a média ponderada.
-        weighted_average = self.calculate_weighted_average(student_id, student_grades, assessments)
+        weighted_average = self.calculate_average(student_id, student_grades, assessments, class_info.get('calculation_method', 'weighted'))
 
         incidents = self.get_incidents_for_class(class_id)
         student_incidents = [i for i in incidents if i['student_id'] == student_id]
@@ -517,8 +524,11 @@ class DataService:
     # Método para criar um novo incidente.
     def create_incident(self, class_id: int, student_id: int, description: str, incident_date: date) -> dict | None:
         if not all([class_id, student_id, description, incident_date]): return None
-        new_incident = Incident(class_id=class_id, student_id=student_id, description=description, date=incident_date)
         with self._get_db() as db:
+            # Verifica se o aluno pertence à turma.
+            if not db.query(ClassEnrollment).filter_by(class_id=class_id, student_id=student_id).first():
+                raise ValueError("Aluno não está matriculado nesta turma.")
+            new_incident = Incident(class_id=class_id, student_id=student_id, description=description, date=incident_date)
             db.add(new_incident)
             db.flush()
             db.refresh(new_incident)
@@ -539,8 +549,13 @@ class DataService:
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
         if not all([student_id, assessment_id, score is not None]): return None
         today = date.today()
-        new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today.isoformat())
         with self._get_db() as db:
+            # Verifica se o aluno está matriculado na turma da avaliação.
+            assessment = db.query(Assessment).get(assessment_id)
+            if assessment:
+                if not db.query(ClassEnrollment).filter_by(class_id=assessment.class_id, student_id=student_id).first():
+                    raise ValueError("Aluno não está matriculado na turma desta avaliação.")
+            new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today)
             db.add(new_grade)
             db.flush()
             db.refresh(new_grade)
@@ -565,8 +580,8 @@ class DataService:
                 try:
                     student_id = int(grade_info['student_id'])
                     assessment_id = int(grade_info['assessment_id'])
-                except (ValueError, TypeError):
-                    # Se a conversão falhar, pula este registro para evitar inconsistências.
+                except (ValueError, TypeError, KeyError):
+                    # Se a conversão falhar ou chave faltar, pula este registro para evitar inconsistências.
                     continue
 
                 score = grade_info['score']
@@ -578,21 +593,29 @@ class DataService:
                         existing_grade.score = score
                 # Se a nota não existe, cria um novo registro.
                 else:
-                    new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today().isoformat())
+                    new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today())
                     db.add(new_grade)
 
-    # Método para calcular a média ponderada de um aluno.
+    # Método para calcular a média de um aluno (ponderada ou aritmética).
     @staticmethod
-    def calculate_weighted_average(student_id: int, grades: list[dict], assessments: list[dict]) -> float:
-        # Soma o peso de todas as avaliações da turma.
-        total_weight = sum(a['weight'] for a in assessments)
-        if total_weight == 0: return 0.0
+    def calculate_average(student_id: int, grades: list[dict], assessments: list[dict], method: str = 'weighted') -> float:
+        if not assessments: return 0.0
+
         # Cria um mapa das notas do aluno para acesso rápido.
         student_grades = {g['assessment_id']: g['score'] for g in grades if g.get('student_id') == student_id}
-        # Calcula a soma ponderada das notas (nota * peso). Se uma nota não existir, considera como 0.
-        weighted_sum = sum(student_grades.get(a['id'], 0.0) * a['weight'] for a in assessments)
-        # Retorna a média ponderada.
-        return weighted_sum / total_weight
+
+        if method == 'arithmetic':
+            # Média aritmética simples (notas faltantes contam como 0).
+            total_score = sum(student_grades.get(a['id'], 0.0) for a in assessments)
+            return total_score / len(assessments)
+        else:
+            # Soma o peso de todas as avaliações da turma.
+            total_weight = sum(a['weight'] for a in assessments)
+            if total_weight == 0: return 0.0
+            # Calcula a soma ponderada das notas (nota * peso). Se uma nota não existir, considera como 0.
+            weighted_sum = sum(student_grades.get(a['id'], 0.0) * a['weight'] for a in assessments)
+            # Retorna a média ponderada.
+            return weighted_sum / total_weight
 
     # Método privado para inserir/atualizar alunos e matrículas em lote (usado pela importação de CSV).
     def _batch_upsert_students_and_enroll(self, db: Session, class_id: int, student_data_list: list[dict]):
@@ -615,7 +638,7 @@ class DataService:
                 # Cria um novo objeto Student.
                 student = Student(
                     first_name=data['first_name'], last_name=data['last_name'],
-                    birth_date=data['birth_date'], enrollment_date=date.today().isoformat()
+                    birth_date=data['birth_date'], enrollment_date=date.today()
                 )
                 db.add(student)
                 db.flush()  # Garante que o ID do aluno seja gerado antes de criar a matrícula.

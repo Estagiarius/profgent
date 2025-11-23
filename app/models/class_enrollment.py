@@ -49,7 +49,7 @@ class ClassEnrollment(Base):
     status_detail = Column(String, nullable=True)
 
     # Define o relacionamento com o modelo Student. Permite acessar os dados do aluno a partir da matrícula.
-    student = relationship("Student")
+    student = relationship("Student", back_populates="enrollments")
     # Define o relacionamento com o modelo Class. 'back_populates' cria a referência inversa no modelo Class.
     class_ = relationship("Class", back_populates="enrollments")
 

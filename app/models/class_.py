@@ -60,14 +60,14 @@ class Class(Base):
     # Define o relacionamento com o modelo Course. 'back_populates' cria a referência inversa no modelo Course.
     course = relationship("Course", back_populates="classes")
     # Define o relacionamento com ClassEnrollment (matrículas), criando a referência inversa.
-    enrollments = relationship("ClassEnrollment", back_populates="class_")
+    enrollments = relationship("ClassEnrollment", back_populates="class_", cascade="all, delete-orphan")
     # Define o relacionamento com Assessment (avaliações). 'backref' é uma forma mais simples de criar a referência inversa.
     # 'cascade="all, delete-orphan"' garante que as avaliações de uma turma sejam excluídas se a turma for excluída.
     assessments = relationship("Assessment", backref="class_", cascade="all, delete-orphan")
     # Define o relacionamento com Lesson (aulas).
-    lessons = relationship("Lesson", back_populates="class_")
+    lessons = relationship("Lesson", back_populates="class_", cascade="all, delete-orphan")
     # Define o relacionamento com Incident (incidentes).
-    incidents = relationship("Incident", back_populates="class_")
+    incidents = relationship("Incident", back_populates="class_", cascade="all, delete-orphan")
 
     # Define uma representação em string para o objeto Class, útil para depuração.
     def __repr__(self):

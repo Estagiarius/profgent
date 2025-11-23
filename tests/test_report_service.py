@@ -41,7 +41,7 @@ def mock_data_service():
         ]
 
         mock_ds.get_incidents_for_class.return_value = []
-        mock_ds.calculate_weighted_average.return_value = 7.5
+        mock_ds.calculate_average.return_value = 7.5
 
         yield mock_ds
 

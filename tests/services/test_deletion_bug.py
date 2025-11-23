@@ -18,6 +18,9 @@ def test_delete_class_with_dependencies(data_service: DataService, db_session):
     # Add Lesson
     lesson = data_service.create_lesson(class_['id'], "Lesson 1", "Content", date.today())
 
+    # Enroll student
+    data_service.add_student_to_class(student['id'], class_['id'], 1)
+
     # Add Incident
     incident = data_service.create_incident(class_['id'], student['id'], "Incident 1", date.today())
 
@@ -59,6 +62,9 @@ def test_delete_student_with_dependencies(data_service: DataService, db_session)
     student = data_service.add_student("Test", "Student 2")
     course = data_service.add_course("Test Course 2", "TC102")
     class_ = data_service.create_class("Test Class 2", course['id'])
+
+    # Enroll student
+    data_service.add_student_to_class(student['id'], class_['id'], 1)
 
     # Add Incident
     incident = data_service.create_incident(class_['id'], student['id'], "Incident 2", date.today())
