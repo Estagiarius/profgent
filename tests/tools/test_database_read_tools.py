@@ -18,7 +18,7 @@ def test_get_student_grade_found(data_service: DataService):
     class_ = data_service.create_class("1A", course['id'])
     assessment = data_service.add_assessment(class_['id'], "Final Exam", 1.0)
     data_service.add_student_to_class(student['id'], class_['id'], 1) # Matricula o aluno
-    data_service.add_grade(student['id'], assessment['id'], 95.5)
+    data_service.add_grade(student['id'], assessment['id'], 9.55)
 
     # --- AÇÃO ---
     # Chama a função da ferramenta diretamente.
@@ -26,7 +26,7 @@ def test_get_student_grade_found(data_service: DataService):
 
     # --- VERIFICAÇÃO ---
     # Garante que a string de resultado contenha as informações esperadas.
-    assert "95.5" in result
+    assert "9.55" in result
     assert "John Doe" in result
     assert "Math 101" in result
 
@@ -59,8 +59,8 @@ def test_list_courses_for_student(data_service: DataService):
 
     assessment1 = data_service.add_assessment(class1['id'], "Essay", 1.0)
     assessment2 = data_service.add_assessment(class2['id'], "Project", 1.0)
-    data_service.add_grade(student['id'], assessment1['id'], 88.0)
-    data_service.add_grade(student['id'], assessment2['id'], 92.0)
+    data_service.add_grade(student['id'], assessment1['id'], 8.8)
+    data_service.add_grade(student['id'], assessment2['id'], 9.2)
 
     # --- AÇÃO ---
     # Chama a ferramenta para listar os cursos do aluno.
@@ -85,13 +85,13 @@ def test_get_class_average(data_service: DataService):
     assessment = data_service.add_assessment(class_['id'], "Lab 1", 1.0)
     data_service.add_student_to_class(student1['id'], class_['id'], 1)
     data_service.add_student_to_class(student2['id'], class_['id'], 2)
-    data_service.add_grade(student1['id'], assessment['id'], 70)
-    data_service.add_grade(student2['id'], assessment['id'], 90)
+    data_service.add_grade(student1['id'], assessment['id'], 7.0)
+    data_service.add_grade(student2['id'], assessment['id'], 9.0)
 
     # --- AÇÃO ---
     # Chama a ferramenta para calcular a média.
     result = get_class_average("Physics 303")
 
     # --- VERIFICAÇÃO ---
-    # Garante que a média calculada ((70 + 90) / 2 = 80) está no resultado.
-    assert "80.00" in result
+    # Garante que a média calculada ((7.0 + 9.0) / 2 = 8.0) está no resultado.
+    assert "8.00" in result

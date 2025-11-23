@@ -47,11 +47,11 @@ def test_add_grade(data_service: DataService):
     assessment = data_service.add_assessment(class_['id'], "Midterm", 1.0)
     data_service.add_student_to_class(student['id'], class_['id'], 1)
     # Ação: Adiciona uma nota para o aluno na avaliação.
-    data_service.add_grade(student['id'], assessment['id'], 85.5)
+    data_service.add_grade(student['id'], assessment['id'], 8.55)
     # Verificação: Confirma que a nota foi salva corretamente.
     grades = data_service.get_grades_for_class(class_['id'])
     assert len(grades) == 1
-    assert grades[0]['score'] == 85.5
+    assert grades[0]['score'] == 8.55
 
 def test_get_all_students(data_service: DataService):
     """Testa a busca de todos os alunos."""
@@ -83,7 +83,7 @@ def test_delete_student(data_service: DataService, db_session):
     class_ = data_service.create_class("1A", course['id'])
     data_service.add_student_to_class(student['id'], class_['id'], 1)
     assessment = data_service.add_assessment(class_['id'], "Final Exam", 1.0)
-    data_service.add_grade(student['id'], assessment['id'], 92.0)
+    data_service.add_grade(student['id'], assessment['id'], 9.2)
     db_session.flush()
     assert data_service.get_student_count() == 1
     assert len(data_service.get_all_grades()) == 1
@@ -192,8 +192,8 @@ def test_get_grades_for_class_filters_inactive_students(data_service: DataServic
     assessment = data_service.add_assessment(class_['id'], "Test", 1.0)
     data_service.add_student_to_class(student_active['id'], class_['id'], 1, status="Active")
     data_service.add_student_to_class(student_inactive['id'], class_['id'], 2, status="Inactive")
-    data_service.add_grade(student_active['id'], assessment['id'], 100)
-    data_service.add_grade(student_inactive['id'], assessment['id'], 50)
+    data_service.add_grade(student_active['id'], assessment['id'], 10.0)
+    data_service.add_grade(student_inactive['id'], assessment['id'], 5.0)
     # Ação: Busca as notas da turma.
     grades = data_service.get_grades_for_class(class_['id'])
     # Verificação: Confirma que apenas a nota do aluno ativo foi retornada.
@@ -221,7 +221,7 @@ def test_delete_assessment(data_service: DataService, db_session):
     class_ = data_service.create_class("Class", course['id'])
     assessment = data_service.add_assessment(class_['id'], "Test to Delete", 1.0)
     data_service.add_student_to_class(student['id'], class_['id'], 1)
-    data_service.add_grade(student['id'], assessment['id'], 100)
+    data_service.add_grade(student['id'], assessment['id'], 10.0)
     db_session.flush()
     assert len(data_service.get_class_by_id(class_['id'])['assessments']) == 1
     assert len(data_service.get_all_grades()) == 1
@@ -302,7 +302,7 @@ def test_get_all_grades_with_details(data_service: DataService):
     class_ = data_service.create_class("Class", course['id'])
     assessment = data_service.add_assessment(class_['id'], "Final Exam", 1.0)
     data_service.add_student_to_class(student['id'], class_['id'], 1)
-    grade = data_service.add_grade(student['id'], assessment['id'], 95.0)
+    grade = data_service.add_grade(student['id'], assessment['id'], 9.5)
     # Ação: Chama o método que busca notas com detalhes.
     grades_with_details = data_service.get_all_grades_with_details()
     # Verificação: Confirma que a nota foi retornada com todos os detalhes esperados.

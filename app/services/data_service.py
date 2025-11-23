@@ -190,8 +190,10 @@ class DataService:
     # Método para adicionar um novo curso.
     def add_course(self, course_name: str, course_code: str) -> dict | None:
         if not course_name or not course_code: return None
-        new_course = Course(course_name=course_name, course_code=course_code)
         with self._get_db() as db:
+            if db.query(Course).filter(Course.course_code == course_code).first():
+                raise ValueError(f"Código do curso '{course_code}' já existe.")
+            new_course = Course(course_name=course_name, course_code=course_code)
             db.add(new_course)
             db.flush()
             db.refresh(new_course)
@@ -318,6 +320,11 @@ class DataService:
     def add_student_to_class(self, student_id: int, class_id: int, call_number: int, status: str = "Active") -> dict | None:
         if not all([student_id, class_id, call_number is not None]): return None
         with self._get_db() as db:
+            # Verifica colisão de número de chamada.
+            collision = db.query(ClassEnrollment).filter_by(class_id=class_id, call_number=call_number).first()
+            if collision and collision.student_id != student_id:
+                raise ValueError(f"Número de chamada {call_number} já está em uso nesta turma.")
+
             # Verifica se a matrícula já existe.
             existing = db.query(ClassEnrollment).filter_by(student_id=student_id, class_id=class_id).first()
             # Se existir, atualiza o número de chamada e o status.
@@ -372,8 +379,10 @@ class DataService:
     def add_assessment(self, class_id: int, name: str, weight: float) -> dict | None:
         if not all([class_id, name, weight is not None]): return None
         if weight < 0: raise ValueError("O peso da avaliação não pode ser negativo.")
-        assessment = Assessment(class_id=class_id, name=name, weight=weight)
         with self._get_db() as db:
+            if db.query(Assessment).filter_by(class_id=class_id, name=name).first():
+                raise ValueError(f"Avaliação com nome '{name}' já existe nesta turma.")
+            assessment = Assessment(class_id=class_id, name=name, weight=weight)
             db.add(assessment)
             db.flush()
             db.refresh(assessment)
@@ -524,6 +533,8 @@ class DataService:
     # Método para criar um novo incidente.
     def create_incident(self, class_id: int, student_id: int, description: str, incident_date: date) -> dict | None:
         if not all([class_id, student_id, description, incident_date]): return None
+        if incident_date > date.today():
+            raise ValueError("Data do incidente não pode ser no futuro.")
         with self._get_db() as db:
             # Verifica se o aluno pertence à turma.
             if not db.query(ClassEnrollment).filter_by(class_id=class_id, student_id=student_id).first():
@@ -548,6 +559,7 @@ class DataService:
     # Método para adicionar uma nova nota.
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
         if not all([student_id, assessment_id, score is not None]): return None
+        if not (0 <= score <= 10): raise ValueError("A nota deve estar entre 0 e 10.")
         today = date.today()
         with self._get_db() as db:
             # Verifica se o aluno está matriculado na turma da avaliação.
@@ -585,6 +597,9 @@ class DataService:
                     continue
 
                 score = grade_info['score']
+                if not (0 <= score <= 10):
+                    # Pode-se lançar erro ou pular. Lançar erro é mais seguro para integridade.
+                    raise ValueError(f"Nota {score} inválida. Deve estar entre 0 e 10.")
 
                 existing_grade = existing_grades_map.get((student_id, assessment_id))
                 # Se a nota já existe, atualiza o valor se for diferente.
