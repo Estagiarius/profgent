@@ -1,50 +1,73 @@
-# Importa a classe principal da aplicação, MainApp, que gerencia a interface gráfica.
-from app.ui.main_app import MainApp
-# Importa o 'engine' e a 'Base' do SQLAlchemy para interagir com o banco de dados.
-from app.data.database import engine, Base
-# Importa o módulo 'os' para interagir com o sistema operacional, como verificar a existência de arquivos.
+import logging
 import os
-
-# Define a função que inicializa o banco de dados.
-def initialize_database():
-    """Cria o banco de dados e as tabelas caso ainda não existam."""
-    # Obtém o caminho do arquivo do banco de dados a partir da URL do 'engine' do SQLAlchemy.
-    db_path = engine.url.database
-    # Verifica se o arquivo do banco de dados não existe no caminho especificado.
-    if not os.path.exists(db_path):
-        # Imprime uma mensagem informando que um novo banco de dados será criado.
-        print("Banco de dados não encontrado. Criando um novo banco de dados e todas as tabelas...")
-        # O objeto 'Base' contém os metadados de todas as nossas tabelas (modelos).
-        # O método 'create_all' verifica a existência das tabelas antes de criá-las, então é seguro executá-lo.
-        Base.metadata.create_all(bind=engine)
-        # Imprime uma mensagem de sucesso após a inicialização.
-        print("Banco de dados inicializado com sucesso.")
-    # Caso o arquivo do banco de dados já exista.
-    else:
-        # Imprime uma mensagem informando que a criação foi pulada.
-        print("O banco de dados já existe. A criação foi pulada.")
-
-
-# Importa o DataService, responsável pela lógica de manipulação de dados.
-from app.services.data_service import DataService
-# Importa o AssistantService, responsável pela lógica do assistente de IA.
+from sqlalchemy import inspect
+from app.ui.main_app import MainApp
+from app.data.database import engine, Base
+# Importa o DataService singleton (instância compartilhada) para garantir consistência com as ferramentas da IA
+from app.services import data_service
+# Importa o AssistantService
 from app.services.assistant_service import AssistantService
 
-# Define a função principal que executa a aplicação.
+# Configuração básica de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("app.log"),
+        logging.StreamHandler()  # Também exibe no console para debug durante o desenvolvimento
+    ]
+)
+
+def initialize_database():
+    """
+    Verifica e inicializa o banco de dados de forma robusta.
+    Usa 'inspect' para verificar tabelas em vez de apenas a existência do arquivo.
+    Isso previne erros quando o arquivo existe mas está vazio ou corrompido.
+    """
+    try:
+        inspector = inspect(engine)
+        # Obtém as tabelas existentes no banco
+        existing_tables = inspector.get_table_names()
+
+        if not existing_tables:
+            logging.info("Banco de dados vazio ou inexistente. Criando nova estrutura de tabelas...")
+            Base.metadata.create_all(bind=engine)
+            logging.info("Banco de dados inicializado com sucesso.")
+        else:
+            logging.info(f"Banco de dados encontrado com as seguintes tabelas: {', '.join(existing_tables)}")
+            # Executa create_all mesmo assim para garantir que qualquer nova tabela definida no código seja criada.
+            # O create_all do SQLAlchemy é inteligente e ignora tabelas que já existem.
+            Base.metadata.create_all(bind=engine)
+
+    except Exception as e:
+        logging.critical(f"Falha crítica na inicialização do banco de dados: {e}")
+        # Relança a exceção para ser capturada no bloco principal e encerrar o programa
+        raise
+
 def main():
-    # Chama a função para garantir que o banco de dados esteja pronto.
-    initialize_database()
+    try:
+        logging.info("Iniciando aplicação Academic Management System...")
 
-    # Cria uma instância dos serviços que serão usados pela aplicação.
-    data_service = DataService()
-    assistant_service = AssistantService()
+        # 1. Inicializa a camada de dados
+        initialize_database()
 
-    # Cria a instância principal da aplicação, injetando os serviços como dependências.
-    app = MainApp(data_service=data_service, assistant_service=assistant_service)
-    # Inicia o loop principal da interface gráfica, que a mantém em execução.
-    app.mainloop()
+        # 2. Inicializa os serviços
+        # O data_service já foi importado como singleton.
+        # Inicializa o serviço do assistente (que carrega configurações e ferramentas)
+        assistant_service = AssistantService()
 
-# Verifica se o script está sendo executado diretamente (não importado como módulo).
+        # 3. Inicializa a Interface Gráfica
+        logging.info("Inicializando interface gráfica...")
+        app = MainApp(data_service=data_service, assistant_service=assistant_service)
+
+        # 4. Inicia o loop principal
+        app.mainloop()
+
+        logging.info("Aplicação encerrada pelo usuário.")
+
+    except Exception as e:
+        logging.critical(f"A aplicação encontrou um erro fatal e não pôde iniciar: {e}", exc_info=True)
+        print(f"\nERRO FATAL: A aplicação falhou. Verifique o arquivo 'app.log' para detalhes.\nErro: {e}")
+
 if __name__ == "__main__":
-    # Chama a função principal para iniciar a aplicação.
     main()

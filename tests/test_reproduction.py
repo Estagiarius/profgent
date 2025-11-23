@@ -5,8 +5,8 @@ from app.core.tools.tool_executor import ToolExecutor
 
 # Mock the ChatCompletionMessageToolCall object structure
 class MockToolCall:
-    def __init__(self, id, name, arguments):
-        self.id = id
+    def __init__(self, call_id, name, arguments):
+        self.call_id = call_id
         self.function = MagicMock()
         self.function.name = name
         self.function.arguments = arguments
@@ -20,7 +20,7 @@ def test_execute_tool_call_with_object_fails():
     executor = ToolExecutor(registry)
 
     # Create a tool call that mimics the OpenAI object
-    tool_call_object = MockToolCall(id="call_123", name="test_tool", arguments='{}')
+    tool_call_object = MockToolCall(call_id="call_123", name="test_tool", arguments='{}')
 
     # Expect failure because ToolExecutor expects a dict
     with pytest.raises(TypeError, match="'MockToolCall' object is not subscriptable"):

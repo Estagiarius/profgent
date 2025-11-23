@@ -21,9 +21,9 @@ class Course(Base):
     :type course_name: str
     :ivar course_code: Código único associado ao curso.
     :type course_code: str
-    :ivar classes: Lista de turmas associadas ao curso. Representado pelo relacionamento
-        com o modelo Class.
-    :type classes: List[Class]
+    :ivar class_subjects: Relacionamento com ClassSubject.
+        Representa as associações com turmas.
+    :type class_subjects: List[ClassSubject]
     """
     # Define o nome da tabela no banco de dados para este modelo.
     __tablename__ = 'courses'
@@ -35,9 +35,8 @@ class Course(Base):
     # Define a coluna 'course_code' como uma string que deve ser única.
     course_code = Column(String, unique=True)
 
-    # Define o relacionamento com o modelo Class. Um curso pode ter várias turmas.
-    # 'back_populates' cria a referência inversa no modelo Class.
-    classes = relationship("Class", back_populates="course")
+    # Relacionamento com ClassSubject (Associações com Turmas)
+    class_subjects = relationship("ClassSubject", back_populates="course", cascade="all, delete-orphan")
 
     # Define uma representação em string para o objeto Course, útil para depuração.
     def __repr__(self):

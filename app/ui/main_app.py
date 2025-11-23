@@ -174,7 +174,7 @@ class MainApp(ctk.CTk):
         self.loop.call_soon(self.loop.stop)
         self.loop.run_forever()
         # Agenda a próxima chamada a este método, criando um loop de polling.
-        self._poll_id = self.after(1, self.update_asyncio)
+        self._poll_id = self.after(20, self.update_asyncio)
 
     # Método chamado quando o usuário fecha a janela.
     def on_closing(self):

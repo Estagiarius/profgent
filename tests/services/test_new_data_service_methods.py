@@ -6,21 +6,22 @@ from app.services.data_service import DataService
 # Define uma função de teste para os métodos relacionados a Aulas (Lesson).
 def test_lesson_methods(data_service: DataService, db_session: Session):
     # --- PREPARAÇÃO ---
-    # Cria um curso e uma turma para associar as aulas.
+    # Cria um curso e uma turma e a disciplina.
     course = data_service.add_course("Science", "SCI101")
-    class_ = data_service.create_class("Grade 5 Science", course['id'])
+    class_ = data_service.create_class("Grade 5 Science")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
     today = date.today()
 
     # --- TESTE DE CRIAÇÃO ---
-    # Ação: Cria uma nova aula.
-    lesson1 = data_service.create_lesson(class_['id'], "Photosynthesis", "Content about photosynthesis.", today)
+    # Ação: Cria uma nova aula vinculada à disciplina.
+    lesson1 = data_service.create_lesson(subject['id'], "Photosynthesis", "Content about photosynthesis.", today)
     db_session.flush() # Envia a criação para o banco de teste.
     # Verificação: Garante que a aula foi criada com um ID.
     assert lesson1['id'] is not None
 
     # --- TESTE DE LEITURA (GET) ---
-    # Ação: Busca as aulas da turma.
-    lessons = data_service.get_lessons_for_class(class_['id'])
+    # Ação: Busca as aulas da disciplina.
+    lessons = data_service.get_lessons_for_subject(subject['id'])
     # Verificação: Confirma que uma aula foi encontrada e seu título está correto.
     assert len(lessons) == 1
     assert lessons[0]['title'] == "Photosynthesis"
@@ -32,7 +33,7 @@ def test_lesson_methods(data_service: DataService, db_session: Session):
     db_session.flush()
 
     # Verificação: Busca novamente a aula e confirma que todos os campos foram atualizados.
-    updated_lessons = data_service.get_lessons_for_class(class_['id'])
+    updated_lessons = data_service.get_lessons_for_subject(subject['id'])
     assert updated_lessons[0]['title'] == "Cellular Respiration"
     assert updated_lessons[0]['content'] == "New content."
     assert updated_lessons[0]['date'] == new_date.isoformat()
@@ -42,19 +43,19 @@ def test_lesson_methods(data_service: DataService, db_session: Session):
     data_service.delete_lesson(lesson1['id'])
     db_session.flush()
     # Verificação: Confirma que não há mais aulas na turma.
-    lessons_after_delete = data_service.get_lessons_for_class(class_['id'])
+    lessons_after_delete = data_service.get_lessons_for_subject(subject['id'])
     assert len(lessons_after_delete) == 0
 
 # Define uma função de teste para os métodos relacionados a Incidentes.
 def test_incident_methods(data_service: DataService):
     # --- PREPARAÇÃO ---
     student = data_service.add_student("Test", "Student")
-    course = data_service.add_course("History", "HIS101")
-    class_ = data_service.create_class("Grade 5 History", course['id'])
+    # course = data_service.add_course("History", "HIS101")
+    class_ = data_service.create_class("Grade 5 History")
     today = date.today()
 
     # --- TESTE DE CRIAÇÃO E LEITURA ---
-    # Ação: Cria um novo incidente.
+    # Ação: Cria um novo incidente (vinculado à turma e aluno, independente de disciplina).
     data_service.create_incident(class_['id'], student['id'], "Excellent participation.", today)
 
     # Ação: Busca os incidentes da turma.
@@ -67,9 +68,9 @@ def test_incident_methods(data_service: DataService):
 def test_analysis_methods(data_service: DataService):
     # --- PREPARAÇÃO ---
     # Cria uma estrutura complexa de dados com vários alunos, notas e incidentes
-    # para simular um cenário realista de análise de risco.
     course = data_service.add_course("Math", "MAT101")
-    class_ = data_service.create_class("Grade 6 Math", course['id'])
+    class_ = data_service.create_class("Grade 6 Math")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
 
     # Alunos com diferentes perfis.
     student_ok = data_service.add_student("Alice", "Aventura") # Boas notas, sem incidentes
@@ -83,9 +84,9 @@ def test_analysis_methods(data_service: DataService):
     data_service.add_student_to_class(student_high_incidents['id'], class_['id'], 3)
     data_service.add_student_to_class(student_both['id'], class_['id'], 4)
 
-    # Cria avaliações com pesos diferentes.
-    exam1 = data_service.add_assessment(class_['id'], "Midterm Exam", 4.0) # Peso 4
-    exam2 = data_service.add_assessment(class_['id'], "Final Exam", 6.0) # Peso 6
+    # Cria avaliações com pesos diferentes na disciplina.
+    exam1 = data_service.add_assessment(subject['id'], "Midterm Exam", 4.0) # Peso 4
+    exam2 = data_service.add_assessment(subject['id'], "Final Exam", 6.0) # Peso 6
 
     # Adiciona notas para cada aluno.
     data_service.add_grade(student_ok['id'], exam1['id'], 8.0)

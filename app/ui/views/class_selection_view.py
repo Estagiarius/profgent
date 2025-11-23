@@ -61,13 +61,9 @@ class ClassSelectionView(ctk.CTkFrame):
         class_name_label = ctk.CTkLabel(card, text=class_data["name"], font=ctk.CTkFont(size=16, weight="bold"))
         class_name_label.grid(row=0, column=0, padx=15, pady=(15, 5), sticky="w")
 
-        # Rótulo com o nome do curso.
-        course_name_label = ctk.CTkLabel(card, text=class_data["course_name"], font=ctk.CTkFont(size=12))
-        course_name_label.grid(row=1, column=0, padx=15, pady=0, sticky="w")
-
         # Rótulo com a contagem de alunos.
         student_count_label = ctk.CTkLabel(card, text=f"{class_data['student_count']} alunos matriculados", font=ctk.CTkFont(size=10))
-        student_count_label.grid(row=2, column=0, padx=15, pady=(5, 10), sticky="w")
+        student_count_label.grid(row=1, column=0, padx=15, pady=(5, 10), sticky="w")
 
         # Frame para agrupar os botões de ação (Detalhes, Editar, Excluir).
         actions_frame = ctk.CTkFrame(card)
@@ -120,42 +116,28 @@ class ClassSelectionView(ctk.CTkFrame):
 
     # Abre o pop-up para adicionar uma nova turma.
     def add_class_popup(self):
-        # Busca os cursos disponíveis para preencher o dropdown.
-        courses_data = data_service.get_all_courses()
-        # Se não houver cursos, exibe um erro e impede a criação da turma.
-        if not courses_data:
-            messagebox.showerror("Erro", "Nenhuma disciplina disponível. Adicione uma disciplina primeiro na tela de Gestão de Dados.")
-            return
-
-        course_names = [c["course_name"] for c in courses_data]
-
         # Função de callback para o diálogo de adição.
         def save_callback(data):
             class_name = data.get("name")
-            selected_course_name = data.get("course")
 
-            if not class_name or not selected_course_name:
-                messagebox.showerror("Erro", "O nome da turma e a disciplina são obrigatórios.")
+            if not class_name:
+                messagebox.showerror("Erro", "O nome da turma é obrigatório.")
                 return
 
-            # Encontra o objeto do curso correspondente ao nome selecionado.
-            selected_course = next((c for c in courses_data if c["course_name"] == selected_course_name), None)
-
-            if selected_course:
-                try:
-                    # Chama o serviço para criar a nova turma.
-                    data_service.create_class(name=class_name, course_id=selected_course["id"])
-                    # Atualiza a lista de cards.
-                    self.populate_class_cards()
-                except ValueError as e:
-                    messagebox.showerror("Erro", str(e))
-                except Exception as e:
-                    messagebox.showerror("Erro", f"Erro ao criar turma: {e}")
+            try:
+                # Chama o serviço para criar a nova turma (agora sem curso obrigatório).
+                data_service.create_class(name=class_name)
+                # Atualiza a lista de cards.
+                self.populate_class_cards()
+            except ValueError as e:
+                messagebox.showerror("Erro", str(e))
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao criar turma: {e}")
 
         # Configuração dos campos para o diálogo de adição.
         fields = {"name": "Nome da Turma"}
-        dropdowns = {"course": ("Disciplina", course_names)}
-        AddDialog(self, "Adicionar Nova Turma", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
+        # Dropdowns removido, pois não selecionamos mais o curso na criação.
+        AddDialog(self, "Adicionar Nova Turma", fields=fields, dropdowns=None, save_callback=save_callback)
 
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs):

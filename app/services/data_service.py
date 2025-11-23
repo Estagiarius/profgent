@@ -11,6 +11,7 @@ from app.models.student import Student
 from app.models.course import Course
 from app.models.grade import Grade
 from app.models.class_ import Class
+from app.models.class_subject import ClassSubject
 from app.models.class_enrollment import ClassEnrollment
 from app.models.assessment import Assessment
 from app.models.lesson import Lesson
@@ -212,23 +213,36 @@ class DataService:
     # Método para buscar um curso pelo nome.
     def get_course_by_name(self, name: str) -> dict | None:
         with self._get_db() as db:
-            # Usa 'joinedload' para carregar as turmas relacionadas na mesma consulta, otimizando o desempenho.
-            course = db.query(Course).options(joinedload(Course.classes)).filter(func.lower(Course.course_name) == name.lower()).first()
+            course = db.query(Course).filter(func.lower(Course.course_name) == name.lower()).first()
             if course:
-                course_data = {"id": course.id, "course_name": course.course_name, "course_code": course.course_code}
-                course_data["classes"] = [{"id": c.id, "name": c.name} for c in course.classes]
-                return course_data
+                return {"id": course.id, "course_name": course.course_name, "course_code": course.course_code}
             return None
 
     # Método para buscar um curso pelo ID.
     def get_course_by_id(self, course_id: int) -> dict | None:
         with self._get_db() as db:
-            # Também usa 'joinedload' para carregar as turmas.
-            course = db.query(Course).options(joinedload(Course.classes)).filter(Course.id == course_id).first()
+            # Carrega também as turmas associadas através de class_subjects
+            course = db.query(Course).options(
+                joinedload(Course.class_subjects).joinedload(ClassSubject.class_)
+            ).filter(Course.id == course_id).first()
+
             if course:
-                course_data = {"id": course.id, "course_name": course.course_name, "course_code": course.course_code}
-                course_data["classes"] = [{"id": c.id, "name": c.name} for c in course.classes]
-                return course_data
+                # Monta a lista de turmas onde este curso é ministrado
+                classes_list = []
+                for cs in course.class_subjects:
+                    if cs.class_:
+                        classes_list.append({
+                            "id": cs.class_.id,
+                            "name": cs.class_.name,
+                            "class_subject_id": cs.id
+                        })
+
+                return {
+                    "id": course.id,
+                    "course_name": course.course_name,
+                    "course_code": course.course_code,
+                    "classes": classes_list
+                }
             return None
 
     # Método para atualizar um curso.
@@ -242,25 +256,49 @@ class DataService:
     # Método para deletar um curso.
     def delete_course(self, course_id: int):
         with self._get_db() as db:
-            course = db.query(Course).filter(Course.id == course_id).first()
-            # Só permite a exclusão se o curso não tiver turmas associadas.
-            if course and not course.classes:
-                db.delete(course)
+            # Verifica se há associações com turmas (ClassSubject)
+            subjects = db.query(ClassSubject).filter(ClassSubject.course_id == course_id).first()
+            if not subjects:
+                course = db.query(Course).filter(Course.id == course_id).first()
+                if course:
+                    db.delete(course)
 
-    # Método para criar uma nova turma.
-    def create_class(self, name: str, course_id: int, calculation_method: str = 'arithmetic') -> dict | None:
-        if not name or not course_id: return None
+    # Método para criar uma nova turma (Agora sem vincular um curso obrigatório).
+    def create_class(self, name: str, calculation_method: str = 'arithmetic') -> dict | None:
+        if not name: return None
 
         with self._get_db() as db:
             # Verifica se já existe uma turma com o mesmo nome (case-insensitive)
             if db.query(Class).filter(func.lower(Class.name) == func.lower(name)).first():
                 raise ValueError(f"Uma turma com o nome '{name}' já existe.")
 
-            new_class = Class(name=name, course_id=course_id, calculation_method=calculation_method)
+            new_class = Class(name=name, calculation_method=calculation_method)
             db.add(new_class)
             db.flush()
             db.refresh(new_class)
             return {"id": new_class.id, "name": new_class.name}
+
+    # Adiciona uma disciplina a uma turma.
+    def add_subject_to_class(self, class_id: int, course_id: int) -> dict | None:
+        if not all([class_id, course_id]): return None
+
+        with self._get_db() as db:
+            # Verifica se já existe
+            existing = db.query(ClassSubject).filter_by(class_id=class_id, course_id=course_id).first()
+            if existing:
+                return {"id": existing.id, "class_id": existing.class_id, "course_id": existing.course_id}
+
+            new_subject = ClassSubject(class_id=class_id, course_id=course_id)
+            db.add(new_subject)
+            db.flush()
+            db.refresh(new_subject)
+            return {"id": new_subject.id, "class_id": new_subject.class_id, "course_id": new_subject.course_id}
+
+    # Busca todas as disciplinas de uma turma.
+    def get_subjects_for_class(self, class_id: int) -> list[dict]:
+        with self._get_db() as db:
+            subjects = db.query(ClassSubject).options(joinedload(ClassSubject.course)).filter(ClassSubject.class_id == class_id).all()
+            return [{"id": s.id, "course_id": s.course.id, "course_name": s.course.course_name, "course_code": s.course.course_code} for s in subjects]
 
     # Método para buscar uma turma pelo nome.
     def get_class_by_name(self, name: str) -> dict | None:
@@ -273,26 +311,17 @@ class DataService:
     # Método para buscar todas as turmas.
     def get_all_classes(self) -> list[dict]:
         with self._get_db() as db:
-            # Carrega o curso e as matrículas relacionadas para evitar consultas extras.
-            classes = db.query(Class).options(joinedload(Class.course), joinedload(Class.enrollments)).order_by(Class.name).all()
+            # Carrega as matrículas relacionadas para evitar consultas extras.
+            classes = db.query(Class).options(joinedload(Class.enrollments)).order_by(Class.name).all()
             # Calcula a contagem de alunos para cada turma.
-            return [{"id": c.id, "name": c.name, "course_name": c.course.course_name, "student_count": len(c.enrollments)} for c in classes]
+            return [{"id": c.id, "name": c.name, "student_count": len(c.enrollments)} for c in classes]
 
     # Método para buscar uma turma pelo ID.
-    def get_class_by_id(self, class_id: int, simplified: bool = False) -> dict | None:
+    def get_class_by_id(self, class_id: int) -> dict | None:
         with self._get_db() as db:
-            query = db.query(Class)
-            # Se 'simplified' for False, carrega também as avaliações e o curso.
-            if not simplified:
-                query = query.options(joinedload(Class.assessments), joinedload(Class.course))
-
-            class_ = query.filter(Class.id == class_id).first()
+            class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
-                class_data = {"id": class_.id, "name": class_.name}
-                if not simplified:
-                    class_data["course_name"] = class_.course.course_name
-                    class_data["assessments"] = [{"id": a.id, "name": a.name, "weight": a.weight} for a in class_.assessments]
-                return class_data
+                return {"id": class_.id, "name": class_.name}
             return None
 
     # Método para atualizar uma turma.
@@ -365,15 +394,15 @@ class DataService:
         with self._get_db() as db:
             return self._get_next_call_number(db, class_id)
 
-    # Método para adicionar uma nova avaliação a uma turma.
-    def add_assessment(self, class_id: int, name: str, weight: float) -> dict | None:
-        if not all([class_id, name, weight is not None]): return None
-        assessment = Assessment(class_id=class_id, name=name, weight=weight)
+    # Método para adicionar uma nova avaliação a uma disciplina de uma turma.
+    def add_assessment(self, class_subject_id: int, name: str, weight: float) -> dict | None:
+        if not all([class_subject_id, name, weight is not None]): return None
+        assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight)
         with self._get_db() as db:
             db.add(assessment)
             db.flush()
             db.refresh(assessment)
-            return {"id": assessment.id, "name": assessment.name, "weight": assessment.weight, "class_id": assessment.class_id}
+            return {"id": assessment.id, "name": assessment.name, "weight": assessment.weight, "class_subject_id": assessment.class_subject_id}
 
     # Método para atualizar uma avaliação.
     def update_assessment(self, assessment_id: int, name: str, weight: float):
@@ -392,20 +421,28 @@ class DataService:
             if assessment:
                 db.delete(assessment)
 
+    # Método para buscar avaliações de uma disciplina da turma.
+    def get_assessments_for_subject(self, class_subject_id: int) -> list[dict]:
+        with self._get_db() as db:
+            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
+            return [{"id": a.id, "name": a.name, "weight": a.weight} for a in assessments]
+
     # Método para buscar todas as notas (geralmente para fins administrativos).
     def get_all_grades(self) -> list[dict]:
         with self._get_db() as db:
             grades = db.query(Grade).all()
             return [{"id": g.id, "student_id": g.student_id, "assessment_id": g.assessment_id, "score": g.score} for g in grades]
 
-    # Método para buscar todas as notas de uma turma específica.
-    def get_grades_for_class(self, class_id: int) -> list[dict]:
+    # Método para buscar todas as notas de uma disciplina específica da turma.
+    def get_grades_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            # Consulta complexa que busca notas apenas de alunos com status 'Active' na turma.
+            # Consulta complexa que busca notas apenas de alunos com status 'Active' na turma associada à disciplina.
+            # Grade -> Assessment -> ClassSubject -> Class -> Enrollment
             grades = (db.query(Grade).options(joinedload(Grade.assessment))
-                      .join(Assessment).join(ClassEnrollment, Grade.student_id == ClassEnrollment.student_id)
-                      .filter(Assessment.class_id == class_id)
-                      .filter(ClassEnrollment.class_id == class_id)
+                      .join(Assessment, Grade.assessment_id == Assessment.id)
+                      .join(ClassSubject, Assessment.class_subject_id == ClassSubject.id)
+                      .join(ClassEnrollment, (Grade.student_id == ClassEnrollment.student_id) & (ClassSubject.class_id == ClassEnrollment.class_id))
+                      .filter(Assessment.class_subject_id == class_subject_id)
                       .filter(ClassEnrollment.status == 'Active').all())
             return [
                 {"id": g.id, "student_id": g.student_id, "assessment_id": g.assessment_id, "score": g.score, "assessment_name": g.assessment.name}
@@ -426,36 +463,56 @@ class DataService:
                 )
                 .join(Student, Grade.student_id == Student.id)
                 .join(Assessment, Grade.assessment_id == Assessment.id)
-                .join(Class, Assessment.class_id == Class.id)
-                .join(Course, Class.course_id == Course.id)
+                .join(ClassSubject, Assessment.class_subject_id == ClassSubject.id)
+                .join(Class, ClassSubject.class_id == Class.id)
+                .join(Course, ClassSubject.course_id == Course.id)
                 .all()
             )
             # Converte o resultado (que é uma lista de Row objects) em uma lista de dicionários.
             return [row._asdict() for row in grades_query]
 
-    # Método para gerar um resumo de desempenho de um aluno em uma turma.
+    # Método para gerar um resumo de desempenho de um aluno em uma turma (geral ou por disciplina?).
+    # Vou manter a assinatura, mas internamente vou considerar todas as disciplinas.
+    # No futuro, isso poderia ser filtrado por disciplina.
     def get_student_performance_summary(self, student_id: int, class_id: int) -> dict | None:
-        class_info = self.get_class_by_id(class_id)
-        if not class_info:
-            return None
+        # Como agora temos várias disciplinas, calcular uma média global pode ser complexo (média das médias?).
+        # Vou calcular a média de todas as notas existentes, ponderadas pelos seus pesos, ignorando a separação de matérias por enquanto,
+        # ou assumindo que o "Resumo" deve ser detalhado.
+        # Para manter a compatibilidade, vou calcular uma média simples de todas as avaliações de todas as matérias da turma.
 
-        # Reutiliza outros métodos do serviço para obter os dados necessários.
-        grades = self.get_grades_for_class(class_id)
-        student_grades = [g for g in grades if g['student_id'] == student_id]
+        with self._get_db() as db:
+            # Pega todas as disciplinas da turma
+            subjects = db.query(ClassSubject).filter(ClassSubject.class_id == class_id).all()
+            if not subjects:
+                return {"weighted_average": 0.0, "incident_count": 0}
 
-        assessments = class_info.get('assessments', [])
+            subject_ids = [s.id for s in subjects]
 
-        # Calcula a média ponderada.
-        weighted_average = self.calculate_weighted_average(student_id, student_grades, assessments)
+            # Pega todas as avaliações de todas as disciplinas
+            assessments = db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).all()
+            assessment_ids = [a.id for a in assessments]
+            assessments_data = [{"id": a.id, "weight": a.weight} for a in assessments]
 
-        incidents = self.get_incidents_for_class(class_id)
-        student_incidents = [i for i in incidents if i['student_id'] == student_id]
+            if not assessments:
+                # Se não há avaliações, retorna 0
+                # Incidentes ainda contam
+                incidents_count = db.query(func.count(Incident.id)).filter(Incident.class_id == class_id, Incident.student_id == student_id).scalar()
+                return {"weighted_average": 0.0, "incident_count": incidents_count}
 
-        # Retorna um resumo com a média e a contagem de incidentes.
-        return {
-            "weighted_average": weighted_average,
-            "incident_count": len(student_incidents)
-        }
+            # Pega todas as notas do aluno nessas avaliações
+            grades = db.query(Grade).filter(Grade.student_id == student_id, Grade.assessment_id.in_(assessment_ids)).all()
+            grades_data = [{"assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id} for g in grades]
+
+            # Calcula a média
+            weighted_average = self.calculate_weighted_average(student_id, grades_data, assessments_data)
+
+            # Incidentes
+            incidents_count = db.query(func.count(Incident.id)).filter(Incident.class_id == class_id, Incident.student_id == student_id).scalar()
+
+            return {
+                "weighted_average": weighted_average,
+                "incident_count": incidents_count
+            }
 
     # Método para identificar alunos em situação de risco (notas baixas ou muitos incidentes).
     def get_students_at_risk(self, class_id: int, grade_threshold: float = 5.0, incident_threshold: int = 2) -> list[dict]:
@@ -480,9 +537,9 @@ class DataService:
         return at_risk_students
 
     # Método para criar um novo registro de aula.
-    def create_lesson(self, class_id: int, title: str, content: str, lesson_date: date) -> dict | None:
-        if not all([class_id, title, lesson_date]): return None
-        new_lesson = Lesson(class_id=class_id, title=title, content=content, date=lesson_date)
+    def create_lesson(self, class_subject_id: int, title: str, content: str, lesson_date: date) -> dict | None:
+        if not all([class_subject_id, title, lesson_date]): return None
+        new_lesson = Lesson(class_subject_id=class_subject_id, title=title, content=content, date=lesson_date)
         with self._get_db() as db:
             db.add(new_lesson)
             db.flush()
@@ -505,10 +562,10 @@ class DataService:
             if lesson:
                 db.delete(lesson)
 
-    # Método para buscar todas as aulas de uma turma.
-    def get_lessons_for_class(self, class_id: int) -> list[dict]:
+    # Método para buscar todas as aulas de uma disciplina da turma.
+    def get_lessons_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            lessons = db.query(Lesson).filter(Lesson.class_id == class_id).order_by(Lesson.date.desc()).all()
+            lessons = db.query(Lesson).filter(Lesson.class_subject_id == class_subject_id).order_by(Lesson.date.desc()).all()
             return [{"id": l.id, "title": l.title, "content": l.content, "date": l.date.isoformat()} for l in lessons]
 
     # Método para criar um novo incidente.
@@ -550,11 +607,11 @@ class DataService:
             if grade:
                 db.delete(grade)
 
-    # Método para inserir ou atualizar notas em lote para uma turma (upsert).
-    def upsert_grades_for_class(self, class_id: int, grades_data: list[dict]):
+    # Método para inserir ou atualizar notas em lote para uma disciplina de uma turma (upsert).
+    def upsert_grades_for_subject(self, class_subject_id: int, grades_data: list[dict]):
         with self._get_db() as db:
-            # Busca todas as notas existentes para a turma e as armazena em um mapa para acesso rápido.
-            existing_grades_query = db.query(Grade).join(Assessment).filter(Assessment.class_id == class_id)
+            # Busca todas as notas existentes para a disciplina e as armazena em um mapa para acesso rápido.
+            existing_grades_query = db.query(Grade).join(Assessment).filter(Assessment.class_subject_id == class_subject_id)
             existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
             # Itera sobre os novos dados de nota.
             for grade_info in grades_data:

@@ -20,16 +20,13 @@ from app.core.tools.tool_executor import ToolExecutor
 # --- Importação das Ferramentas (Tools) ---
 # Importa as ferramentas de leitura e escrita do banco de dados.
 from app.tools.database_tools import (
-    get_student_grade, list_courses_for_student, get_class_average,
+    get_student_grades_by_course, list_courses_for_student,
     list_all_classes, get_class_roster,
     add_new_student, add_new_course, add_new_grade,
-    create_new_class, create_new_assessment,
+    create_new_class, add_subject_to_class, create_new_assessment,
     add_new_lesson, register_incident,
-    update_student_name, update_class_name, delete_student_record, delete_class_record,
-    enroll_existing_student, change_student_status,
-    list_lessons, update_lesson, delete_lesson_record, list_incidents,
-    list_all_courses, update_course_name, delete_course_record,
-    update_assessment, delete_assessment_record
+    update_student_name, enroll_existing_student,
+    list_all_courses
 )
 # Importa as ferramentas de busca na internet.
 from app.tools.internet_tools import search_internet
@@ -90,9 +87,8 @@ class AssistantService:
     # Método privado para registrar as ferramentas que o assistente pode usar.
     def _register_tools(self):
         # Ferramentas de leitura
-        self.tool_registry.register(get_student_grade)
+        self.tool_registry.register(get_student_grades_by_course)
         self.tool_registry.register(list_courses_for_student)
-        self.tool_registry.register(get_class_average)
         self.tool_registry.register(list_all_classes)
         self.tool_registry.register(get_class_roster)
         # Ferramentas de análise
@@ -112,27 +108,14 @@ class AssistantService:
         self.tool_registry.register(add_new_course)
         self.tool_registry.register(add_new_grade)
         self.tool_registry.register(create_new_class)
+        self.tool_registry.register(add_subject_to_class)
         self.tool_registry.register(create_new_assessment)
         self.tool_registry.register(add_new_lesson)
         self.tool_registry.register(register_incident)
         # Ferramentas de manutenção e matrícula
         self.tool_registry.register(update_student_name)
-        self.tool_registry.register(update_class_name)
-        self.tool_registry.register(delete_student_record)
-        self.tool_registry.register(delete_class_record)
         self.tool_registry.register(enroll_existing_student)
-        self.tool_registry.register(change_student_status)
-        # Ferramentas operacionais (Aulas e Incidentes)
-        self.tool_registry.register(list_lessons)
-        self.tool_registry.register(update_lesson)
-        self.tool_registry.register(delete_lesson_record)
-        self.tool_registry.register(list_incidents)
-        # Ferramentas de refinamento (Cursos e Avaliações)
         self.tool_registry.register(list_all_courses)
-        self.tool_registry.register(update_course_name)
-        self.tool_registry.register(delete_course_record)
-        self.tool_registry.register(update_assessment)
-        self.tool_registry.register(delete_assessment_record)
 
     # Método privado para inicializar o provedor de LLM ativo.
     def _initialize_provider(self):

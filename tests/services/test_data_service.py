@@ -29,27 +29,33 @@ def test_add_course(data_service: DataService):
 
 def test_add_assessment(data_service: DataService):
     """Testa a adição de uma nova avaliação."""
-    # Preparação: Cria um curso e uma turma.
+    # Preparação: Cria um curso e uma turma e associa.
     course = data_service.add_course("Science 101", "SCI101")
-    class_ = data_service.create_class("1A", course['id'])
-    # Ação: Adiciona uma avaliação à turma.
-    assessment = data_service.add_assessment(class_['id'], "Midterm", 1.0)
+    class_ = data_service.create_class("1A") # Nova assinatura: apenas nome
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
+
+    # Ação: Adiciona uma avaliação à disciplina da turma.
+    assessment = data_service.add_assessment(subject['id'], "Midterm", 1.0)
     # Verificação: Confirma que os dados da avaliação estão corretos.
     assert assessment['name'] == "Midterm"
-    assert assessment['class_id'] == class_['id']
+    assert assessment['class_subject_id'] == subject['id']
 
 def test_add_grade(data_service: DataService):
     """Testa a adição de uma nova nota."""
-    # Preparação: Cria aluno, curso, turma, avaliação e matricula o aluno.
+    # Preparação: Cria aluno, curso, turma, disciplina, avaliação e matricula o aluno.
     student = data_service.add_student("Jane", "Doe")
     course = data_service.add_course("Science 101", "SCI101")
-    class_ = data_service.create_class("1A", course['id'])
-    assessment = data_service.add_assessment(class_['id'], "Midterm", 1.0)
+    class_ = data_service.create_class("1A")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
+
+    assessment = data_service.add_assessment(subject['id'], "Midterm", 1.0)
     data_service.add_student_to_class(student['id'], class_['id'], 1)
+
     # Ação: Adiciona uma nota para o aluno na avaliação.
     data_service.add_grade(student['id'], assessment['id'], 85.5)
+
     # Verificação: Confirma que a nota foi salva corretamente.
-    grades = data_service.get_grades_for_class(class_['id'])
+    grades = data_service.get_grades_for_subject(subject['id'])
     assert len(grades) == 1
     assert grades[0]['score'] == 85.5
 
@@ -80,10 +86,12 @@ def test_delete_student(data_service: DataService, db_session):
     # Preparação: Cria um aluno e uma nota para ele.
     student = data_service.add_student("John", "Doe")
     course = data_service.add_course("History 101", "HIST101")
-    class_ = data_service.create_class("1A", course['id'])
-    assessment = data_service.add_assessment(class_['id'], "Final Exam", 1.0)
+    class_ = data_service.create_class("1A")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
+    assessment = data_service.add_assessment(subject['id'], "Final Exam", 1.0)
     data_service.add_grade(student['id'], assessment['id'], 92.0)
     db_session.flush()
+
     assert data_service.get_student_count() == 1
     assert len(data_service.get_all_grades()) == 1
     # Ação: Deleta o aluno.
@@ -101,15 +109,15 @@ def test_get_student_by_name(data_service: DataService):
 
 def test_create_class(data_service: DataService):
     """Testa a criação de uma nova turma."""
-    course = data_service.add_course("Biology 101", "BIO101")
-    data_service.create_class("1A", course['id'])
+    # course = data_service.add_course("Biology 101", "BIO101") # Não é mais necessário
+    data_service.create_class("1A")
     assert len(data_service.get_all_classes()) == 1
 
 def test_add_student_to_class(data_service: DataService):
     """Testa a matrícula de um aluno em uma turma."""
     student = data_service.add_student("Alice", "Wonderland")
-    course = data_service.add_course("Literature", "LIT101")
-    class_ = data_service.create_class("2B", course['id'])
+    # course = data_service.add_course("Literature", "LIT101") # Não é mais necessário
+    class_ = data_service.create_class("2B")
     # Ação: Matricula o aluno.
     enrollment = data_service.add_student_to_class(student['id'], class_['id'], 1)
     # Verificação: Confirma que os IDs na matrícula estão corretos.
@@ -120,8 +128,8 @@ def test_get_students_in_class(data_service: DataService):
     """Testa a busca de todos os alunos matriculados em uma turma."""
     student1 = data_service.add_student("Student", "One")
     student2 = data_service.add_student("Student", "Two")
-    course = data_service.add_course("Gym", "GYM101")
-    class_ = data_service.create_class("3C", course['id'])
+    # course = data_service.add_course("Gym", "GYM101") # Não é mais necessário
+    class_ = data_service.create_class("3C")
     data_service.add_student_to_class(student1['id'], class_['id'], 1)
     data_service.add_student_to_class(student2['id'], class_['id'], 2)
     enrolled_students = data_service.get_enrollments_for_class(class_['id'])
@@ -130,8 +138,8 @@ def test_get_students_in_class(data_service: DataService):
 def test_update_enrollment_status(data_service: DataService, db_session):
     """Testa a atualização do status de uma matrícula."""
     student = data_service.add_student("Student", "One")
-    course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
+    # course = data_service.add_course("Course", "C101") # Não é mais necessário
+    class_ = data_service.create_class("Class")
     enrollment = data_service.add_student_to_class(student['id'], class_['id'], 1)
     db_session.flush()
     assert enrollment['status'] == "Active"
@@ -146,8 +154,8 @@ def test_get_unenrolled_students(data_service: DataService):
     """Testa a busca de alunos não matriculados em uma turma específica."""
     student1 = data_service.add_student("Enrolled", "Student")
     data_service.add_student("Unenrolled", "Student")
-    course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
+    # course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class")
     data_service.add_student_to_class(student1['id'], class_['id'], 1)
     # Ação: Busca os alunos não matriculados.
     unenrolled = data_service.get_unenrolled_students(class_['id'])
@@ -160,8 +168,8 @@ def test_get_students_with_active_enrollment(data_service: DataService):
     student_active = data_service.add_student("Active", "Student")
     student_inactive = data_service.add_student("Inactive", "Student")
     data_service.add_student("None", "Student") # Aluno sem matrícula
-    course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
+    # course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class")
     data_service.add_student_to_class(student_active['id'], class_['id'], 1, status="Active")
     data_service.add_student_to_class(student_inactive['id'], class_['id'], 2, status="Inactive")
     # Ação: Busca os alunos ativos.
@@ -173,8 +181,8 @@ def test_get_students_with_active_enrollment(data_service: DataService):
 def test_get_next_call_number(data_service: DataService):
     """Testa o cálculo do próximo número de chamada para uma turma."""
     student1 = data_service.add_student("Student", "One")
-    course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
+    # course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Class")
     # Verificação 1: Turma vazia, próximo número deve ser 1.
     assert data_service.get_next_call_number(class_['id']) == 1
     # Preparação: Adiciona um aluno com número de chamada 5.
@@ -183,18 +191,22 @@ def test_get_next_call_number(data_service: DataService):
     assert data_service.get_next_call_number(class_['id']) == 6
 
 def test_get_grades_for_class_filters_inactive_students(data_service: DataService):
-    """Testa se get_grades_for_class retorna apenas notas de alunos ativos."""
+    """Testa se get_grades_for_subject retorna apenas notas de alunos ativos."""
     student_active = data_service.add_student("Active", "Student")
     student_inactive = data_service.add_student("Inactive", "Student")
     course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
-    assessment = data_service.add_assessment(class_['id'], "Test", 1.0)
+    class_ = data_service.create_class("Class")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
+    assessment = data_service.add_assessment(subject['id'], "Test", 1.0)
+
     data_service.add_student_to_class(student_active['id'], class_['id'], 1, status="Active")
     data_service.add_student_to_class(student_inactive['id'], class_['id'], 2, status="Inactive")
+
     data_service.add_grade(student_active['id'], assessment['id'], 100)
     data_service.add_grade(student_inactive['id'], assessment['id'], 50)
-    # Ação: Busca as notas da turma.
-    grades = data_service.get_grades_for_class(class_['id'])
+
+    # Ação: Busca as notas da disciplina.
+    grades = data_service.get_grades_for_subject(subject['id'])
     # Verificação: Confirma que apenas a nota do aluno ativo foi retornada.
     assert len(grades) == 1
     assert grades[0]['student_id'] == student_active['id']
@@ -202,33 +214,40 @@ def test_get_grades_for_class_filters_inactive_students(data_service: DataServic
 def test_update_assessment(data_service: DataService, db_session):
     """Testa a atualização das informações de uma avaliação."""
     course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
-    assessment = data_service.add_assessment(class_['id'], "Old Name", 1.0)
+    class_ = data_service.create_class("Class")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
+
+    assessment = data_service.add_assessment(subject['id'], "Old Name", 1.0)
     db_session.flush()
     # Ação: Atualiza o nome e o peso da avaliação.
     data_service.update_assessment(assessment['id'], "New Name", 2.0)
     db_session.flush()
     # Verificação: Busca novamente a avaliação e confirma as mudanças.
-    updated_assessment = data_service.get_class_by_id(class_['id'])['assessments'][0]
-    assert updated_assessment['name'] == "New Name"
-    assert updated_assessment['weight'] == 2.0
+    updated_assessments = data_service.get_assessments_for_subject(subject['id'])
+    assert updated_assessments[0]['name'] == "New Name"
+    assert updated_assessments[0]['weight'] == 2.0
 
 def test_delete_assessment(data_service: DataService, db_session):
     """Testa a exclusão de uma avaliação e suas notas associadas."""
     student = data_service.add_student("Student", "One")
     course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
-    assessment = data_service.add_assessment(class_['id'], "Test to Delete", 1.0)
+    class_ = data_service.create_class("Class")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
+
+    assessment = data_service.add_assessment(subject['id'], "Test to Delete", 1.0)
     data_service.add_student_to_class(student['id'], class_['id'], 1)
     data_service.add_grade(student['id'], assessment['id'], 100)
     db_session.flush()
-    assert len(data_service.get_class_by_id(class_['id'])['assessments']) == 1
+
+    assert len(data_service.get_assessments_for_subject(subject['id'])) == 1
     assert len(data_service.get_all_grades()) == 1
+
     # Ação: Deleta a avaliação.
     data_service.delete_assessment(assessment['id'])
     db_session.flush()
+
     # Verificação: Confirma que a avaliação e a nota foram removidas.
-    assert len(data_service.get_class_by_id(class_['id'])['assessments']) == 0
+    assert len(data_service.get_assessments_for_subject(subject['id'])) == 0
     assert len(data_service.get_all_grades()) == 0
 
 def test_grade_grid_logic(data_service: DataService, db_session):
@@ -237,33 +256,42 @@ def test_grade_grid_logic(data_service: DataService, db_session):
     student1 = data_service.add_student("Student", "One")
     student2 = data_service.add_student("Student", "Two")
     course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
+    class_ = data_service.create_class("Class")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
+
     data_service.add_student_to_class(student1['id'], class_['id'], 1)
     data_service.add_student_to_class(student2['id'], class_['id'], 2)
-    assess1 = data_service.add_assessment(class_['id'], "Test 1", 1.0) # Peso 1
-    assess2 = data_service.add_assessment(class_['id'], "Test 2", 2.0) # Peso 2
+
+    assess1 = data_service.add_assessment(subject['id'], "Test 1", 1.0) # Peso 1
+    assess2 = data_service.add_assessment(subject['id'], "Test 2", 2.0) # Peso 2
     assessments = [assess1, assess2]
+
     # Ação 1: Adiciona uma nota para o aluno 1.
     data_service.add_grade(student1['id'], assess1['id'], 8.0)
     db_session.flush()
-    grades = data_service.get_grades_for_class(class_['id'])
+
+    grades = data_service.get_grades_for_subject(subject['id'])
     # Verificação 1: Calcula a média ponderada. (8.0 * 1.0 + 0.0 * 2.0) / (1.0 + 2.0) = 8/3 = 2.67
     avg1 = data_service.calculate_weighted_average(student1['id'], grades, assessments)
     assert round(avg1, 2) == 2.67
+
     # Verificação 2: Aluno 2 não tem notas, a média é 0.
     avg2 = data_service.calculate_weighted_average(student2['id'], grades, assessments)
     assert avg2 == 0.0
+
     # Ação 2: Usa o upsert para atualizar uma nota e adicionar duas novas.
     grades_to_upsert = [
         {'student_id': student1['id'], 'assessment_id': assess1['id'], 'score': 9.0}, # Atualiza
         {'student_id': student1['id'], 'assessment_id': assess2['id'], 'score': 7.0}, # Adiciona
         {'student_id': student2['id'], 'assessment_id': assess1['id'], 'score': 10.0} # Adiciona
     ]
-    data_service.upsert_grades_for_class(class_['id'], grades_to_upsert)
+    data_service.upsert_grades_for_subject(subject['id'], grades_to_upsert)
     db_session.flush()
+
     # Verificação 3: Calcula as novas médias.
-    final_grades = data_service.get_grades_for_class(class_['id'])
+    final_grades = data_service.get_grades_for_subject(subject['id'])
     assert len(final_grades) == 3
+
     # Média Aluno 1: (9.0 * 1.0 + 7.0 * 2.0) / 3 = 23/3 = 7.67
     final_avg1 = data_service.calculate_weighted_average(student1['id'], final_grades, assessments)
     assert round(final_avg1, 2) == 7.67
@@ -274,8 +302,8 @@ def test_grade_grid_logic(data_service: DataService, db_session):
 def test_update_and_delete_class(data_service: DataService, db_session):
     """Testa a atualização e exclusão de uma turma."""
     student = data_service.add_student("Student", "One")
-    course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Old Name", course['id'])
+    # course = data_service.add_course("Course", "C101")
+    class_ = data_service.create_class("Old Name")
     data_service.add_student_to_class(student['id'], class_['id'], 1)
     db_session.flush()
     # Ação 1: Atualiza o nome da turma.
@@ -295,12 +323,15 @@ def test_update_and_delete_class(data_service: DataService, db_session):
 
 def test_get_all_grades_with_details(data_service: DataService):
     """Testa a busca de todas as notas com seus detalhes relacionais completos."""
-    # Preparação: Cria a estrutura completa de dados (aluno -> turma -> curso, nota -> avaliação -> turma).
+    # Preparação: Cria a estrutura completa de dados (aluno -> turma -> disciplina, nota -> avaliação -> disciplina).
     student = data_service.add_student("Student", "One")
     course = data_service.add_course("Course", "C101")
-    class_ = data_service.create_class("Class", course['id'])
-    assessment = data_service.add_assessment(class_['id'], "Final Exam", 1.0)
+    class_ = data_service.create_class("Class")
+    subject = data_service.add_subject_to_class(class_['id'], course['id'])
+
+    assessment = data_service.add_assessment(subject['id'], "Final Exam", 1.0)
     data_service.add_student_to_class(student['id'], class_['id'], 1)
+
     grade = data_service.add_grade(student['id'], assessment['id'], 95.0)
     # Ação: Chama o método que busca notas com detalhes.
     grades_with_details = data_service.get_all_grades_with_details()

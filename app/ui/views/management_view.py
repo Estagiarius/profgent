@@ -65,7 +65,7 @@ class ManagementView(ctk.CTkFrame):
         grades_tab = self.tab_view.tab("Notas")
         grades_tab.grid_rowconfigure(1, weight=1)
         grades_tab.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(grades_tab, text="Use a tela 'Quadro de Notas' para adicionar novas notas.").grid(row=0, column=0, padx=10, pady=10)
+        ctk.CTkLabel(grades_tab, text="Use a tela 'Quadro de Notas' na visualização da turma para adicionar novas notas.").grid(row=0, column=0, padx=10, pady=10)
         self.grades_frame = ctk.CTkScrollableFrame(grades_tab)
         self.grades_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
@@ -112,9 +112,10 @@ class ManagementView(ctk.CTkFrame):
             f = ctk.CTkFrame(self.grades_frame)
             f.pack(fill="x", pady=5)
 
+            # Atualizado para mostrar Turma e Disciplina
             label_text = (
                 f"ID: {grade['id']} | {grade['student_first_name']} {grade['student_last_name']} | "
-                f"{grade['course_name']} | {grade['assessment_name']}: {grade['score']}"
+                f"{grade['class_name']} - {grade['course_name']} | {grade['assessment_name']}: {grade['score']}"
             )
 
             ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
