@@ -105,9 +105,11 @@ class DashboardView(ctk.CTkFrame):
 
         # Agrega as notas de todas as turmas dentro do curso selecionado.
         all_grades = []
-        for class_data in selected_course['classes']:
-            grades_in_class = self.data_service.get_grades_for_class(class_data['id'])
-            all_grades.extend(grades_in_class)
+        for class_data in selected_course.get('classes', []):
+            # Usa o ID do ClassSubject para buscar notas específicas desta disciplina nesta turma
+            if 'class_subject_id' in class_data:
+                grades_in_class = self.data_service.get_grades_for_subject(class_data['class_subject_id'])
+                all_grades.extend(grades_in_class)
 
         # Chama a função utilitária para gerar o gráfico e obter o caminho do arquivo de imagem temporário.
         chart_path = create_grade_distribution_chart(all_grades, selected_course['course_name'])

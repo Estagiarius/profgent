@@ -221,9 +221,28 @@ class DataService:
     # Método para buscar um curso pelo ID.
     def get_course_by_id(self, course_id: int) -> dict | None:
         with self._get_db() as db:
-            course = db.query(Course).filter(Course.id == course_id).first()
+            # Carrega também as turmas associadas através de class_subjects
+            course = db.query(Course).options(
+                joinedload(Course.class_subjects).joinedload(ClassSubject.class_)
+            ).filter(Course.id == course_id).first()
+
             if course:
-                return {"id": course.id, "course_name": course.course_name, "course_code": course.course_code}
+                # Monta a lista de turmas onde este curso é ministrado
+                classes_list = []
+                for cs in course.class_subjects:
+                    if cs.class_:
+                        classes_list.append({
+                            "id": cs.class_.id,
+                            "name": cs.class_.name,
+                            "class_subject_id": cs.id
+                        })
+
+                return {
+                    "id": course.id,
+                    "course_name": course.course_name,
+                    "course_code": course.course_code,
+                    "classes": classes_list
+                }
             return None
 
     # Método para atualizar um curso.
