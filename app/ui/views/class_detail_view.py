@@ -31,6 +31,9 @@ class ClassDetailView(ctk.CTkFrame):
         # ID da aula que está sendo editada. Inicialmente nulo.
         self.editing_lesson_id = None
 
+        # Inicializa o dicionário de entradas de notas para evitar AttributeError
+        self.grade_entries = {}
+
         # Mapeamento entre o status exibido na UI (português) e o armazenado no banco (inglês).
         self.status_map = {"Ativo": "Active", "Inativo": "Inactive"}
         # Mapeamento reverso para exibir o status do banco na UI.
@@ -245,7 +248,7 @@ class ClassDetailView(ctk.CTkFrame):
             if not self.current_subject_id or self.current_subject_id not in self.subject_mapping.values():
                  first_subject_name = subject_names[0]
                  self.subject_combo.set(first_subject_name)
-                 self.current_subject_id = self.subject_mapping[first_subject_name]
+                 self.on_subject_change(first_subject_name)
 
     def on_subject_change(self, selected_subject_name):
         """Callback para quando a disciplina é trocada no dropdown."""
