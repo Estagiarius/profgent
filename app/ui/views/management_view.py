@@ -107,7 +107,7 @@ class ManagementView(ctk.CTkFrame):
         run_async_task(
             self._load_data_async(),
             self.main_app.loop,
-            self.main_app.thread_queue,
+            self.main_app.async_queue,
             self._populate_data_callback
         )
 
