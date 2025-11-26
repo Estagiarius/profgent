@@ -104,7 +104,12 @@ class ManagementView(ctk.CTkFrame):
         self._clear_frame(self.grades_frame)
         self._show_loading()
         # Executa a busca de dados em segundo plano e define o callback para atualizar a UI.
-        run_async_task(self._load_data_async(), self.main_app, self._populate_data_callback)
+        run_async_task(
+            self._load_data_async(),
+            self.main_app.loop,
+            self.main_app.thread_queue,
+            self._populate_data_callback
+        )
 
     async def _load_data_async(self):
         """Busca todos os dados necessários do banco de dados de forma assíncrona."""
