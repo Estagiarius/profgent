@@ -6,6 +6,7 @@ from app.ui.views.add_dialog import AddDialog
 # Importa o diálogo de entrada de texto padrão para confirmação de exclusão.
 from customtkinter import CTkInputDialog
 from tkinter import messagebox
+from app.utils.async_utils import run_async_task
 
 # Define a classe para a tela de Gestão de Dados.
 class ManagementView(ctk.CTkFrame):
@@ -15,6 +16,10 @@ class ManagementView(ctk.CTkFrame):
         self.main_app = main_app
         # Obtém a instância do DataService a partir da aplicação principal.
         self.data_service = self.main_app.data_service
+
+        # Inicializa as variáveis de dados para evitar AttributeError antes do carregamento.
+        self.all_students_data = []
+        self.active_students_data = []
 
         # Configura o layout de grade da view.
         self.grid_rowconfigure(1, weight=1) # A linha 1 (com as abas) se expande.
@@ -70,24 +75,76 @@ class ManagementView(ctk.CTkFrame):
         self.grades_frame = ctk.CTkScrollableFrame(grades_tab)
         self.grades_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
+        # Frame de carregamento com um indicador de progresso.
+        self.loading_frame = ctk.CTkFrame(self)
+        ctk.CTkLabel(self.loading_frame, text="Carregando dados...").pack(pady=(20, 10))
+        self.progress_bar = ctk.CTkProgressBar(self.loading_frame, mode='indeterminate')
+        self.progress_bar.pack(pady=10, padx=20, fill="x")
+
+    def _show_loading(self):
+        """Mostra o indicador de carregamento e esconde o conteúdo principal."""
+        self.tab_view.grid_forget()
+        self.loading_frame.place(relx=0.5, rely=0.5, anchor="center")
+        self.progress_bar.start()
+
+    def _hide_loading(self):
+        """Esconde o indicador de carregamento e mostra o conteúdo principal."""
+        self.progress_bar.stop()
+        self.loading_frame.place_forget()
+        self.tab_view.grid(row=1, column=0, padx=20, pady=10, sticky="nsew")
+
     # Método chamado sempre que a view é exibida.
-    def on_show(self, **kwargs): self.populate_data()
+    def on_show(self, **kwargs):
+        self.populate_data()
+
     # Método para preencher os dados de todas as abas de uma vez.
-    def populate_data(self): self._populate_students(); self._populate_courses(); self._populate_grades()
+    def populate_data(self):
+        self._clear_frame(self.students_frame)
+        self._clear_frame(self.courses_frame)
+        self._clear_frame(self.grades_frame)
+        self._show_loading()
+        # Executa a busca de dados em segundo plano e define o callback para atualizar a UI.
+        run_async_task(self._load_data_async(), self.main_app, self._populate_data_callback)
+
+    async def _load_data_async(self):
+        """Busca todos os dados necessários do banco de dados de forma assíncrona."""
+        # Nota: O DataService em si não é async, mas run_async_task executa isso em um thread.
+        all_students = self.data_service.get_all_students()
+        active_students = self.data_service.get_students_with_active_enrollment()
+        courses = self.data_service.get_all_courses()
+        grades = self.data_service.get_all_grades_with_details()
+        return {
+            "all_students": all_students,
+            "active_students": active_students,
+            "courses": courses,
+            "grades": grades
+        }
+
+    def _populate_data_callback(self, future):
+        """Callback executado quando os dados assíncronos são carregados."""
+        self._hide_loading()
+        try:
+            data = future.result()
+            self.all_students_data = data["all_students"]
+            self.active_students_data = data["active_students"]
+
+            self._populate_students() # Popula com base no estado do checkbox
+            self._populate_courses(data["courses"])
+            self._populate_grades(data["grades"])
+        except Exception as e:
+            messagebox.showerror("Erro ao Carregar Dados", f"Não foi possível carregar os dados: {e}")
+
     # Método utilitário para limpar todos os widgets de um frame.
     def _clear_frame(self, frame): [w.destroy() for w in frame.winfo_children()]
 
     # Preenche a lista de alunos na aba "Alunos".
     def _populate_students(self):
         self._clear_frame(self.students_frame)
-        # Verifica se o checkbox de filtro está marcado.
-        if self.show_active_only.get():
-            students = self.data_service.get_students_with_active_enrollment()
-        else:
-            students = self.data_service.get_all_students()
+        # Usa os dados já carregados na memória.
+        students_to_show = self.active_students_data if self.show_active_only.get() else self.all_students_data
 
         # Itera sobre os alunos e cria uma linha para cada um.
-        for student in students:
+        for student in students_to_show:
             f = ctk.CTkFrame(self.students_frame); f.pack(fill="x", pady=5)
             label_text = f"ID: {student['id']} | {student['first_name']} {student['last_name']}"
             ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
@@ -95,25 +152,22 @@ class ManagementView(ctk.CTkFrame):
             ctk.CTkButton(f, text="Editar", command=lambda s=student: self.edit_student(s)).pack(side="right", padx=5)
 
     # Preenche a lista de cursos na aba "Disciplinas".
-    def _populate_courses(self):
+    def _populate_courses(self, courses):
         self._clear_frame(self.courses_frame)
-        for course in self.data_service.get_all_courses():
+        for course in courses:
             f = ctk.CTkFrame(self.courses_frame); f.pack(fill="x", pady=5)
             ctk.CTkLabel(f, text=f"ID: {course['id']} | {course['course_name']} ({course['course_code']})").pack(side="left", padx=10)
             ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda c_id=course['id']: self.delete_course(c_id)).pack(side="right", padx=5)
             ctk.CTkButton(f, text="Editar", command=lambda c=course: self.edit_course(c)).pack(side="right", padx=5)
 
     # Preenche a lista de notas na aba "Notas".
-    def _populate_grades(self):
+    def _populate_grades(self, grades):
         self._clear_frame(self.grades_frame)
-        # Busca todas as notas com detalhes (nome do aluno, curso, etc.).
-        grades = self.data_service.get_all_grades_with_details()
-
+        # Itera sobre as notas e cria uma linha para cada uma.
         for grade in grades:
             f = ctk.CTkFrame(self.grades_frame)
             f.pack(fill="x", pady=5)
 
-            # Atualizado para mostrar Turma e Disciplina
             label_text = (
                 f"ID: {grade['id']} | {grade['student_first_name']} {grade['student_last_name']} | "
                 f"{grade['class_name']} - {grade['course_name']} | {grade['assessment_name']}: {grade['score']}"
@@ -121,8 +175,6 @@ class ManagementView(ctk.CTkFrame):
 
             ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
             ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda g_id=grade['id']: self.delete_grade(g_id)).pack(side="right", padx=5)
-            # A funcionalidade de edição de notas nesta tela foi removida, pois
-            # o Quadro de Notas é o local principal para isso.
 
     # Método auxiliar para exibir um diálogo de confirmação de exclusão.
     def _confirm_delete(self):
