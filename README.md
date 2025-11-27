@@ -69,3 +69,9 @@ poetry run pytest
 ```
 
 Os testes são configurados para rodar em um banco de dados SQLite em memória para garantir isolamento e velocidade.
+
+## Documentação Técnica
+
+Para desenvolvedores e mantenedores do sistema, foi criada uma documentação detalhada da arquitetura, incluindo diagramas de banco de dados e fluxos de execução:
+
+*   [Arquitetura do Sistema (ARCHITECTURE.md)](ARCHITECTURE.md)
