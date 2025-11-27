@@ -33,17 +33,19 @@ O projeto utiliza o Poetry para gerenciamento de dependências.
 
 **AVISO IMPORTANTE:** O sistema de migração de banco de dados **Alembic foi removido** deste projeto.
 
-*   **Inicialização do Banco de Dados:** O banco de dados (`app.db`) e todas as tabelas são criados automaticamente na primeira vez que a aplicação é executada. A lógica para isso está em `main.py` na função `initialize_database`, que usa `Base.metadata.create_all(engine)`.
+*   **Inicialização do Banco de Dados:** O banco de dados (`academic_management.db`) e todas as tabelas são criados automaticamente na primeira vez que a aplicação é executada. A lógica para isso está em `main.py` na função `initialize_database`, que usa `Base.metadata.create_all(engine)`.
 *   **Não tente usar comandos do Alembic.** Eles não funcionarão e podem causar erros.
 
 ## Estrutura do Código
 
 *   `app/`: Contém o código-fonte principal da aplicação.
+    *   `core/`: Núcleo da aplicação (Configuração, Segurança, Framework de IA).
     *   `data/`: Módulo de acesso a dados, incluindo a configuração do banco de dados.
     *   `models/`: Definições de modelos SQLAlchemy para todas as entidades do banco de dados.
-    *   `services/`: Lógica de negócios (`DataService`, `AssistantService`).
-    *   `tools/`: Ferramentas utilizadas pelo Assistente de IA para interagir com a aplicação.
+    *   `services/`: Lógica de negócios (`DataService`, `AssistantService`, `ReportService`).
+    *   `tools/`: Implementações concretas das ferramentas utilizadas pelo Assistente de IA.
     *   `ui/`: Componentes da interface do usuário (Views) construídos com CustomTkinter.
+    *   `utils/`: Utilitários gerais (Async, Gráficos, Parsers).
 *   `tests/`: Contém todos os testes automatizados.
 *   `main.py`: O ponto de entrada da aplicação.
 
@@ -51,6 +53,7 @@ O projeto utiliza o Poetry para gerenciamento de dependências.
 
 O Assistente de IA opera utilizando um conjunto de "ferramentas" que lhe permitem interagir de forma segura com o banco de dados e outros serviços.
 
-*   **Definição de Ferramentas:** As ferramentas são funções Python localizadas no diretório `app/tools/`. Elas são decoradas com `@tool` para expor sua assinatura à API do LLM.
+*   **Infraestrutura:** A lógica de execução e registro das ferramentas reside em `app/core/tools/` (`ToolRegistry`, `ToolExecutor`).
+*   **Definição de Ferramentas:** As implementações concretas das ferramentas estão em `app/tools/`. Elas são decoradas com `@tool` para expor sua assinatura à API do LLM.
 *   **Registro de Ferramentas:** Todas as ferramentas devem ser registradas no `AssistantService` (`app/services/assistant_service.py`) para que o assistente possa utilizá-las.
 *   **Segurança:** O agente deve usar exclusivamente as ferramentas fornecidas. Tentar escrever ou executar código arbitrário é estritamente proibido.
