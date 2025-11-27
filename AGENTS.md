@@ -1,20 +1,31 @@
 # Guia para Agentes de IA
 
-Este documento fornece diretrizes e informações essenciais para agentes de IA que trabalham neste repositório.
+Este documento fornece diretrizes e informações essenciais para agentes de IA que trabalham neste repositório. Para uma visão técnica aprofundada, consulte sempre o arquivo [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Visão Geral do Projeto
 
-Este é um Sistema de Gestão Acadêmica construído em Python com uma GUI CustomTkinter e um banco de dados SQLite gerenciado via SQLAlchemy. O projeto inclui um Assistente de IA que utiliza um framework de ferramentas para interagir com o banco de dados.
+Este é um Sistema de Gestão Acadêmica construído em Python com uma GUI CustomTkinter e um banco de dados SQLite gerenciado via SQLAlchemy. O projeto inclui um Assistente de IA que utiliza um framework de ferramentas ("Function Calling") para interagir com o sistema de forma segura.
 
 ## Configuração do Ambiente
 
-O projeto utiliza o Poetry para gerenciamento de dependências.
+O projeto utiliza o **Poetry** para gerenciamento de dependências.
 
 1.  **Instalar dependências:**
     ```bash
     poetry install --no-root --with dev
     ```
-    *Use a flag `--with dev` para incluir dependências de teste como o pytest.*
+    *A flag `--with dev` é obrigatória para incluir dependências de teste como `pytest` e `pytest-mock`.*
+
+## Padrões de Desenvolvimento
+
+Para manter a consistência e estabilidade do código, siga estas regras estritamente:
+
+*   **Idioma:** Todo o código visível ao usuário (interface, logs, saídas de ferramentas) e comentários devem ser em **Português do Brasil**. Identificadores de código (variáveis, funções, classes) devem permanecer em **Inglês**.
+*   **Interface Gráfica e Assincronismo:** A aplicação usa `CustomTkinter` (CTK) em um loop de eventos principal.
+    *   **NUNCA** execute código bloqueante (ex: `time.sleep`, requisições HTTP síncronas, queries pesadas) diretamente na thread da UI. Isso congelará a aplicação.
+    *   Utilize o utilitário `run_async_task` (`app/utils/async_utils.py`) para despachar corrotinas para background.
+    *   A classe `MainApp` integra o loop `asyncio` através de um mecanismo de polling (`update_asyncio`).
+*   **Injeção de Dependência:** As Views da UI não devem instanciar serviços diretamente. Elas devem receber instâncias de `DataService` e `AssistantService` via construtor (`__init__`).
 
 ## Execução e Testes
 
@@ -27,33 +38,38 @@ O projeto utiliza o Poetry para gerenciamento de dependências.
     ```bash
     poetry run pytest
     ```
-    *Os testes são executados em um banco de dados SQLite em memória para garantir o isolamento.*
+    *   **Ambiente de Teste:** Os testes utilizam o `tests/conftest.py` para criar um banco de dados SQLite **em memória** (`db_session` fixture) para cada função de teste. Isso garante isolamento total e evita efeitos colaterais.
+    *   **Fixtures Úteis:**
+        *   `db_session`: Sessão SQLAlchemy isolada em memória.
+        *   `data_service`: Instância de `DataService` configurada para usar a `db_session`.
+        *   `assistant_service`: Instância com o provedor de IA "mockado" para evitar chamadas de rede.
 
 ## Arquitetura do Banco de Dados
 
 **AVISO IMPORTANTE:** O sistema de migração de banco de dados **Alembic foi removido** deste projeto.
 
-*   **Inicialização do Banco de Dados:** O banco de dados (`academic_management.db`) e todas as tabelas são criados automaticamente na primeira vez que a aplicação é executada. A lógica para isso está em `main.py` na função `initialize_database`, que usa `Base.metadata.create_all(engine)`.
-*   **Não tente usar comandos do Alembic.** Eles não funcionarão e podem causar erros.
+*   **Banco de Dados:** O arquivo é nomeado `academic_management.db`.
+*   **Inicialização:** Todas as tabelas são criadas automaticamente na primeira vez que a aplicação é executada. A lógica reside em `main.py` -> `initialize_database`, utilizando `Base.metadata.create_all(engine)`.
+*   **Não tente usar comandos do Alembic.** Eles não funcionarão.
 
 ## Estrutura do Código
 
-*   `app/`: Contém o código-fonte principal da aplicação.
-    *   `core/`: Núcleo da aplicação (Configuração, Segurança, Framework de IA).
-    *   `data/`: Módulo de acesso a dados, incluindo a configuração do banco de dados.
-    *   `models/`: Definições de modelos SQLAlchemy para todas as entidades do banco de dados.
+*   `app/`: Código-fonte da aplicação.
+    *   `core/`: Núcleo estrutural (Configuração `config.py`, Segurança, Framework de IA).
+    *   `data/`: Configuração da conexão com o banco de dados (`database.py`).
+    *   `models/`: Definições de modelos SQLAlchemy (Schema).
     *   `services/`: Lógica de negócios (`DataService`, `AssistantService`, `ReportService`).
-    *   `tools/`: Implementações concretas das ferramentas utilizadas pelo Assistente de IA.
-    *   `ui/`: Componentes da interface do usuário (Views) construídos com CustomTkinter.
-    *   `utils/`: Utilitários gerais (Async, Gráficos, Parsers).
-*   `tests/`: Contém todos os testes automatizados.
-*   `main.py`: O ponto de entrada da aplicação.
+    *   `tools/`: Implementações concretas das ferramentas do Assistente.
+    *   `ui/`: Camada de apresentação (`views/` e `main_app.py`).
+    *   `utils/`: Utilitários compartilhados (Async, Gráficos, Parsers).
+*   `tests/`: Testes automatizados.
+*   `main.py`: Ponto de entrada (Bootstrap).
 
 ## Framework de Ferramentas do Agente
 
-O Assistente de IA opera utilizando um conjunto de "ferramentas" que lhe permitem interagir de forma segura com o banco de dados e outros serviços.
+O Assistente de IA interage com o sistema exclusivamente através de ferramentas registradas.
 
-*   **Infraestrutura:** A lógica de execução e registro das ferramentas reside em `app/core/tools/` (`ToolRegistry`, `ToolExecutor`).
-*   **Definição de Ferramentas:** As implementações concretas das ferramentas estão em `app/tools/`. Elas são decoradas com `@tool` para expor sua assinatura à API do LLM.
-*   **Registro de Ferramentas:** Todas as ferramentas devem ser registradas no `AssistantService` (`app/services/assistant_service.py`) para que o assistente possa utilizá-las.
-*   **Segurança:** O agente deve usar exclusivamente as ferramentas fornecidas. Tentar escrever ou executar código arbitrário é estritamente proibido.
+*   **Infraestrutura:** A lógica de registro e execução reside em `app/core/tools/` (`ToolRegistry`, `ToolExecutor`).
+*   **Definição:** As ferramentas concretas estão em `app/tools/` e devem ser decoradas com `@tool`.
+*   **Registro:** Novas ferramentas devem ser registradas manualmente no método `_register_tools` da classe `AssistantService` (`app/services/assistant_service.py`).
+*   **Segurança:** O agente deve usar apenas as ferramentas fornecidas. A execução de código arbitrário é proibida.
