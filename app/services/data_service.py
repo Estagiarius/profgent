@@ -193,6 +193,39 @@ class DataService:
             students = db.query(Student).filter(Student.id.notin_(enrolled_student_ids)).all()
             return [{"id": s.id, "first_name": s.first_name, "last_name": s.last_name} for s in students]
 
+    # Método para buscar alunos (ativos) que fazem aniversário no dia de hoje.
+    def get_students_with_birthday_today(self) -> list[dict]:
+        today = date.today()
+        # Converte para strings com zero à esquerda (ex: '01', '02', ..., '12').
+        current_month = f"{today.month:02d}"
+        current_day = f"{today.day:02d}"
+
+        with self._get_db() as db:
+            # Consulta otimizada que faz join com ClassEnrollment e Class para obter o nome da turma.
+            # Filtra apenas matrículas 'Active'.
+            # Usa strftime para extrair dia e mês da data de nascimento no SQLite.
+            students = (
+                db.query(Student, Class.name.label("class_name"))
+                .join(ClassEnrollment, Student.id == ClassEnrollment.student_id)
+                .join(Class, ClassEnrollment.class_id == Class.id)
+                .filter(ClassEnrollment.status == 'Active')
+                .filter(func.strftime('%m', Student.birth_date) == current_month)
+                .filter(func.strftime('%d', Student.birth_date) == current_day)
+                .all()
+            )
+
+            results = []
+            for student, class_name in students:
+                # Calcula a idade que o aluno está completando hoje.
+                age = today.year - student.birth_date.year if student.birth_date else 0
+                results.append({
+                    "id": student.id,
+                    "name": f"{student.first_name} {student.last_name}",
+                    "age": age,
+                    "class_name": class_name
+                })
+            return results
+
     # Método para adicionar um novo curso.
     def add_course(self, course_name: str, course_code: str) -> dict | None:
         if not course_name or not course_code: return None
