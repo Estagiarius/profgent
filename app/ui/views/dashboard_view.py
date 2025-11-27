@@ -21,12 +21,13 @@ class DashboardView(ctk.CTkFrame):
         self.selected_course_id = None
 
         # Configura o layout de grade da view.
-        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=3) # Coluna do gráfico (maior)
+        self.grid_columnconfigure(1, weight=1) # Coluna dos aniversariantes (menor)
         self.grid_rowconfigure(2, weight=1) # A linha 2 (onde fica o gráfico) se expande.
 
         # --- Título ---
         self.title_label = ctk.CTkLabel(self, text="Dashboard de Análises", font=ctk.CTkFont(size=20, weight="bold"))
-        self.title_label.grid(row=0, column=0, padx=20, pady=(20, 10), sticky="ew")
+        self.title_label.grid(row=0, column=0, columnspan=2, padx=20, pady=(20, 10), sticky="ew")
 
         # --- Frame de Controles ---
         # Frame para agrupar o rótulo e o menu de seleção de curso.
@@ -50,6 +51,18 @@ class DashboardView(ctk.CTkFrame):
         # Referência para a imagem do gráfico para evitar que seja coletada pelo garbage collector.
         self.chart_image = None
 
+        # --- Frame de Aniversariantes ---
+        self.birthdays_frame_container = ctk.CTkFrame(self)
+        self.birthdays_frame_container.grid(row=1, column=1, rowspan=2, padx=(0, 20), pady=10, sticky="nsew")
+        self.birthdays_frame_container.grid_rowconfigure(1, weight=1)
+        self.birthdays_frame_container.grid_columnconfigure(0, weight=1)
+
+        self.birthdays_title = ctk.CTkLabel(self.birthdays_frame_container, text="Aniversariantes do Dia", font=ctk.CTkFont(size=16, weight="bold"))
+        self.birthdays_title.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+        self.birthdays_scrollable_frame = ctk.CTkScrollableFrame(self.birthdays_frame_container, label_text="")
+        self.birthdays_scrollable_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
+
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs):
         _ = kwargs
@@ -57,6 +70,8 @@ class DashboardView(ctk.CTkFrame):
         self.load_courses()
         # Atualiza o gráfico com base na seleção atual.
         self.update_chart()
+        # Atualiza a lista de aniversariantes.
+        self.update_birthdays()
 
     # Carrega os cursos do banco de dados e preenche o menu dropdown.
     def load_courses(self):
@@ -125,3 +140,25 @@ class DashboardView(ctk.CTkFrame):
         # Se o arquivo não foi criado...
         else:
             self.chart_label.configure(image=None, text="Não foi possível gerar o gráfico.")
+
+    # Atualiza a lista de aniversariantes do dia.
+    def update_birthdays(self):
+        # Limpa os widgets anteriores no frame de scroll.
+        for widget in self.birthdays_scrollable_frame.winfo_children():
+            widget.destroy()
+
+        # Busca os aniversariantes do dia.
+        birthdays = self.data_service.get_students_with_birthday_today()
+
+        if not birthdays:
+            ctk.CTkLabel(self.birthdays_scrollable_frame, text="Nenhum aniversariante hoje.", text_color="gray").pack(pady=20)
+            return
+
+        # Cria um card para cada aniversariante.
+        for student in birthdays:
+            card = ctk.CTkFrame(self.birthdays_scrollable_frame, fg_color=("gray85", "gray25"))
+            card.pack(fill="x", pady=5, padx=5)
+
+            ctk.CTkLabel(card, text=student["name"], font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=(5, 0))
+            ctk.CTkLabel(card, text=f"Completando {student['age']} anos").pack(anchor="w", padx=10)
+            ctk.CTkLabel(card, text=f"{student['class_name']}", font=ctk.CTkFont(size=11), text_color="gray").pack(anchor="w", padx=10, pady=(0, 5))
