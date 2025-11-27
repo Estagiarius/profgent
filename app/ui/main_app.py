@@ -70,7 +70,7 @@ class MainApp(ctk.CTk):
         self.assistant_service = assistant_service
 
         # Define o título e o tamanho inicial da janela principal.
-        self.title("Gestão Acadêmica")
+        self.title("Profgent")
         self.geometry("1100x800")
 
         # Define uma função a ser chamada quando o usuário tenta fechar a janela.

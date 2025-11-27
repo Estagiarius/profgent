@@ -46,7 +46,7 @@ def initialize_database():
 
 def main():
     try:
-        logging.info("Iniciando aplicação Academic Management System...")
+        logging.info("Iniciando o Profgent...")
 
         # 1. Inicializa a camada de dados
         initialize_database()
