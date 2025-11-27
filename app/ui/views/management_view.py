@@ -15,6 +15,9 @@ class ManagementView(ctk.CTkFrame):
         self.main_app = main_app
         # Obtém a instância do DataService a partir da aplicação principal.
         self.data_service = self.main_app.data_service
+        self.current_page = 1
+        self.page_size = 20
+        self.total_pages = 1
 
         # Configura o layout de grade da view.
         self.grid_rowconfigure(1, weight=1) # A linha 1 (com as abas) se expande.
@@ -35,7 +38,7 @@ class ManagementView(ctk.CTkFrame):
 
         # --- Aba de Alunos ---
         students_tab = self.tab_view.tab("Alunos")
-        students_tab.grid_rowconfigure(1, weight=1)
+        students_tab.grid_rowconfigure(2, weight=1)  # Frame de lista expande
         students_tab.grid_columnconfigure(0, weight=1)
 
         # Frame para os botões de controle da aba de alunos.
@@ -45,13 +48,40 @@ class ManagementView(ctk.CTkFrame):
         self.add_student_button = ctk.CTkButton(student_controls_frame, text="Adicionar Novo Aluno", command=self.add_student_popup)
         self.add_student_button.pack(side="left", padx=(0, 10))
 
+        # Busca
+        self.search_entry = ctk.CTkEntry(student_controls_frame, placeholder_text="Buscar aluno...")
+        self.search_entry.pack(side="left", padx=10, fill="x", expand=True)
+
+        self.search_button = ctk.CTkButton(student_controls_frame, text="Buscar", width=80, command=lambda: self._load_student_page(1))
+        self.search_button.pack(side="left", padx=5)
+
         # Checkbox para filtrar e mostrar apenas alunos com matrículas ativas.
-        self.show_active_only = ctk.CTkCheckBox(student_controls_frame, text="Mostrar Apenas Alunos Ativos", command=self._populate_students)
-        self.show_active_only.pack(side="left")
+        self.show_active_only = ctk.CTkCheckBox(student_controls_frame, text="Mostrar Apenas Alunos Ativos", command=lambda: self._load_student_page(1))
+        self.show_active_only.pack(side="left", padx=10)
+
+        # Cabeçalho da Lista
+        header_frame = ctk.CTkFrame(students_tab, height=30)
+        header_frame.grid(row=1, column=0, padx=10, pady=(0, 5), sticky="ew")
+        ctk.CTkLabel(header_frame, text="ID", width=50, anchor="w").pack(side="left", padx=10)
+        ctk.CTkLabel(header_frame, text="Nome Completo", anchor="w").pack(side="left", padx=10, fill="x", expand=True)
+        ctk.CTkLabel(header_frame, text="Ações", width=150, anchor="e").pack(side="right", padx=10)
 
         # Frame com rolagem para a lista de alunos.
         self.students_frame = ctk.CTkScrollableFrame(students_tab)
-        self.students_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        self.students_frame.grid(row=2, column=0, padx=10, pady=5, sticky="nsew")
+
+        # Frame de Paginação
+        pagination_frame = ctk.CTkFrame(students_tab)
+        pagination_frame.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
+
+        self.btn_prev = ctk.CTkButton(pagination_frame, text="Anterior", width=80, command=self._prev_page)
+        self.btn_prev.pack(side="left", padx=10)
+
+        self.lbl_page = ctk.CTkLabel(pagination_frame, text="Página 1 de 1")
+        self.lbl_page.pack(side="left", fill="x", expand=True)
+
+        self.btn_next = ctk.CTkButton(pagination_frame, text="Próximo", width=80, command=self._next_page)
+        self.btn_next.pack(side="right", padx=10)
 
         # --- Aba de Disciplinas ---
         courses_tab = self.tab_view.tab("Disciplinas")
@@ -73,26 +103,75 @@ class ManagementView(ctk.CTkFrame):
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs): self.populate_data()
     # Método para preencher os dados de todas as abas de uma vez.
-    def populate_data(self): self._populate_students(); self._populate_courses(); self._populate_grades()
+    def populate_data(self):
+        # Carrega a primeira página de alunos
+        self._load_student_page(1)
+        self._populate_courses()
+        self._populate_grades()
+
     # Método utilitário para limpar todos os widgets de um frame.
     def _clear_frame(self, frame): [w.destroy() for w in frame.winfo_children()]
 
-    # Preenche a lista de alunos na aba "Alunos".
-    def _populate_students(self):
+    def _prev_page(self):
+        if self.current_page > 1:
+            self._load_student_page(self.current_page - 1)
+
+    def _next_page(self):
+        if self.current_page < self.total_pages:
+            self._load_student_page(self.current_page + 1)
+
+    # Carrega uma página específica de alunos
+    def _load_student_page(self, page_number):
         self._clear_frame(self.students_frame)
-        # Verifica se o checkbox de filtro está marcado.
-        if self.show_active_only.get():
-            students = self.data_service.get_students_with_active_enrollment()
-        else:
-            students = self.data_service.get_all_students()
+        self.current_page = page_number
+
+        search_term = self.search_entry.get().strip()
+        active_only = bool(self.show_active_only.get())
+
+        result = self.data_service.get_paginated_students(
+            page=self.current_page,
+            page_size=self.page_size,
+            search_term=search_term if search_term else None,
+            active_only=active_only
+        )
+
+        # Se a página solicitada estiver vazia e não for a primeira, volta uma página
+        # Isso acontece, por exemplo, ao excluir o último item da última página
+        if not result["students"] and self.current_page > 1 and result["total_count"] > 0:
+             self._load_student_page(self.current_page - 1)
+             return
+
+        students = result["students"]
+        total_count = result["total_count"]
+        self.total_pages = result["total_pages"]
+        self.current_page = result["current_page"] # Garante sincronia
+
+        # Atualiza controles de paginação
+        self.lbl_page.configure(text=f"Página {self.current_page} de {self.total_pages} (Total: {total_count})")
+
+        state_prev = "normal" if self.current_page > 1 else "disabled"
+        state_next = "normal" if self.current_page < self.total_pages else "disabled"
+        self.btn_prev.configure(state=state_prev)
+        self.btn_next.configure(state=state_next)
 
         # Itera sobre os alunos e cria uma linha para cada um.
         for student in students:
-            f = ctk.CTkFrame(self.students_frame); f.pack(fill="x", pady=5)
-            label_text = f"ID: {student['id']} | {student['first_name']} {student['last_name']}"
-            ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
-            ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda s_id=student['id']: self.delete_student(s_id)).pack(side="right", padx=5)
-            ctk.CTkButton(f, text="Editar", command=lambda s=student: self.edit_student(s)).pack(side="right", padx=5)
+            f = ctk.CTkFrame(self.students_frame)
+            f.pack(fill="x", pady=2)
+
+            # ID
+            ctk.CTkLabel(f, text=str(student['id']), width=50, anchor="w").pack(side="left", padx=10)
+
+            # Nome
+            name_text = f"{student['first_name']} {student['last_name']}"
+            ctk.CTkLabel(f, text=name_text, anchor="w").pack(side="left", padx=10, fill="x", expand=True)
+
+            # Botões
+            btn_frame = ctk.CTkFrame(f, fg_color="transparent")
+            btn_frame.pack(side="right", padx=5)
+
+            ctk.CTkButton(btn_frame, text="Excluir", fg_color="red", width=60, command=lambda s_id=student['id']: self.delete_student(s_id)).pack(side="right", padx=5)
+            ctk.CTkButton(btn_frame, text="Editar", width=60, command=lambda s=student: self.edit_student(s)).pack(side="right", padx=5)
 
     # Preenche a lista de cursos na aba "Disciplinas".
     def _populate_courses(self):
@@ -133,7 +212,7 @@ class ManagementView(ctk.CTkFrame):
         if self._confirm_delete():
             try:
                 self.data_service.delete_student(sid)
-                self.populate_data()
+                self._load_student_page(self.current_page) # Recarrega a página atual
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao excluir aluno: {e}")
 
@@ -158,7 +237,7 @@ class ManagementView(ctk.CTkFrame):
         # Define o callback que será executado ao salvar no diálogo.
         def cb(id, data):
             self.data_service.update_student(id, data['first_name'], data['last_name'])
-            self.populate_data()
+            self._load_student_page(self.current_page)
         initial_data = { "id": s['id'], "first_name": s['first_name'], "last_name": s['last_name'] }
         EditDialog(self, "Editar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, initial_data, cb)
 
@@ -171,7 +250,7 @@ class ManagementView(ctk.CTkFrame):
     def add_student_popup(self):
         def cb(data):
             self.data_service.add_student(data['first_name'], data['last_name'])
-            self.populate_data()
+            self._load_student_page(self.current_page)
         AddDialog(self, "Adicionar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, save_callback=cb)
 
     # Abre o diálogo de adição para um novo curso.

@@ -184,6 +184,44 @@ class DataService:
             active_students = db.query(Student).join(ClassEnrollment).filter(ClassEnrollment.status == 'Active').all()
             return [{"id": s.id, "first_name": s.first_name, "last_name": s.last_name} for s in active_students]
 
+    # Método para buscar alunos com paginação e filtro.
+    def get_paginated_students(self, page: int, page_size: int, search_term: str = None, active_only: bool = False) -> dict:
+        with self._get_db() as db:
+            query = db.query(Student)
+
+            if active_only:
+                query = query.join(ClassEnrollment).filter(ClassEnrollment.status == 'Active').distinct()
+
+            if search_term:
+                search_pattern = f"%{search_term.lower()}%"
+                query = query.filter(func.lower(Student.first_name + " " + Student.last_name).like(search_pattern))
+
+            total_count = query.count()
+
+            # Ordena por nome
+            query = query.order_by(Student.first_name, Student.last_name)
+
+            # Aplica paginação
+            offset = (page - 1) * page_size
+            students = query.offset(offset).limit(page_size).all()
+
+            student_list = [
+                {
+                    "id": s.id,
+                    "first_name": s.first_name,
+                    "last_name": s.last_name,
+                    "birth_date": s.birth_date.isoformat() if s.birth_date else None
+                }
+                for s in students
+            ]
+
+            return {
+                "students": student_list,
+                "total_count": total_count,
+                "total_pages": (total_count + page_size - 1) // page_size if page_size > 0 else 1,
+                "current_page": page
+            }
+
     # Método para buscar alunos que não estão matriculados em uma turma específica.
     def get_unenrolled_students(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
