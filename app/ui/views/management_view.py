@@ -34,7 +34,8 @@ class ManagementView(ctk.CTkFrame):
         # Adiciona as abas.
         self.tab_view.add("Alunos")
         self.tab_view.add("Disciplinas")
-        self.tab_view.add("Notas")
+        # Aba "Notas" removida conforme solicitação. Código legado comentado abaixo.
+        # self.tab_view.add("Notas")
 
         # --- Aba de Alunos ---
         students_tab = self.tab_view.tab("Alunos")
@@ -92,13 +93,13 @@ class ManagementView(ctk.CTkFrame):
         self.courses_frame = ctk.CTkScrollableFrame(courses_tab)
         self.courses_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
-        # --- Aba de Notas ---
-        grades_tab = self.tab_view.tab("Notas")
-        grades_tab.grid_rowconfigure(1, weight=1)
-        grades_tab.grid_columnconfigure(0, weight=1)
-        ctk.CTkLabel(grades_tab, text="Use a tela 'Quadro de Notas' na visualização da turma para adicionar novas notas.").grid(row=0, column=0, padx=10, pady=10)
-        self.grades_frame = ctk.CTkScrollableFrame(grades_tab)
-        self.grades_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        # --- Aba de Notas (Código Legado - Comentado) ---
+        # grades_tab = self.tab_view.tab("Notas")
+        # grades_tab.grid_rowconfigure(1, weight=1)
+        # grades_tab.grid_columnconfigure(0, weight=1)
+        # ctk.CTkLabel(grades_tab, text="Use a tela 'Quadro de Notas' na visualização da turma para adicionar novas notas.").grid(row=0, column=0, padx=10, pady=10)
+        # self.grades_frame = ctk.CTkScrollableFrame(grades_tab)
+        # self.grades_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs): self.populate_data()
@@ -107,7 +108,7 @@ class ManagementView(ctk.CTkFrame):
         # Carrega a primeira página de alunos
         self._load_student_page(1)
         self._populate_courses()
-        self._populate_grades()
+        # self._populate_grades()
 
     # Método utilitário para limpar todos os widgets de um frame.
     def _clear_frame(self, frame): [w.destroy() for w in frame.winfo_children()]
@@ -182,26 +183,26 @@ class ManagementView(ctk.CTkFrame):
             ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda c_id=course['id']: self.delete_course(c_id)).pack(side="right", padx=5)
             ctk.CTkButton(f, text="Editar", command=lambda c=course: self.edit_course(c)).pack(side="right", padx=5)
 
-    # Preenche a lista de notas na aba "Notas".
-    def _populate_grades(self):
-        self._clear_frame(self.grades_frame)
-        # Busca todas as notas com detalhes (nome do aluno, curso, etc.).
-        grades = self.data_service.get_all_grades_with_details()
-
-        for grade in grades:
-            f = ctk.CTkFrame(self.grades_frame)
-            f.pack(fill="x", pady=5)
-
-            # Atualizado para mostrar Turma e Disciplina
-            label_text = (
-                f"ID: {grade['id']} | {grade['student_first_name']} {grade['student_last_name']} | "
-                f"{grade['class_name']} - {grade['course_name']} | {grade['assessment_name']}: {grade['score']}"
-            )
-
-            ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
-            ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda g_id=grade['id']: self.delete_grade(g_id)).pack(side="right", padx=5)
-            # A funcionalidade de edição de notas nesta tela foi removida, pois
-            # o Quadro de Notas é o local principal para isso.
+    # Preenche a lista de notas na aba "Notas". (Código Legado - Comentado)
+    # def _populate_grades(self):
+    #     self._clear_frame(self.grades_frame)
+    #     # Busca todas as notas com detalhes (nome do aluno, curso, etc.).
+    #     grades = self.data_service.get_all_grades_with_details()
+    #
+    #     for grade in grades:
+    #         f = ctk.CTkFrame(self.grades_frame)
+    #         f.pack(fill="x", pady=5)
+    #
+    #         # Atualizado para mostrar Turma e Disciplina
+    #         label_text = (
+    #             f"ID: {grade['id']} | {grade['student_first_name']} {grade['student_last_name']} | "
+    #             f"{grade['class_name']} - {grade['course_name']} | {grade['assessment_name']}: {grade['score']}"
+    #         )
+    #
+    #         ctk.CTkLabel(f, text=label_text).pack(side="left", padx=10)
+    #         ctk.CTkButton(f, text="Excluir", fg_color="red", command=lambda g_id=grade['id']: self.delete_grade(g_id)).pack(side="right", padx=5)
+    #         # A funcionalidade de edição de notas nesta tela foi removida, pois
+    #         # o Quadro de Notas é o local principal para isso.
 
     # Método auxiliar para exibir um diálogo de confirmação de exclusão.
     def _confirm_delete(self):
@@ -224,13 +225,13 @@ class ManagementView(ctk.CTkFrame):
             except Exception as e:
                 messagebox.showerror("Erro", f"Erro ao excluir disciplina: {e}")
 
-    def delete_grade(self, gid):
-        if self._confirm_delete():
-            try:
-                self.data_service.delete_grade(gid)
-                self.populate_data()
-            except Exception as e:
-                messagebox.showerror("Erro", f"Erro ao excluir nota: {e}")
+    # def delete_grade(self, gid):
+    #     if self._confirm_delete():
+    #         try:
+    #             self.data_service.delete_grade(gid)
+    #             self.populate_data()
+    #         except Exception as e:
+    #             messagebox.showerror("Erro", f"Erro ao excluir nota: {e}")
 
     # Abre o diálogo de edição para um aluno.
     def edit_student(self, s):
