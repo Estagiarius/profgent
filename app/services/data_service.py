@@ -760,7 +760,7 @@ class DataService:
                 # Cria um novo objeto Student.
                 student = Student(
                     first_name=data['first_name'], last_name=data['last_name'],
-                    birth_date=data['birth_date'], enrollment_date=date.today()
+                    birth_date=data['birth_date'], enrollment_date=date.today().isoformat()
                 )
                 db.add(student)
                 db.flush()  # Garante que o ID do aluno seja gerado antes de criar a matrícula.

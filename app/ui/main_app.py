@@ -150,6 +150,7 @@ class MainApp(ctk.CTk):
             pass
         finally:
             # Agenda a próxima verificação da fila para daqui a 100 milissegundos.
+            # noinspection PyTypeHints
             self.after(100, self._process_queue)
 
     # Método para alternar entre as diferentes telas da aplicação.

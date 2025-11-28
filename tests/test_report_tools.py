@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from app.tools.report_tools import (
     generate_grade_chart_tool,
     generate_class_distribution_tool,

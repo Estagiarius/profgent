@@ -1,4 +1,3 @@
-import json
 from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.tools.tool_decorator import tool
