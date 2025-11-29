@@ -247,7 +247,9 @@ class DataService:
                 .join(ClassEnrollment, Student.id == ClassEnrollment.student_id)
                 .join(Class, ClassEnrollment.class_id == Class.id)
                 .filter(ClassEnrollment.status == 'Active')
+                # noinspection PyTypeChecker
                 .filter(func.strftime('%m', Student.birth_date) == current_month)
+                # noinspection PyTypeChecker
                 .filter(func.strftime('%d', Student.birth_date) == current_day)
                 .all()
             )

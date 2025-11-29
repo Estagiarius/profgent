@@ -84,6 +84,7 @@ class MainApp(ctk.CTk):
         self._process_queue()
 
         # Define um ID inicial para o loop de polling do asyncio.
+        # noinspection PyTypeChecker
         self._poll_id = None
         # Inicia o loop que integra o asyncio com o loop de eventos do tkinter.
         self.update_asyncio()
