@@ -1,5 +1,4 @@
 import logging
-import os
 from sqlalchemy import inspect
 from app.ui.main_app import MainApp
 from app.data.database import engine, Base

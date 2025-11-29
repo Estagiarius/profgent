@@ -247,7 +247,9 @@ class DataService:
                 .join(ClassEnrollment, Student.id == ClassEnrollment.student_id)
                 .join(Class, ClassEnrollment.class_id == Class.id)
                 .filter(ClassEnrollment.status == 'Active')
+                # noinspection PyTypeChecker
                 .filter(func.strftime('%m', Student.birth_date) == current_month)
+                # noinspection PyTypeChecker
                 .filter(func.strftime('%d', Student.birth_date) == current_day)
                 .all()
             )
@@ -760,7 +762,7 @@ class DataService:
                 # Cria um novo objeto Student.
                 student = Student(
                     first_name=data['first_name'], last_name=data['last_name'],
-                    birth_date=data['birth_date'], enrollment_date=date.today()
+                    birth_date=data['birth_date'], enrollment_date=date.today().isoformat()
                 )
                 db.add(student)
                 db.flush()  # Garante que o ID do aluno seja gerado antes de criar a matrícula.
