@@ -70,6 +70,8 @@ class MainApp(ctk.CTk):
         self.assistant_service = assistant_service
 
         # Define o título e o tamanho inicial da janela principal.
+        ctk.set_appearance_mode("Dark")
+        ctk.set_default_color_theme("app/ui/themes/black_orange.json")
         self.title("Profgent")
         self.geometry("1100x800")
 
