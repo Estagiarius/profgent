@@ -156,7 +156,7 @@ class DashboardView(ctk.CTkFrame):
 
         # Cria um card para cada aniversariante.
         for student in birthdays:
-            card = ctk.CTkFrame(self.birthdays_scrollable_frame, fg_color=("gray85", "gray25"))
+            card = ctk.CTkFrame(self.birthdays_scrollable_frame)
             card.pack(fill="x", pady=5, padx=5)
 
             ctk.CTkLabel(card, text=student["name"], font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=(5, 0))

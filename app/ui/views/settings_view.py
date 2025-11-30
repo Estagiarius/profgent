@@ -4,6 +4,8 @@ import customtkinter as ctk
 from app.core.security.credentials import get_api_key, save_api_key
 # Importa funções para salvar e carregar configurações gerais da aplicação.
 from app.core.config import save_setting, load_setting
+import sys
+import os
 # Importa as classes dos provedores de LLM.
 from app.core.llm.openai_provider import OpenAIProvider
 from app.core.llm.maritaca_provider import MaritacaProvider
@@ -67,6 +69,29 @@ class SettingsView(ctk.CTkFrame):
 
         # Configura o layout de grade da view.
         self.grid_columnconfigure(0, weight=1)
+
+        # --- Aparência e Tema ---
+        self.appearance_frame = ctk.CTkFrame(self)
+        self.appearance_frame.grid(row=0, column=0, padx=20, pady=10, sticky="ew")
+        ctk.CTkLabel(self.appearance_frame, text="Tema da Aplicação").pack(side="left", padx=10, pady=10)
+
+        self.theme_map = {
+            "Black & Orange": "app/ui/themes/black_orange.json",
+            "Ocean Breeze": "app/ui/themes/ocean_breeze.json",
+            "Dracula": "app/ui/themes/dracula.json",
+            "Forest Glade": "app/ui/themes/forest_glade.json",
+            "Padrão (Azul)": "blue" # Fallback to default
+        }
+        self.theme_var = ctk.StringVar(value=load_setting("app_theme_name", "Black & Orange"))
+        self.theme_menu = ctk.CTkOptionMenu(self.appearance_frame, values=list(self.theme_map.keys()), variable=self.theme_var)
+        self.theme_menu.pack(side="left", padx=10, pady=10)
+
+        self.save_theme_button = ctk.CTkButton(self.appearance_frame, text="Salvar Tema", command=self.save_theme_only)
+        self.save_theme_button.pack(side="left", padx=5)
+
+        self.restart_button = ctk.CTkButton(self.appearance_frame, text="Salvar e Reiniciar", command=self.save_theme_and_restart, fg_color="#b91c1c", hover_color="#991b1b")
+        self.restart_button.pack(side="left", padx=5)
+
 
         # --- Seleção do Provedor de IA ---
         self.provider_frame = ctk.CTkFrame(self)
@@ -155,6 +180,20 @@ class SettingsView(ctk.CTkFrame):
             # Se um valor foi digitado no campo, salva a chave de API.
             if entry.get(): save_api_key(service, entry.get())
         self.feedback_label.configure(text="Configurações salvas!", text_color="green")
+
+    def save_theme_only(self):
+        theme_name = self.theme_var.get()
+        theme_path = self.theme_map.get(theme_name)
+        if theme_path:
+            save_setting("app_theme_name", theme_name)
+            save_setting("app_theme_path", theme_path)
+            self.feedback_label.configure(text="Tema salvo. Reinicie a aplicação para aplicar todas as mudanças.", text_color="orange")
+
+    def save_theme_and_restart(self):
+        self.save_theme_only()
+        # Reinicia a aplicação
+        self.feedback_label.configure(text="Reiniciando...", text_color="orange")
+        self.after(500, lambda: os.execl(sys.executable, sys.executable, *sys.argv))
 
     # Inicia o processo assíncrono de atualização da lista de modelos.
     def refresh_models(self):
