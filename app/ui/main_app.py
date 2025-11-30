@@ -11,6 +11,7 @@ from app.ui.views.settings_view import SettingsView
 from app.ui.views.management_view import ManagementView
 from app.ui.views.class_selection_view import ClassSelectionView
 from app.ui.views.class_detail_view import ClassDetailView
+from app.core.config import load_setting
 
 # Importa as classes de serviço que contêm a lógica de negócios e da IA.
 from app.services.data_service import DataService
@@ -71,7 +72,15 @@ class MainApp(ctk.CTk):
 
         # Define o título e o tamanho inicial da janela principal.
         ctk.set_appearance_mode("Dark")
-        ctk.set_default_color_theme("app/ui/themes/black_orange.json")
+
+        # Carrega o tema salvo ou usa o padrão "Black & Orange"
+        theme_path = load_setting("app_theme_path", "app/ui/themes/black_orange.json")
+        try:
+            ctk.set_default_color_theme(theme_path)
+        except FileNotFoundError:
+            # Fallback seguro caso o arquivo de tema não exista mais
+            ctk.set_default_color_theme("blue")
+
         self.title("Profgent")
         self.geometry("1100x800")
 
