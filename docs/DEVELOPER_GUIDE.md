@@ -13,8 +13,8 @@ O sistema atende a dois atores principais: o **Usuário** (Administrador/Profess
 
 ```mermaid
 usecaseDiagram
-    actor "Usuário (Professor/Admin)" as User
-    actor "Assistente de IA" as AI
+    actor User as "Usuário (Professor/Admin)"
+    actor AI as "Assistente de IA"
 
     package "Sistema de Gestão Acadêmica" {
         usecase "Gerenciar Turmas" as UC1
@@ -142,42 +142,42 @@ classDiagram
 O sistema segue uma arquitetura em camadas, separando a Interface de Usuário (UI), Lógica de Negócios (Services) e Acesso a Dados (Data Layer).
 
 ```mermaid
-componentDiagram
-    package "Camada de Apresentação (UI)" {
-        [MainApp (CustomTkinter)] as UI_Main
-        [Views (ClassDetail, Dashboard, etc.)] as UI_Views
-    }
+graph TB
+    subgraph UI_Layer ["Camada de Apresentação (UI)"]
+        UI_Main["MainApp (CustomTkinter)"]
+        UI_Views["Views (ClassDetail, Dashboard, etc.)"]
+    end
 
-    package "Camada de Serviço (Business Logic)" {
-        [DataService (Singleton)] as Service_Data
-        [AssistantService (AI Orchestrator)] as Service_AI
-        [ReportService (Charts/Files)] as Service_Report
-    }
+    subgraph Service_Layer ["Camada de Serviço (Business Logic)"]
+        Service_Data["DataService (Singleton)"]
+        Service_AI["AssistantService (AI Orchestrator)"]
+        Service_Report["ReportService (Charts/Files)"]
+    end
 
-    package "Núcleo e Ferramentas" {
-        [ToolRegistry] as Core_Tools
-        [ToolExecutor] as Core_Executor
-        [LLMProvider (OpenAI/Ollama)] as Core_LLM
-    }
+    subgraph Core_Layer ["Núcleo e Ferramentas"]
+        Core_Tools["ToolRegistry"]
+        Core_Executor["ToolExecutor"]
+        Core_LLM["LLMProvider (OpenAI/Ollama)"]
+    end
 
-    package "Camada de Dados" {
-        [SQLite Database] as DB
-    }
+    subgraph Data_Layer ["Camada de Dados"]
+        DB[("SQLite Database")]
+    end
 
     %% Conexões
-    UI_Main --> UI_Views : Gerencia Navegação
-    UI_Views --> Service_Data : CRUD Requests
-    UI_Views --> Service_AI : Chat Requests
-    UI_Views --> Service_Report : Relatórios Requests
+    UI_Main --> UI_Views
+    UI_Views --> Service_Data
+    UI_Views --> Service_AI
+    UI_Views --> Service_Report
 
-    Service_Data --> DB : SQLAlchemy ORM
-    Service_Report --> Service_Data : Fetch Data
+    Service_Data --> DB
+    Service_Report --> Service_Data
 
-    Service_AI --> Core_LLM : Envia Prompts
-    Service_AI --> Core_Executor : Solicita Execução
-    Core_Executor --> Core_Tools : Consulta
-    Core_Executor --> Service_Data : Executa Ações de Banco
-    Core_Executor --> Service_Report : Executa Ações de Relatório
+    Service_AI --> Core_LLM
+    Service_AI --> Core_Executor
+    Core_Executor --> Core_Tools
+    Core_Executor --> Service_Data
+    Core_Executor --> Service_Report
 ```
 
 ---
