@@ -13,10 +13,9 @@ O sistema atende a dois atores principais: o **Usuário** (Administrador/Profess
 
 ```mermaid
 usecaseDiagram
-actor User as "Usuário (Professor/Admin)"
-actor AI as "Assistente de IA"
+    actor "Usuário (Professor/Admin)" as User
+    actor "Assistente de IA" as AI
 
-package "Sistema de Gestão Acadêmica" {
     usecase "Gerenciar Turmas" as UC1
     usecase "Gerenciar Alunos (Importar/Editar)" as UC2
     usecase "Gerenciar Notas e Avaliações" as UC3
@@ -26,19 +25,18 @@ package "Sistema de Gestão Acadêmica" {
     usecase "Consultar Assistente Inteligente" as UC7
     usecase "Executar Ferramentas de Banco de Dados" as UC8
     usecase "Executar Ferramentas de Relatório" as UC9
-}
 
-User --> UC1
-User --> UC2
-User --> UC3
-User --> UC4
-User --> UC5
-User --> UC6
-User --> UC7
+    User --> UC1
+    User --> UC2
+    User --> UC3
+    User --> UC4
+    User --> UC5
+    User --> UC6
+    User --> UC7
 
-UC7 ..> AI : Interage com
-AI --> UC8 : Executa Ações
-AI --> UC9 : Gera Análises
+    UC7 ..> AI
+    AI --> UC8
+    AI --> UC9
 ```
 
 ---
@@ -51,82 +49,82 @@ O banco de dados utiliza SQLite com SQLAlchemy ORM. O diagrama abaixo ilustra as
 
 ```mermaid
 classDiagram
-class Student {
-    +int id
-    +string first_name
-    +string last_name
-    +date birth_date
-    +string enrollment_date
-}
+    class Student {
+        +int id
+        +string first_name
+        +string last_name
+        +date birth_date
+        +string enrollment_date
+    }
 
-class Class {
-    +int id
-    +string name
-    +enum calculation_method
-}
+    class Class {
+        +int id
+        +string name
+        +enum calculation_method
+    }
 
-class ClassEnrollment {
-    +int id
-    +int class_id
-    +int student_id
-    +int call_number
-    +string status
-    +string status_detail
-}
+    class ClassEnrollment {
+        +int id
+        +int class_id
+        +int student_id
+        +int call_number
+        +string status
+        +string status_detail
+    }
 
-class Course {
-    +int id
-    +string course_name
-    +string course_code
-}
+    class Course {
+        +int id
+        +string course_name
+        +string course_code
+    }
 
-class ClassSubject {
-    +int id
-    +int class_id
-    +int course_id
-}
+    class ClassSubject {
+        +int id
+        +int class_id
+        +int course_id
+    }
 
-class Assessment {
-    +int id
-    +int class_subject_id
-    +string name
-    +float weight
-}
+    class Assessment {
+        +int id
+        +int class_subject_id
+        +string name
+        +float weight
+    }
 
-class Grade {
-    +int id
-    +int student_id
-    +int assessment_id
-    +float score
-    +string date_recorded
-}
+    class Grade {
+        +int id
+        +int student_id
+        +int assessment_id
+        +float score
+        +string date_recorded
+    }
 
-class Lesson {
-    +int id
-    +int class_subject_id
-    +date date
-    +string title
-    +string content
-}
+    class Lesson {
+        +int id
+        +int class_subject_id
+        +date date
+        +string title
+        +string content
+    }
 
-class Incident {
-    +int id
-    +int class_id
-    +int student_id
-    +date date
-    +string description
-}
+    class Incident {
+        +int id
+        +int class_id
+        +int student_id
+        +date date
+        +string description
+    }
 
-Class "1" -- "*" ClassEnrollment : Tem
-Class "1" -- "*" Incident : Tem
-Class "1" -- "*" ClassSubject : Oferece
-Student "1" -- "*" ClassEnrollment : Matriculado em
-Student "1" -- "*" Grade : Recebe
-Student "1" -- "*" Incident : Envolvido em
-Course "1" -- "*" ClassSubject : Define
-ClassSubject "1" -- "*" Assessment : Tem
-ClassSubject "1" -- "*" Lesson : Tem
-Assessment "1" -- "*" Grade : Avaliado em
+    Class "1" -- "*" ClassEnrollment : Tem
+    Class "1" -- "*" Incident : Tem
+    Class "1" -- "*" ClassSubject : Oferece
+    Student "1" -- "*" ClassEnrollment : Matriculado em
+    Student "1" -- "*" Grade : Recebe
+    Student "1" -- "*" Incident : Envolvido em
+    Course "1" -- "*" ClassSubject : Define
+    ClassSubject "1" -- "*" Assessment : Tem
+    ClassSubject "1" -- "*" Lesson : Tem
+    Assessment "1" -- "*" Grade : Avaliado em
 ```
 
 ---
