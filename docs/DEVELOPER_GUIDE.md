@@ -13,32 +13,32 @@ O sistema atende a dois atores principais: o **Usuário** (Administrador/Profess
 
 ```mermaid
 usecaseDiagram
-    actor User as "Usuário (Professor/Admin)"
-    actor AI as "Assistente de IA"
+actor User as "Usuário (Professor/Admin)"
+actor AI as "Assistente de IA"
 
-    package "Sistema de Gestão Acadêmica" {
-        usecase "Gerenciar Turmas" as UC1
-        usecase "Gerenciar Alunos (Importar/Editar)" as UC2
-        usecase "Gerenciar Notas e Avaliações" as UC3
-        usecase "Gerenciar Aulas (Conteúdo)" as UC4
-        usecase "Registrar Incidentes" as UC5
-        usecase "Gerar Relatórios e Gráficos" as UC6
-        usecase "Consultar Assistente Inteligente" as UC7
-        usecase "Executar Ferramentas de Banco de Dados" as UC8
-        usecase "Executar Ferramentas de Relatório" as UC9
-    }
+package "Sistema de Gestão Acadêmica" {
+    usecase "Gerenciar Turmas" as UC1
+    usecase "Gerenciar Alunos (Importar/Editar)" as UC2
+    usecase "Gerenciar Notas e Avaliações" as UC3
+    usecase "Gerenciar Aulas (Conteúdo)" as UC4
+    usecase "Registrar Incidentes" as UC5
+    usecase "Gerar Relatórios e Gráficos" as UC6
+    usecase "Consultar Assistente Inteligente" as UC7
+    usecase "Executar Ferramentas de Banco de Dados" as UC8
+    usecase "Executar Ferramentas de Relatório" as UC9
+}
 
-    User --> UC1
-    User --> UC2
-    User --> UC3
-    User --> UC4
-    User --> UC5
-    User --> UC6
-    User --> UC7
+User --> UC1
+User --> UC2
+User --> UC3
+User --> UC4
+User --> UC5
+User --> UC6
+User --> UC7
 
-    UC7 ..> AI : Interage com
-    AI --> UC8 : Executa Ações
-    AI --> UC9 : Gera Análises
+UC7 ..> AI : Interage com
+AI --> UC8 : Executa Ações
+AI --> UC9 : Gera Análises
 ```
 
 ---
@@ -51,88 +51,82 @@ O banco de dados utiliza SQLite com SQLAlchemy ORM. O diagrama abaixo ilustra as
 
 ```mermaid
 classDiagram
-    %% Relacionamentos
-    Class "1" -- "*" ClassEnrollment : Tem
-    Class "1" -- "*" Incident : Tem
-    Class "1" -- "*" ClassSubject : Oferece
+class Student {
+    +int id
+    +string first_name
+    +string last_name
+    +date birth_date
+    +string enrollment_date
+}
 
-    Student "1" -- "*" ClassEnrollment : Matriculado em
-    Student "1" -- "*" Grade : Recebe
-    Student "1" -- "*" Incident : Envolvido em
+class Class {
+    +int id
+    +string name
+    +enum calculation_method
+}
 
-    Course "1" -- "*" ClassSubject : Define
+class ClassEnrollment {
+    +int id
+    +int class_id
+    +int student_id
+    +int call_number
+    +string status
+    +string status_detail
+}
 
-    ClassSubject "1" -- "*" Assessment : Tem
-    ClassSubject "1" -- "*" Lesson : Tem
+class Course {
+    +int id
+    +string course_name
+    +string course_code
+}
 
-    Assessment "1" -- "*" Grade : Avaliado em
+class ClassSubject {
+    +int id
+    +int class_id
+    +int course_id
+}
 
-    %% Definições das Classes
-    class Student {
-        +int id
-        +string first_name
-        +string last_name
-        +date birth_date
-        +string enrollment_date
-    }
+class Assessment {
+    +int id
+    +int class_subject_id
+    +string name
+    +float weight
+}
 
-    class Class {
-        +int id
-        +string name
-        +enum calculation_method
-    }
+class Grade {
+    +int id
+    +int student_id
+    +int assessment_id
+    +float score
+    +string date_recorded
+}
 
-    class ClassEnrollment {
-        +int id
-        +int class_id
-        +int student_id
-        +int call_number
-        +string status
-        +string status_detail
-    }
+class Lesson {
+    +int id
+    +int class_subject_id
+    +date date
+    +string title
+    +string content
+}
 
-    class Course {
-        +int id
-        +string course_name
-        +string course_code
-    }
+class Incident {
+    +int id
+    +int class_id
+    +int student_id
+    +date date
+    +string description
+}
 
-    class ClassSubject {
-        +int id
-        +int class_id
-        +int course_id
-    }
-
-    class Assessment {
-        +int id
-        +int class_subject_id
-        +string name
-        +float weight
-    }
-
-    class Grade {
-        +int id
-        +int student_id
-        +int assessment_id
-        +float score
-        +string date_recorded
-    }
-
-    class Lesson {
-        +int id
-        +int class_subject_id
-        +date date
-        +string title
-        +string content
-    }
-
-    class Incident {
-        +int id
-        +int class_id
-        +int student_id
-        +date date
-        +string description
-    }
+Class "1" -- "*" ClassEnrollment : Tem
+Class "1" -- "*" Incident : Tem
+Class "1" -- "*" ClassSubject : Oferece
+Student "1" -- "*" ClassEnrollment : Matriculado em
+Student "1" -- "*" Grade : Recebe
+Student "1" -- "*" Incident : Envolvido em
+Course "1" -- "*" ClassSubject : Define
+ClassSubject "1" -- "*" Assessment : Tem
+ClassSubject "1" -- "*" Lesson : Tem
+Assessment "1" -- "*" Grade : Avaliado em
 ```
 
 ---
@@ -142,29 +136,28 @@ classDiagram
 O sistema segue uma arquitetura em camadas, separando a Interface de Usuário (UI), Lógica de Negócios (Services) e Acesso a Dados (Data Layer).
 
 ```mermaid
-graph TB
-    subgraph UI_Layer ["Camada de Apresentação (UI)"]
-        UI_Main["MainApp (CustomTkinter)"]
-        UI_Views["Views (ClassDetail, Dashboard, etc.)"]
+graph TD
+    subgraph UI_Layer [Camada de Apresentação UI]
+        UI_Main[MainApp CustomTkinter]
+        UI_Views[Views ClassDetail, Dashboard]
     end
 
-    subgraph Service_Layer ["Camada de Serviço (Business Logic)"]
-        Service_Data["DataService (Singleton)"]
-        Service_AI["AssistantService (AI Orchestrator)"]
-        Service_Report["ReportService (Charts/Files)"]
+    subgraph Service_Layer [Camada de Serviço Business Logic]
+        Service_Data[DataService Singleton]
+        Service_AI[AssistantService AI Orchestrator]
+        Service_Report[ReportService Charts/Files]
     end
 
-    subgraph Core_Layer ["Núcleo e Ferramentas"]
-        Core_Tools["ToolRegistry"]
-        Core_Executor["ToolExecutor"]
-        Core_LLM["LLMProvider (OpenAI/Ollama)"]
+    subgraph Core_Layer [Núcleo e Ferramentas]
+        Core_Tools[ToolRegistry]
+        Core_Executor[ToolExecutor]
+        Core_LLM[LLMProvider OpenAI/Ollama]
     end
 
-    subgraph Data_Layer ["Camada de Dados"]
-        DB[("SQLite Database")]
+    subgraph Data_Layer [Camada de Dados]
+        DB[(SQLite Database)]
     end
 
-    %% Conexões
     UI_Main --> UI_Views
     UI_Views --> Service_Data
     UI_Views --> Service_AI
