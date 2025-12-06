@@ -9,23 +9,29 @@ Para uma visão técnica de alto nível, consulte [ARCHITECTURE.md](../ARCHITECT
 
 ## 1. Visão Geral (Diagrama de Casos de Uso)
 
-O sistema atende a dois atores principais: o **Usuário** (Administrador/Professor) e o **Assistente de IA**. Abaixo estão as principais funcionalidades disponíveis.
+O sistema atende a dois atores principais: o **Usuário** (Administrador/Professor) e o **Assistente de IA**. Abaixo estão as principais funcionalidades disponíveis, representadas através de um fluxograma de interação.
 
 ```mermaid
-usecaseDiagram
-    actor "Usuário (Professor/Admin)" as User
-    actor "Assistente de IA" as AI
+graph LR
+    %% Definição dos Atores (Fora do Sistema)
+    User["👤 Usuário (Professor/Admin)"]
+    AI["🤖 Assistente de IA"]
 
-    usecase "Gerenciar Turmas" as UC1
-    usecase "Gerenciar Alunos (Importar/Editar)" as UC2
-    usecase "Gerenciar Notas e Avaliações" as UC3
-    usecase "Gerenciar Aulas (Conteúdo)" as UC4
-    usecase "Registrar Incidentes" as UC5
-    usecase "Gerar Relatórios e Gráficos" as UC6
-    usecase "Consultar Assistente Inteligente" as UC7
-    usecase "Executar Ferramentas de Banco de Dados" as UC8
-    usecase "Executar Ferramentas de Relatório" as UC9
+    %% Limite do Sistema
+    subgraph System ["Sistema de Gestão Acadêmica"]
+        direction TB
+        UC1(["Gerenciar Turmas"])
+        UC2(["Gerenciar Alunos (Importar/Editar)"])
+        UC3(["Gerenciar Notas e Avaliações"])
+        UC4(["Gerenciar Aulas (Conteúdo)"])
+        UC5(["Registrar Incidentes"])
+        UC6(["Gerar Relatórios e Gráficos"])
+        UC7(["Consultar Assistente Inteligente"])
+        UC8(["Executar Ferramentas de Banco de Dados"])
+        UC9(["Executar Ferramentas de Relatório"])
+    end
 
+    %% Conexões Usuário -> Casos de Uso
     User --> UC1
     User --> UC2
     User --> UC3
@@ -34,7 +40,8 @@ usecaseDiagram
     User --> UC6
     User --> UC7
 
-    UC7 ..> AI
+    %% Conexões Casos de Uso -> IA
+    UC7 -.-> AI
     AI --> UC8
     AI --> UC9
 ```
