@@ -12,6 +12,7 @@ from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
 from app.utils.import_utils import async_import_students
+from app.utils.format_utils import parse_float_input, format_float_output
 # Importa o serviço de relatórios.
 from app.services.report_service import ReportService
 import os
@@ -388,7 +389,7 @@ class ClassDetailView(ctk.CTkFrame):
 
             try:
                 # Tenta converter o valor para um número float.
-                score = float(score_str)
+                score = parse_float_input(score_str)
                 # Valida se a nota está no intervalo permitido (0 a 10).
                 if not (0 <= score <= 10):
                     messagebox.showerror("Nota Inválida", f"Nota inválida '{score}'. As notas devem ser entre 0 e 10.")
@@ -457,15 +458,15 @@ class ClassDetailView(ctk.CTkFrame):
                 # Procura a nota existente para este aluno e avaliação.
                 existing_grade = next((g for g in grades if g['student_id'] == enrollment['student_id'] and g['assessment_id'] == assessment['id']), None)
                 if existing_grade:
-                    # Se existir, preenche o campo com o valor.
-                    entry.insert(0, str(existing_grade['score']))
+                    # Se existir, preenche o campo com o valor formatado.
+                    entry.insert(0, format_float_output(existing_grade['score']))
 
                 # Armazena a referência do widget de entrada.
                 self.grade_entries[(enrollment['student_id'], assessment['id'])] = entry
 
             # Calcula e exibe a média final ponderada do aluno para esta disciplina.
             average = data_service.calculate_weighted_average(enrollment['student_id'], grades, assessments)
-            average_label = ctk.CTkLabel(self.grade_grid_frame, text=f"{average:.2f}")
+            average_label = ctk.CTkLabel(self.grade_grid_frame, text=format_float_output(average, precision=2))
             average_label.grid(row=row, column=len(assessments) + 1, padx=5, pady=5, sticky="w")
 
     # Abre o pop-up para adicionar um novo incidente.
@@ -589,7 +590,7 @@ class ClassDetailView(ctk.CTkFrame):
             weight_str = data.get("weight")
             if name and weight_str:
                 try:
-                    weight = float(weight_str)
+                    weight = parse_float_input(weight_str)
                     data_service.add_assessment(self.current_subject_id, name, weight)
                     self.populate_assessment_list()
                 except ValueError as e:
@@ -616,7 +617,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         for i, assessment in enumerate(assessments, start=1):
             ctk.CTkLabel(self.assessment_list_frame, text=assessment['name']).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.assessment_list_frame, text=str(assessment['weight'])).grid(row=i, column=1, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.assessment_list_frame, text=format_float_output(assessment['weight'])).grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
             actions_frame = ctk.CTkFrame(self.assessment_list_frame)
             actions_frame.grid(row=i, column=2, padx=5, pady=5, sticky="e")
@@ -642,14 +643,18 @@ class ClassDetailView(ctk.CTkFrame):
             weight_str = data.get("weight")
             if name and weight_str:
                 try:
-                    weight = float(weight_str)
+                    weight = parse_float_input(weight_str)
                     data_service.update_assessment(assessment_id, name, weight)
                     self.populate_assessment_list()
                 except ValueError as e:
                     messagebox.showerror("Erro", f"Erro ao editar avaliação: {e}")
 
         fields = {"name": "Nome da Avaliação", "weight": "Peso"}
-        initial_data = {"id": assessment['id'], "name": assessment['name'], "weight": str(assessment['weight'])}
+        initial_data = {
+            "id": assessment['id'],
+            "name": assessment['name'],
+            "weight": format_float_output(assessment['weight'])
+        }
         EditDialog(self, "Editar Avaliação", fields, initial_data, save_callback)
 
     # Abre o pop-up para matricular um aluno existente na turma.
