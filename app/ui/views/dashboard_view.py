@@ -1,7 +1,7 @@
 # Importa a biblioteca 'customtkinter' para os componentes da interface.
 import customtkinter as ctk
 # Importa a função utilitária que gera o gráfico de distribuição de notas.
-from app.utils.charts import create_grade_distribution_chart
+from app.utils.charts import create_grade_distribution_chart, create_approval_pie_chart
 # Importa a biblioteca Pillow (PIL) para manipulação de imagens.
 from PIL import Image
 # Importa o módulo 'os' para interagir com o sistema de arquivos (verificar se o arquivo do gráfico existe).
@@ -57,6 +57,7 @@ class DashboardView(ctk.CTkFrame):
         """Configura os elementos da aba Visão Geral."""
         self.tab_overview.grid_columnconfigure(0, weight=1)
         self.tab_overview.grid_columnconfigure(1, weight=1)
+        self.tab_overview.grid_rowconfigure(1, weight=1)
 
         # Cards de Estatísticas
         self.stats_frame = ctk.CTkFrame(self.tab_overview)
@@ -73,15 +74,67 @@ class DashboardView(ctk.CTkFrame):
         # Seção de Aprovação Global
         self.approval_frame = ctk.CTkFrame(self.tab_overview)
         self.approval_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=20, sticky="nsew")
+
+        # Layout: Coluna 0 (Texto), Coluna 1 (Gráfico Pizza)
         self.approval_frame.grid_columnconfigure(0, weight=1)
+        self.approval_frame.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(self.approval_frame, text="Índice Global de Aprovação (Média >= 5.0)", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 5))
+        # -- Coluna 0: Texto e Botão --
+        text_container = ctk.CTkFrame(self.approval_frame, fg_color="transparent")
+        text_container.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
-        self.approval_label = ctk.CTkLabel(self.approval_frame, text="--%", font=ctk.CTkFont(size=40, weight="bold"))
+        ctk.CTkLabel(text_container, text="Índice Global de Aprovação\n(Média >= 5.0)", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 5))
+
+        self.approval_label = ctk.CTkLabel(text_container, text="--%", font=ctk.CTkFont(size=40, weight="bold"))
         self.approval_label.pack(pady=10)
 
-        self.approval_detail_label = ctk.CTkLabel(self.approval_frame, text="Aprovados: 0 | Abaixo da Média: 0", text_color="gray")
-        self.approval_detail_label.pack(pady=(0, 10))
+        self.approval_detail_label = ctk.CTkLabel(text_container, text="Aprovados: 0 | Abaixo da Média: 0", text_color="gray")
+        self.approval_detail_label.pack(pady=(0, 20))
+
+        self.btn_details = ctk.CTkButton(text_container, text="Ver Alunos em Risco", command=self.open_risk_details_dialog, fg_color="red", hover_color="#d32f2f")
+        self.btn_details.pack(pady=10)
+
+        # -- Coluna 1: Gráfico Pizza --
+        self.pie_chart_container = ctk.CTkFrame(self.approval_frame, fg_color="transparent")
+        self.pie_chart_container.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+
+        self.pie_chart_label = ctk.CTkLabel(self.pie_chart_container, text="")
+        self.pie_chart_label.pack(expand=True)
+        self.pie_chart_image = None # Prevent GC
+
+        # Armazena os dados detalhados para o modal
+        self.failed_details_data = []
+
+    def open_risk_details_dialog(self):
+        """Abre um modal com a lista de alunos abaixo da média."""
+        if not self.failed_details_data:
+            from tkinter import messagebox
+            messagebox.showinfo("Informação", "Não há alunos abaixo da média no momento.")
+            return
+
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Alunos em Risco (Média < 5.0)")
+        dialog.geometry("500x400")
+        dialog.transient(self) # Faz a janela ser filha da principal
+        dialog.grab_set() # Foca na janela
+
+        # Cabeçalho
+        ctk.CTkLabel(dialog, text="Alunos Abaixo da Média", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+
+        # Scrollable list
+        scroll_frame = ctk.CTkScrollableFrame(dialog)
+        scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        for i, item in enumerate(self.failed_details_data):
+            row_frame = ctk.CTkFrame(scroll_frame)
+            row_frame.pack(fill="x", pady=2)
+
+            # Format: Nome - Disciplina (Turma): Nota
+            text = f"{item['student_name']} - {item['course_name']} ({item['class_name']})"
+            score_text = f"Média: {item['average']}"
+
+            ctk.CTkLabel(row_frame, text=text, anchor="w").pack(side="left", padx=10, pady=5)
+            ctk.CTkLabel(row_frame, text=score_text, text_color="red", font=ctk.CTkFont(weight="bold")).pack(side="right", padx=10, pady=5)
 
     def _create_stat_card(self, parent, title, value, row, col):
         card = ctk.CTkFrame(parent)
@@ -139,10 +192,20 @@ class DashboardView(ctk.CTkFrame):
         approval_rate = perf.get('approval_rate', 0.0)
         approved = perf.get('approved', 0)
         failed = perf.get('failed', 0)
+        self.failed_details_data = perf.get('failed_details', [])
 
         color = "green" if approval_rate >= 70 else "orange" if approval_rate >= 50 else "red"
         self.approval_label.configure(text=f"{approval_rate:.1f}%", text_color=color)
         self.approval_detail_label.configure(text=f"Aprovados: {approved} | Abaixo da Média: {failed}")
+
+        # Atualiza o gráfico de Pizza
+        pie_chart_path = create_approval_pie_chart(approved, failed)
+        if os.path.exists(pie_chart_path):
+            img = Image.open(pie_chart_path)
+            self.pie_chart_image = ctk.CTkImage(light_image=img, size=img.size)
+            self.pie_chart_label.configure(image=self.pie_chart_image, text="")
+        else:
+             self.pie_chart_label.configure(image=None, text="Erro no Gráfico")
 
     # Carrega os cursos do banco de dados e preenche o menu dropdown.
     def load_courses(self):

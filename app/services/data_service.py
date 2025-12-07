@@ -794,13 +794,19 @@ class DataService:
 
     # Método para calcular a taxa de aprovação global baseada em todas as disciplinas e alunos ativos.
     def get_global_performance_stats(self) -> dict:
-        """Calcula taxas globais de aprovação/reprovação baseadas em matrículas ativas em todas as disciplinas."""
+        """Calcula taxas globais de aprovação/reprovação e lista alunos em risco (abaixo da média)."""
         total_enrollments_analyzed = 0
         approved_count = 0
+        failed_details = []
 
         with self._get_db() as db:
             # Itera sobre todas as disciplinas existentes.
-            subjects = db.query(ClassSubject).all()
+            # Eager load class and course to avoid N+1 inside the loop
+            subjects = db.query(ClassSubject).options(
+                joinedload(ClassSubject.class_),
+                joinedload(ClassSubject.course)
+            ).all()
+
             for subject in subjects:
                 assessments = db.query(Assessment).filter(Assessment.class_subject_id == subject.id).all()
                 if not assessments: continue
@@ -811,7 +817,8 @@ class DataService:
                 grades = db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).all()
                 grades_data = [{"assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id} for g in grades]
 
-                active_enrollments = db.query(ClassEnrollment).filter(
+                # Eager load Student to get names easily
+                active_enrollments = db.query(ClassEnrollment).options(joinedload(ClassEnrollment.student)).filter(
                     ClassEnrollment.class_id == subject.class_id,
                     ClassEnrollment.status == 'Active'
                 ).all()
@@ -821,12 +828,20 @@ class DataService:
                     total_enrollments_analyzed += 1
                     if avg >= 5.0:
                         approved_count += 1
+                    else:
+                        failed_details.append({
+                            "student_name": f"{enrollment.student.first_name} {enrollment.student.last_name}",
+                            "class_name": subject.class_.name,
+                            "course_name": subject.course.course_name,
+                            "average": round(avg, 2)
+                        })
 
         return {
             "total_analyzed": total_enrollments_analyzed,
             "approved": approved_count,
             "failed": total_enrollments_analyzed - approved_count,
-            "approval_rate": (approved_count / total_enrollments_analyzed * 100) if total_enrollments_analyzed > 0 else 0.0
+            "approval_rate": (approved_count / total_enrollments_analyzed * 100) if total_enrollments_analyzed > 0 else 0.0,
+            "failed_details": failed_details
         }
 
     # Método privado para inserir/atualizar alunos e matrículas em lote (usado pela importação de CSV).

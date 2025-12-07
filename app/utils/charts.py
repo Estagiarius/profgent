@@ -45,3 +45,39 @@ def create_grade_distribution_chart(data: Union[List[Dict[str, Any]], List[float
     plt.close(fig)
 
     return output_path
+
+def create_approval_pie_chart(approved: int, failed: int) -> str:
+    """
+    Gera um gráfico de pizza mostrando a proporção de aprovados vs reprovados.
+
+    :param approved: Número de aprovações.
+    :param failed: Número de reprovações.
+    :return: Caminho do arquivo temporário com a imagem.
+    """
+    temp_dir = tempfile.gettempdir()
+    output_path = os.path.join(temp_dir, "academic_app_pie_chart.png")
+
+    fig, ax = plt.subplots(figsize=(5, 4))
+
+    total = approved + failed
+    if total == 0:
+        ax.text(0.5, 0.5, 'Sem dados suficientes', horizontalalignment='center', verticalalignment='center')
+        ax.axis('off')
+    else:
+        labels = ['Aprovados', 'Abaixo da Média']
+        sizes = [approved, failed]
+        colors = ['#66bb6a', '#ef5350'] # Green and Red compatible with dark mode
+
+        # Only show labels if slice > 0
+        labels = [l if s > 0 else '' for l, s in zip(labels, sizes)]
+
+        ax.pie(sizes, labels=labels, colors=colors, autopct=lambda p: f'{p:.1f}%' if p > 0 else '',
+               startangle=90, textprops={'color':"white" if plt.rcParams['figure.facecolor'] == 'black' else 'black'})
+        ax.axis('equal')
+
+    # Set transparent background to blend with CustomTkinter dark theme
+    fig.patch.set_alpha(0.0)
+
+    plt.savefig(output_path, transparent=True)
+    plt.close(fig)
+    return output_path
