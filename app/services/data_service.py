@@ -756,6 +756,20 @@ class DataService:
                 "total_incidents": total_incidents
             }
 
+    # Método para obter o ranking de incidentes por turma.
+    def get_class_incident_ranking(self, limit: int = 5) -> list[dict]:
+        with self._get_db() as db:
+            # Query grouped by Class.id, ordering by count descending
+            ranking = (
+                db.query(Class.name, func.count(Incident.id).label('count'))
+                .join(Incident, Class.id == Incident.class_id)
+                .group_by(Class.id)
+                .order_by(func.count(Incident.id).desc())
+                .limit(limit)
+                .all()
+            )
+            return [{"class_name": r.name, "count": r.count} for r in ranking]
+
     # Método para calcular as médias finais de todos os alunos ativos em um curso.
     def get_course_averages(self, course_id: int) -> list[float]:
         """Calcula as médias finais ponderadas para todos os alunos ativos em um curso."""
@@ -794,10 +808,11 @@ class DataService:
 
     # Método para calcular a taxa de aprovação global baseada em todas as disciplinas e alunos ativos.
     def get_global_performance_stats(self) -> dict:
-        """Calcula taxas globais de aprovação/reprovação e lista alunos em risco (abaixo da média)."""
+        """Calcula taxas globais de aprovação/reprovação e lista alunos em risco e destaque."""
         total_enrollments_analyzed = 0
         approved_count = 0
         failed_details = []
+        honor_roll_details = []
 
         with self._get_db() as db:
             # Itera sobre todas as disciplinas existentes.
@@ -828,6 +843,14 @@ class DataService:
                     total_enrollments_analyzed += 1
                     if avg >= 5.0:
                         approved_count += 1
+                        # Check for Honor Roll (>= 9.0)
+                        if avg >= 9.0:
+                             honor_roll_details.append({
+                                "student_name": f"{enrollment.student.first_name} {enrollment.student.last_name}",
+                                "class_name": subject.class_.name,
+                                "course_name": subject.course.course_name,
+                                "average": round(avg, 2)
+                            })
                     else:
                         failed_details.append({
                             "student_name": f"{enrollment.student.first_name} {enrollment.student.last_name}",
@@ -841,7 +864,8 @@ class DataService:
             "approved": approved_count,
             "failed": total_enrollments_analyzed - approved_count,
             "approval_rate": (approved_count / total_enrollments_analyzed * 100) if total_enrollments_analyzed > 0 else 0.0,
-            "failed_details": failed_details
+            "failed_details": failed_details,
+            "honor_roll_details": honor_roll_details
         }
 
     # Método privado para inserir/atualizar alunos e matrículas em lote (usado pela importação de CSV).
