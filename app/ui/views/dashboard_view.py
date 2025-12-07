@@ -29,27 +29,17 @@ class DashboardView(ctk.CTkFrame):
         self.title_label = ctk.CTkLabel(self, text="Dashboard de Análises", font=ctk.CTkFont(size=20, weight="bold"))
         self.title_label.grid(row=0, column=0, columnspan=2, padx=20, pady=(20, 10), sticky="ew")
 
-        # --- Frame de Controles ---
-        # Frame para agrupar o rótulo e o menu de seleção de curso.
-        self.controls_frame = ctk.CTkFrame(self)
-        self.controls_frame.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
+        # --- Sistema de Abas (Visão Geral e Por Disciplina) ---
+        self.tabview = ctk.CTkTabview(self)
+        self.tabview.grid(row=1, column=0, rowspan=2, padx=20, pady=10, sticky="nsew")
 
-        self.course_label = ctk.CTkLabel(self.controls_frame, text="Selecione a Disciplina para Análise:")
-        self.course_label.pack(side="left", padx=10, pady=10)
+        # Aba de Visão Geral
+        self.tab_overview = self.tabview.add("Visão Geral")
+        self.setup_overview_tab()
 
-        # Menu dropdown para selecionar o curso.
-        self.course_menu = ctk.CTkOptionMenu(self.controls_frame, values=[], command=self.on_course_select)
-        self.course_menu.pack(side="left", padx=10, pady=10, fill="x", expand=True)
-
-        # --- Frame de Exibição do Gráfico ---
-        self.chart_frame = ctk.CTkFrame(self)
-        self.chart_frame.grid(row=2, column=0, padx=20, pady=20, sticky="nsew")
-
-        # Rótulo que exibirá a imagem do gráfico ou uma mensagem de texto.
-        self.chart_label = ctk.CTkLabel(self.chart_frame, text="Selecione um curso para ver a distribuição de notas.")
-        self.chart_label.pack(expand=True)
-        # Referência para a imagem do gráfico para evitar que seja coletada pelo garbage collector.
-        self.chart_image = None
+        # Aba de Análise por Disciplina
+        self.tab_analysis = self.tabview.add("Por Disciplina")
+        self.setup_analysis_tab()
 
         # --- Frame de Aniversariantes ---
         self.birthdays_frame_container = ctk.CTkFrame(self)
@@ -63,15 +53,96 @@ class DashboardView(ctk.CTkFrame):
         self.birthdays_scrollable_frame = ctk.CTkScrollableFrame(self.birthdays_frame_container, label_text="")
         self.birthdays_scrollable_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
 
+    def setup_overview_tab(self):
+        """Configura os elementos da aba Visão Geral."""
+        self.tab_overview.grid_columnconfigure(0, weight=1)
+        self.tab_overview.grid_columnconfigure(1, weight=1)
+
+        # Cards de Estatísticas
+        self.stats_frame = ctk.CTkFrame(self.tab_overview)
+        self.stats_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+
+        # Grid para os cards dentro do frame
+        self.stats_frame.grid_columnconfigure((0, 1), weight=1)
+
+        self.card_students = self._create_stat_card(self.stats_frame, "Alunos Ativos", "0", 0, 0)
+        self.card_classes = self._create_stat_card(self.stats_frame, "Turmas", "0", 0, 1)
+        self.card_courses = self._create_stat_card(self.stats_frame, "Disciplinas", "0", 1, 0)
+        self.card_incidents = self._create_stat_card(self.stats_frame, "Incidentes", "0", 1, 1)
+
+        # Seção de Aprovação Global
+        self.approval_frame = ctk.CTkFrame(self.tab_overview)
+        self.approval_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=20, sticky="nsew")
+        self.approval_frame.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(self.approval_frame, text="Índice Global de Aprovação (Média >= 5.0)", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 5))
+
+        self.approval_label = ctk.CTkLabel(self.approval_frame, text="--%", font=ctk.CTkFont(size=40, weight="bold"))
+        self.approval_label.pack(pady=10)
+
+        self.approval_detail_label = ctk.CTkLabel(self.approval_frame, text="Aprovados: 0 | Abaixo da Média: 0", text_color="gray")
+        self.approval_detail_label.pack(pady=(0, 10))
+
+    def _create_stat_card(self, parent, title, value, row, col):
+        card = ctk.CTkFrame(parent)
+        card.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
+
+        ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12, weight="bold"), text_color="gray").pack(pady=(10, 0))
+        value_label = ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"))
+        value_label.pack(pady=(0, 10))
+        return value_label
+
+    def setup_analysis_tab(self):
+        """Configura os elementos da aba Análise por Disciplina."""
+        self.tab_analysis.grid_columnconfigure(0, weight=1)
+        self.tab_analysis.grid_rowconfigure(1, weight=1)
+
+        # Frame de Controles
+        self.controls_frame = ctk.CTkFrame(self.tab_analysis)
+        self.controls_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+
+        self.course_label = ctk.CTkLabel(self.controls_frame, text="Selecione a Disciplina:")
+        self.course_label.pack(side="left", padx=10, pady=10)
+
+        self.course_menu = ctk.CTkOptionMenu(self.controls_frame, values=[], command=self.on_course_select)
+        self.course_menu.pack(side="left", padx=10, pady=10, fill="x", expand=True)
+
+        # Frame do Gráfico
+        self.chart_frame = ctk.CTkFrame(self.tab_analysis)
+        self.chart_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+
+        self.chart_label = ctk.CTkLabel(self.chart_frame, text="Selecione um curso para ver a distribuição de médias.")
+        self.chart_label.pack(expand=True, fill="both")
+        self.chart_image = None
+
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs):
         _ = kwargs
+        # Carrega dados globais
+        self.update_global_stats()
         # Carrega (ou recarrega) a lista de cursos.
         self.load_courses()
         # Atualiza o gráfico com base na seleção atual.
         self.update_chart()
         # Atualiza a lista de aniversariantes.
         self.update_birthdays()
+
+    def update_global_stats(self):
+        """Atualiza os cards e estatísticas da aba Visão Geral."""
+        stats = self.data_service.get_global_dashboard_stats()
+        self.card_students.configure(text=str(stats.get('active_students', 0)))
+        self.card_classes.configure(text=str(stats.get('total_classes', 0)))
+        self.card_courses.configure(text=str(stats.get('total_courses', 0)))
+        self.card_incidents.configure(text=str(stats.get('total_incidents', 0)))
+
+        perf = self.data_service.get_global_performance_stats()
+        approval_rate = perf.get('approval_rate', 0.0)
+        approved = perf.get('approved', 0)
+        failed = perf.get('failed', 0)
+
+        color = "green" if approval_rate >= 70 else "orange" if approval_rate >= 50 else "red"
+        self.approval_label.configure(text=f"{approval_rate:.1f}%", text_color=color)
+        self.approval_detail_label.configure(text=f"Aprovados: {approved} | Abaixo da Média: {failed}")
 
     # Carrega os cursos do banco de dados e preenche o menu dropdown.
     def load_courses(self):
@@ -106,28 +177,23 @@ class DashboardView(ctk.CTkFrame):
 
     # Gera e exibe o gráfico para o curso selecionado.
     def update_chart(self):
-        """Gera e exibe o gráfico para o curso selecionado."""
+        """Gera e exibe o gráfico com as médias finais dos alunos para o curso selecionado."""
         # Se nenhum curso estiver selecionado, exibe uma mensagem.
         if self.selected_course_id is None:
             self.chart_label.configure(text="Nenhum curso selecionado ou disponível.", image=None)
             return
 
-        # Busca os detalhes do curso selecionado, incluindo suas turmas.
+        # Busca os detalhes do curso selecionado
         selected_course = self.data_service.get_course_by_id(self.selected_course_id)
         if not selected_course:
             self.chart_label.configure(text=f"Não foi possível encontrar o curso com ID: {self.selected_course_id}", image=None)
             return
 
-        # Agrega as notas de todas as turmas dentro do curso selecionado.
-        all_grades = []
-        for class_data in selected_course.get('classes', []):
-            # Usa o ID do ClassSubject para buscar notas específicas desta disciplina nesta turma
-            if 'class_subject_id' in class_data:
-                grades_in_class = self.data_service.get_grades_for_subject(class_data['class_subject_id'])
-                all_grades.extend(grades_in_class)
+        # Busca as médias calculadas (ao invés de notas brutas)
+        averages = self.data_service.get_course_averages(self.selected_course_id)
 
-        # Chama a função utilitária para gerar o gráfico e obter o caminho do arquivo de imagem temporário.
-        chart_path = create_grade_distribution_chart(all_grades, selected_course['course_name'])
+        # Chama a função utilitária para gerar o gráfico de médias.
+        chart_path = create_grade_distribution_chart(averages, selected_course['course_name'])
 
         # Se o arquivo de imagem do gráfico foi criado com sucesso...
         if os.path.exists(chart_path):
