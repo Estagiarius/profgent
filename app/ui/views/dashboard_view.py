@@ -154,6 +154,9 @@ class DashboardView(ctk.CTkFrame):
         dialog.title(title)
         dialog.geometry("500x400")
         dialog.transient(self)
+        
+        # Aguarda a janela estar pronta
+        dialog.wait_visibility()
         dialog.grab_set()
 
         ctk.CTkLabel(dialog, text=title, font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
