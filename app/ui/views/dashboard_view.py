@@ -37,6 +37,10 @@ class DashboardView(ctk.CTkFrame):
         self.tab_overview = self.tabview.add("Visão Geral")
         self.setup_overview_tab()
 
+        # Aba de Rankings e Destaques (Nova)
+        self.tab_rankings = self.tabview.add("Destaques & Alertas")
+        self.setup_rankings_tab()
+
         # Aba de Análise por Disciplina
         self.tab_analysis = self.tabview.add("Por Disciplina")
         self.setup_analysis_tab()
@@ -106,38 +110,39 @@ class DashboardView(ctk.CTkFrame):
         self.failed_details_data = []
         self.honor_roll_data = []
 
-        # --- Seção de Quadro de Honra e Incidentes (Novo) ---
-        self.extra_metrics_frame = ctk.CTkFrame(self.tab_overview)
-        self.extra_metrics_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
-        self.extra_metrics_frame.grid_columnconfigure(0, weight=1)
-        self.extra_metrics_frame.grid_columnconfigure(1, weight=1)
+    def setup_rankings_tab(self):
+        """Configura os elementos da aba de Destaques e Alertas."""
+        self.tab_rankings.grid_columnconfigure(0, weight=1)
+        self.tab_rankings.grid_columnconfigure(1, weight=1)
+        self.tab_rankings.grid_rowconfigure(0, weight=1)
 
-        # Quadro de Honra
-        self.honor_frame = ctk.CTkFrame(self.extra_metrics_frame)
+        # --- Quadro de Honra (Coluna 0) ---
+        self.honor_frame = ctk.CTkFrame(self.tab_rankings)
         self.honor_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        ctk.CTkLabel(self.honor_frame, text="Quadro de Honra (Média >= 9.0)", font=ctk.CTkFont(weight="bold", size=14)).pack(pady=10)
-        self.honor_count_label = ctk.CTkLabel(self.honor_frame, text="0 Alunos", font=ctk.CTkFont(size=20, weight="bold"), text_color="#FFD700")
+        ctk.CTkLabel(self.honor_frame, text="Quadro de Honra (Média >= 9.0)", font=ctk.CTkFont(weight="bold", size=16)).pack(pady=10)
+
+        self.honor_count_label = ctk.CTkLabel(self.honor_frame, text="0 Alunos Destaque", font=ctk.CTkFont(size=14), text_color="#FFD700")
         self.honor_count_label.pack(pady=5)
 
-        ctk.CTkButton(self.honor_frame, text="Ver Destaques", command=self.open_honor_details_dialog, fg_color="#F9A825", hover_color="#FBC02D").pack(pady=10)
+        # Lista de Alunos Destaque (Embedded)
+        self.honor_list_frame = ctk.CTkScrollableFrame(self.honor_frame)
+        self.honor_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Incidentes
-        self.incidents_frame = ctk.CTkFrame(self.extra_metrics_frame)
+        # --- Ranking de Incidentes (Coluna 1) ---
+        self.incidents_frame = ctk.CTkFrame(self.tab_rankings)
         self.incidents_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
-        ctk.CTkLabel(self.incidents_frame, text="Top Incidentes por Turma", font=ctk.CTkFont(weight="bold", size=14)).pack(pady=10)
-        self.incidents_list_frame = ctk.CTkScrollableFrame(self.incidents_frame, height=100)
-        self.incidents_list_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        ctk.CTkLabel(self.incidents_frame, text="Top Incidentes por Turma", font=ctk.CTkFont(weight="bold", size=16)).pack(pady=10)
+
+        # Lista de Incidentes (Embedded)
+        self.incidents_list_frame = ctk.CTkScrollableFrame(self.incidents_frame)
+        self.incidents_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
 
     def open_risk_details_dialog(self):
         """Abre um modal com a lista de alunos abaixo da média."""
         self._show_student_list_modal("Alunos em Risco (Média < 5.0)", self.failed_details_data, "red")
-
-    def open_honor_details_dialog(self):
-        """Abre um modal com a lista de alunos destaque."""
-        self._show_student_list_modal("Quadro de Honra (Média >= 9.0)", self.honor_roll_data, "#F9A825")
 
     def _show_student_list_modal(self, title, data, score_color):
         if not data:
@@ -149,9 +154,6 @@ class DashboardView(ctk.CTkFrame):
         dialog.title(title)
         dialog.geometry("500x400")
         dialog.transient(self)
-        
-        # Aguarda a janela ficar visível antes de chamar grab_set
-        dialog.wait_visibility()
         dialog.grab_set()
 
         ctk.CTkLabel(dialog, text=title, font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
@@ -232,10 +234,25 @@ class DashboardView(ctk.CTkFrame):
         self.approval_label.configure(text=f"{approval_rate:.1f}%", text_color=color)
         self.approval_detail_label.configure(text=f"Aprovados: {approved} | Abaixo da Média: {failed}")
 
-        # Atualiza Honor Roll Count
-        self.honor_count_label.configure(text=f"{len(self.honor_roll_data)} Alunos")
+        # Atualiza Honor Roll (Aba Destaques)
+        self.honor_count_label.configure(text=f"{len(self.honor_roll_data)} Alunos Destaque")
 
-        # Atualiza o gráfico de Pizza
+        # Limpa e popula lista de Honra
+        for widget in self.honor_list_frame.winfo_children():
+            widget.destroy()
+
+        if not self.honor_roll_data:
+             ctk.CTkLabel(self.honor_list_frame, text="Nenhum aluno em destaque.", text_color="gray").pack(pady=5)
+        else:
+            for item in self.honor_roll_data:
+                row = ctk.CTkFrame(self.honor_list_frame)
+                row.pack(fill="x", pady=2)
+                text = f"{item['student_name']} - {item['course_name']}"
+                score_text = f"{item['average']}"
+                ctk.CTkLabel(row, text=text, anchor="w").pack(side="left", padx=5)
+                ctk.CTkLabel(row, text=score_text, text_color="#FFD700", font=ctk.CTkFont(weight="bold")).pack(side="right", padx=5)
+
+        # Atualiza o gráfico de Pizza (Aba Visão Geral)
         pie_chart_path = create_approval_pie_chart(approved, failed)
         if os.path.exists(pie_chart_path):
             img = Image.open(pie_chart_path)
@@ -244,7 +261,7 @@ class DashboardView(ctk.CTkFrame):
         else:
              self.pie_chart_label.configure(image=None, text="Erro no Gráfico")
 
-        # Atualiza Ranking de Incidentes
+        # Atualiza Ranking de Incidentes (Aba Destaques)
         incident_ranking = self.data_service.get_class_incident_ranking()
 
         # Clear previous widgets
