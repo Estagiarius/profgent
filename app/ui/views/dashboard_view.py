@@ -104,40 +104,67 @@ class DashboardView(ctk.CTkFrame):
 
         # Armazena os dados detalhados para o modal
         self.failed_details_data = []
+        self.honor_roll_data = []
+
+        # --- Seção de Quadro de Honra e Incidentes (Novo) ---
+        self.extra_metrics_frame = ctk.CTkFrame(self.tab_overview)
+        self.extra_metrics_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=10, sticky="nsew")
+        self.extra_metrics_frame.grid_columnconfigure(0, weight=1)
+        self.extra_metrics_frame.grid_columnconfigure(1, weight=1)
+
+        # Quadro de Honra
+        self.honor_frame = ctk.CTkFrame(self.extra_metrics_frame)
+        self.honor_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        ctk.CTkLabel(self.honor_frame, text="Quadro de Honra (Média >= 9.0)", font=ctk.CTkFont(weight="bold", size=14)).pack(pady=10)
+        self.honor_count_label = ctk.CTkLabel(self.honor_frame, text="0 Alunos", font=ctk.CTkFont(size=20, weight="bold"), text_color="#FFD700")
+        self.honor_count_label.pack(pady=5)
+
+        ctk.CTkButton(self.honor_frame, text="Ver Destaques", command=self.open_honor_details_dialog, fg_color="#F9A825", hover_color="#FBC02D").pack(pady=10)
+
+        # Incidentes
+        self.incidents_frame = ctk.CTkFrame(self.extra_metrics_frame)
+        self.incidents_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        ctk.CTkLabel(self.incidents_frame, text="Top Incidentes por Turma", font=ctk.CTkFont(weight="bold", size=14)).pack(pady=10)
+        self.incidents_list_frame = ctk.CTkScrollableFrame(self.incidents_frame, height=100)
+        self.incidents_list_frame.pack(fill="both", expand=True, padx=5, pady=5)
+
 
     def open_risk_details_dialog(self):
         """Abre um modal com a lista de alunos abaixo da média."""
-        if not self.failed_details_data:
+        self._show_student_list_modal("Alunos em Risco (Média < 5.0)", self.failed_details_data, "red")
+
+    def open_honor_details_dialog(self):
+        """Abre um modal com a lista de alunos destaque."""
+        self._show_student_list_modal("Quadro de Honra (Média >= 9.0)", self.honor_roll_data, "#F9A825")
+
+    def _show_student_list_modal(self, title, data, score_color):
+        if not data:
             from tkinter import messagebox
-            messagebox.showinfo("Informação", "Não há alunos abaixo da média no momento.")
+            messagebox.showinfo("Informação", "Nenhum aluno nesta categoria no momento.")
             return
 
         dialog = ctk.CTkToplevel(self)
-        dialog.title("Alunos em Risco (Média < 5.0)")
+        dialog.title(title)
         dialog.geometry("500x400")
-        dialog.transient(self) # Faz a janela ser filha da principal
+        dialog.transient(self)
+        dialog.grab_set()
 
-        # Cabeçalho
-        ctk.CTkLabel(dialog, text="Alunos Abaixo da Média", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
+        ctk.CTkLabel(dialog, text=title, font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
 
-        # Scrollable list
         scroll_frame = ctk.CTkScrollableFrame(dialog)
         scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        for i, item in enumerate(self.failed_details_data):
+        for item in data:
             row_frame = ctk.CTkFrame(scroll_frame)
             row_frame.pack(fill="x", pady=2)
 
-            # Format: Nome - Disciplina (Turma): Nota
             text = f"{item['student_name']} - {item['course_name']} ({item['class_name']})"
             score_text = f"Média: {item['average']}"
 
             ctk.CTkLabel(row_frame, text=text, anchor="w").pack(side="left", padx=10, pady=5)
-            ctk.CTkLabel(row_frame, text=score_text, text_color="red", font=ctk.CTkFont(weight="bold")).pack(side="right", padx=10, pady=5)
-
-        # Aguarda a janela estar pronta antes de torná-la modal
-        dialog.wait_visibility()
-        dialog.grab_set()
+            ctk.CTkLabel(row_frame, text=score_text, text_color=score_color, font=ctk.CTkFont(weight="bold")).pack(side="right", padx=10, pady=5)
 
     def _create_stat_card(self, parent, title, value, row, col):
         card = ctk.CTkFrame(parent)
@@ -196,10 +223,14 @@ class DashboardView(ctk.CTkFrame):
         approved = perf.get('approved', 0)
         failed = perf.get('failed', 0)
         self.failed_details_data = perf.get('failed_details', [])
+        self.honor_roll_data = perf.get('honor_roll_details', [])
 
         color = "green" if approval_rate >= 70 else "orange" if approval_rate >= 50 else "red"
         self.approval_label.configure(text=f"{approval_rate:.1f}%", text_color=color)
         self.approval_detail_label.configure(text=f"Aprovados: {approved} | Abaixo da Média: {failed}")
+
+        # Atualiza Honor Roll Count
+        self.honor_count_label.configure(text=f"{len(self.honor_roll_data)} Alunos")
 
         # Atualiza o gráfico de Pizza
         pie_chart_path = create_approval_pie_chart(approved, failed)
@@ -209,6 +240,22 @@ class DashboardView(ctk.CTkFrame):
             self.pie_chart_label.configure(image=self.pie_chart_image, text="")
         else:
              self.pie_chart_label.configure(image=None, text="Erro no Gráfico")
+
+        # Atualiza Ranking de Incidentes
+        incident_ranking = self.data_service.get_class_incident_ranking()
+
+        # Clear previous widgets
+        for widget in self.incidents_list_frame.winfo_children():
+            widget.destroy()
+
+        if not incident_ranking:
+             ctk.CTkLabel(self.incidents_list_frame, text="Nenhum incidente registrado.", text_color="gray").pack(pady=5)
+        else:
+            for i, item in enumerate(incident_ranking):
+                row = ctk.CTkFrame(self.incidents_list_frame)
+                row.pack(fill="x", pady=2)
+                ctk.CTkLabel(row, text=f"{i+1}. {item['class_name']}", anchor="w").pack(side="left", padx=5)
+                ctk.CTkLabel(row, text=f"{item['count']} incidentes", font=ctk.CTkFont(weight="bold")).pack(side="right", padx=5)
 
     # Carrega os cursos do banco de dados e preenche o menu dropdown.
     def load_courses(self):
