@@ -116,7 +116,6 @@ class DashboardView(ctk.CTkFrame):
         dialog.title("Alunos em Risco (Média < 5.0)")
         dialog.geometry("500x400")
         dialog.transient(self) # Faz a janela ser filha da principal
-        dialog.grab_set() # Foca na janela
 
         # Cabeçalho
         ctk.CTkLabel(dialog, text="Alunos Abaixo da Média", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
@@ -135,6 +134,10 @@ class DashboardView(ctk.CTkFrame):
 
             ctk.CTkLabel(row_frame, text=text, anchor="w").pack(side="left", padx=10, pady=5)
             ctk.CTkLabel(row_frame, text=score_text, text_color="red", font=ctk.CTkFont(weight="bold")).pack(side="right", padx=10, pady=5)
+
+        # Aguarda a janela estar pronta antes de torná-la modal
+        dialog.wait_visibility()
+        dialog.grab_set()
 
     def _create_stat_card(self, parent, title, value, row, col):
         card = ctk.CTkFrame(parent)
