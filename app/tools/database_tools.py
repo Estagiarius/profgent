@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 from sqlalchemy.exc import SQLAlchemyError
 from app.core.tools.tool_decorator import tool
 from app.services import data_service
@@ -48,6 +49,42 @@ def global_search_tool(search_term: str) -> str:
 
     except Exception as e:
         return f"Erro na busca global: {e}"
+
+@tool
+def get_class_full_details_tool(class_name: str) -> str:
+    """
+    Obtém TODOS os detalhes de uma turma: alunos (com status), disciplinas e avaliações.
+    Retorna um JSON complexo ideal para análise detalhada.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+
+        # Get Subjects and Assessments
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        subjects_data = []
+        for s in subjects:
+            assessments = data_service.get_assessments_for_subject(s['id'])
+            subjects_data.append({
+                "name": s['course_name'],
+                "assessments": [{"name": a['name'], "weight": a['weight']} for a in assessments]
+            })
+
+        # Get Enrollments
+        enrollments = data_service.get_enrollments_for_class(cls['id'])
+        students_data = [{
+            "name": f"{e['student_first_name']} {e['student_last_name']}",
+            "call_number": e['call_number'],
+            "status": e['status']
+        } for e in enrollments]
+
+        result = {
+            "class_name": cls['name'],
+            "subjects": subjects_data,
+            "students": students_data
+        }
+        return json.dumps(result, indent=2)
+    except Exception as e: return f"Erro ao obter detalhes da turma: {e}"
 
 @tool
 def get_student_grades_by_course(student_name: str, course_name: str) -> str:
@@ -266,6 +303,93 @@ def search_students(search_term: str) -> str:
 # --- WRITE TOOLS ---
 
 @tool
+def import_students_csv_tool(class_name: str, csv_content: str) -> str:
+    """
+    Importa uma lista de alunos a partir de um texto CSV para uma turma específica.
+    O CSV deve ter cabeçalho (ex: Full Name,Birth Date,Status) ou seguir o padrão da escola.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+
+        result = data_service.import_students_from_csv(cls['id'], csv_content)
+        imported = result.get('imported_count', 0)
+        errors = result.get('errors', [])
+
+        msg = f"Importação concluída. {imported} alunos importados/atualizados."
+        if errors:
+            msg += f"\nErros ({len(errors)}): " + "; ".join(errors[:3])
+            if len(errors) > 3: msg += "..."
+        return msg
+    except Exception as e: return f"Erro na importação: {e}"
+
+@tool
+def transfer_student_tool(student_name: str, from_class_name: str, to_class_name: str) -> str:
+    """
+    Transfere um aluno de uma turma para outra.
+    O aluno será marcado como 'Inactive' na turma antiga e matriculado como 'Active' na nova.
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student: return "Aluno não encontrado."
+
+        from_cls = data_service.get_class_by_name(from_class_name)
+        if not from_cls: return f"Turma de origem '{from_class_name}' não encontrada."
+
+        to_cls = data_service.get_class_by_name(to_class_name)
+        if not to_cls: return f"Turma de destino '{to_class_name}' não encontrada."
+
+        # Find old enrollment
+        enrollments = data_service.get_enrollments_for_class(from_cls['id'])
+        old_enrollment = next((e for e in enrollments if e['student_id'] == student['id']), None)
+
+        if not old_enrollment:
+            return f"Aluno {student_name} não está matriculado na turma {from_class_name}."
+
+        # Inactivate old
+        data_service.update_enrollment_status(old_enrollment['id'], "Inactive")
+
+        # Create new enrollment
+        next_num = data_service.get_next_call_number(to_cls['id'])
+        data_service.add_student_to_class(student['id'], to_cls['id'], next_num, "Active")
+
+        return f"Transferência realizada com sucesso: {student_name} movido de {from_class_name} para {to_class_name}."
+
+    except Exception as e: return f"Erro na transferência: {e}"
+
+@tool
+def copy_class_structure_tool(source_class_name: str, target_class_name: str) -> str:
+    """
+    Copia a estrutura (Disciplinas e Avaliações) de uma turma para outra.
+    Útil para configurar rapidamente uma nova turma baseada em uma existente.
+    """
+    try:
+        source_cls = data_service.get_class_by_name(source_class_name)
+        if not source_cls: return f"Turma de origem '{source_class_name}' não encontrada."
+
+        target_cls = data_service.get_class_by_name(target_class_name)
+        if not target_cls: return f"Turma de destino '{target_class_name}' não encontrada."
+
+        subjects = data_service.get_subjects_for_class(source_cls['id'])
+        copied_subjects = 0
+        copied_assessments = 0
+
+        for subj in subjects:
+            # Add subject to target class
+            new_subj = data_service.add_subject_to_class(target_cls['id'], subj['course_id'])
+            copied_subjects += 1
+
+            # Get assessments from source subject and copy to new subject
+            assessments = data_service.get_assessments_for_subject(subj['id'])
+            for assess in assessments:
+                data_service.add_assessment(new_subj['id'], assess['name'], assess['weight'])
+                copied_assessments += 1
+
+        return f"Estrutura copiada com sucesso! {copied_subjects} disciplinas e {copied_assessments} avaliações replicadas de {source_class_name} para {target_class_name}."
+
+    except Exception as e: return f"Erro ao copiar estrutura: {e}"
+
+@tool
 def add_new_student(first_name: str, last_name: str, date_of_birth: str = None, enroll_in_class: str = None) -> str:
     """
     Adiciona um novo aluno ao sistema, com opção de matrícula em uma turma.
@@ -306,6 +430,41 @@ def add_new_student(first_name: str, last_name: str, date_of_birth: str = None, 
         return f"Erro: Ocorreu um erro de banco de dados ao adicionar o aluno: {e}"
     except Exception as e:
         return f"Erro: Ocorreu um erro inesperado: {e}"
+
+@tool
+def update_student_enrollment_tool(student_name: str, class_name: str, new_status: str, new_call_number: int = None) -> str:
+    """
+    Atualiza os dados de matrícula de um aluno em uma turma (Status e/ou Número de Chamada).
+
+    :param new_status: 'Active' ou 'Inactive'.
+    :param new_call_number: Novo número de chamada (opcional).
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student: return f"Aluno não encontrado."
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma não encontrada."
+
+        enrollments = data_service.get_enrollments_for_class(cls['id'])
+        target_enrollment = next((e for e in enrollments if e['student_id'] == student['id']), None)
+
+        if not target_enrollment: return f"Aluno não está matriculado nesta turma."
+
+        if new_status not in ['Active', 'Inactive']:
+            return f"Status inválido. Use 'Active' ou 'Inactive'."
+
+        # Update status
+        data_service.update_enrollment_status(target_enrollment['id'], new_status)
+
+        # Update call number if provided
+        if new_call_number is not None:
+            # We reuse add_student_to_class which handles updates if record exists
+            data_service.add_student_to_class(student['id'], cls['id'], new_call_number, new_status)
+            return f"Matrícula atualizada: Status={new_status}, Nº={new_call_number}."
+
+        return f"Matrícula atualizada para status '{new_status}'."
+
+    except Exception as e: return f"Erro ao atualizar matrícula: {e}"
 
 @tool
 def delete_student(student_name: str) -> str:
@@ -572,6 +731,39 @@ def add_new_grade(student_name: str, class_name: str, subject_name: str, assessm
         return "Erro ao adicionar nota."
     except Exception as e:
         return f"Erro: {e}"
+
+@tool
+def update_grade_tool(student_name: str, class_name: str, subject_name: str, assessment_name: str, new_score: float) -> str:
+    """
+    Atualiza uma nota existente de um aluno.
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student: return f"Aluno não encontrado."
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma não encontrada."
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina não encontrada."
+        assessments = data_service.get_assessments_for_subject(target_subject['id'])
+        target_assessment = next((a for a in assessments if a['name'].lower() == assessment_name.lower()), None)
+        if not target_assessment: return f"Avaliação não encontrada."
+
+        # Find existing grade
+        # We use upsert logic essentially: find if exists, then update.
+        # But DataService doesn't have `update_grade` (it uses upsert_grades_for_subject).
+        # We can implement it via upsert_grades_for_subject with a single item list.
+
+        grade_data = [{
+            "student_id": student['id'],
+            "assessment_id": target_assessment['id'],
+            "score": new_score
+        }]
+
+        data_service.upsert_grades_for_subject(target_subject['id'], grade_data)
+        return f"Nota atualizada para {new_score}."
+
+    except Exception as e: return f"Erro ao atualizar nota: {e}"
 
 @tool
 def delete_grade(student_name: str, class_name: str, subject_name: str, assessment_name: str) -> str:
