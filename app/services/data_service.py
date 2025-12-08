@@ -156,7 +156,10 @@ class DataService:
             return None
 
     # Método para atualizar os dados de um aluno.
-    def update_student(self, student_id: int, first_name: str, last_name: str):
+    def update_student(self, student_id: int, first_name: str, last_name: str, birth_date: date | None = None):
+        if birth_date and birth_date > date.today():
+            raise ValueError("Birth date cannot be in the future.")
+
         with self._get_db() as db:
             # Busca o aluno pelo ID.
             student = db.query(Student).filter(Student.id == student_id).first()
@@ -164,6 +167,7 @@ class DataService:
             if student:
                 student.first_name = first_name
                 student.last_name = last_name
+                student.birth_date = birth_date
 
     # Método para deletar um aluno.
     def delete_student(self, student_id: int):

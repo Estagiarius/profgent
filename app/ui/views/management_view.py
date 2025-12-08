@@ -1,5 +1,6 @@
 # Importa a biblioteca 'customtkinter' para os componentes da interface.
 import customtkinter as ctk
+from datetime import datetime
 # Importa as janelas de diálogo personalizadas para edição e adição.
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.add_dialog import AddDialog
@@ -237,10 +238,43 @@ class ManagementView(ctk.CTkFrame):
     def edit_student(self, s):
         # Define o callback que será executado ao salvar no diálogo.
         def cb(id, data):
-            self.data_service.update_student(id, data['first_name'], data['last_name'])
-            self._load_student_page(self.current_page)
-        initial_data = { "id": s['id'], "first_name": s['first_name'], "last_name": s['last_name'] }
-        EditDialog(self, "Editar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, initial_data, cb)
+            birth_date_obj = None
+            if data['birth_date']:
+                try:
+                    birth_date_obj = datetime.strptime(data['birth_date'], "%d/%m/%Y").date()
+                except ValueError:
+                    messagebox.showerror("Erro", "Formato de data inválido. Use DD/MM/AAAA.")
+                    return
+
+            try:
+                self.data_service.update_student(id, data['first_name'], data['last_name'], birth_date=birth_date_obj)
+                self._load_student_page(self.current_page)
+            except ValueError as e:
+                messagebox.showerror("Erro", str(e))
+
+        # Formata a data de nascimento para exibição (DD/MM/AAAA)
+        birth_date_str = ""
+        if s.get('birth_date'):
+            try:
+                # s['birth_date'] vem do DataService como string ISO (YYYY-MM-DD)
+                dt = datetime.strptime(s['birth_date'], "%Y-%m-%d")
+                birth_date_str = dt.strftime("%d/%m/%Y")
+            except ValueError:
+                pass
+
+        initial_data = {
+            "id": s['id'],
+            "first_name": s['first_name'],
+            "last_name": s['last_name'],
+            "birth_date": birth_date_str
+        }
+
+        fields = {
+            "first_name": "Nome",
+            "last_name": "Sobrenome",
+            "birth_date": "Data de Nascimento (DD/MM/AAAA)"
+        }
+        EditDialog(self, "Editar Aluno", fields, initial_data, cb)
 
     # Abre o diálogo de edição para um curso.
     def edit_course(self, c):
@@ -250,9 +284,26 @@ class ManagementView(ctk.CTkFrame):
     # Abre o diálogo de adição para um novo aluno.
     def add_student_popup(self):
         def cb(data):
-            self.data_service.add_student(data['first_name'], data['last_name'])
-            self._load_student_page(self.current_page)
-        AddDialog(self, "Adicionar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, save_callback=cb)
+            birth_date_obj = None
+            if data['birth_date']:
+                try:
+                    birth_date_obj = datetime.strptime(data['birth_date'], "%d/%m/%Y").date()
+                except ValueError:
+                    messagebox.showerror("Erro", "Formato de data inválido. Use DD/MM/AAAA.")
+                    return
+
+            try:
+                self.data_service.add_student(data['first_name'], data['last_name'], birth_date=birth_date_obj)
+                self._load_student_page(self.current_page)
+            except ValueError as e:
+                messagebox.showerror("Erro", str(e))
+
+        fields = {
+            "first_name": "Nome",
+            "last_name": "Sobrenome",
+            "birth_date": "Data de Nascimento (DD/MM/AAAA)"
+        }
+        AddDialog(self, "Adicionar Aluno", fields, save_callback=cb)
 
     # Abre o diálogo de adição para um novo curso.
     def add_course_popup(self):
