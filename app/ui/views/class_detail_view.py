@@ -8,6 +8,7 @@ from app.services import data_service
 # Importa as janelas de diálogo personalizadas para adicionar e editar registros.
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
+from app.ui.views.enrollment_dialog import EnrollmentDialog
 from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
@@ -662,24 +663,31 @@ class ClassDetailView(ctk.CTkFrame):
         if not self.class_id: return
 
         unenrolled_students = data_service.get_unenrolled_students(self.class_id)
-        student_names = [f"{s['first_name']} {s['last_name']}" for s in unenrolled_students]
 
-        if not student_names:
+        if not unenrolled_students:
             messagebox.showinfo("Aviso", "Nenhum aluno disponível para matricular.")
             return
 
-        def save_callback(data):
-            student_name = data["student"]
-            student = next((s for s in unenrolled_students if f"{s['first_name']} {s['last_name']}" == student_name), None)
+        def enroll_callback(student_ids: list[int]):
+            if not student_ids: return
 
-            if student:
-                next_call_number = data_service.get_next_call_number(self.class_id)
-                data_service.add_student_to_class(student['id'], self.class_id, next_call_number)
+            try:
+                data_service.enroll_students(self.class_id, student_ids)
+
+                count = len(student_ids)
+                messagebox.showinfo("Sucesso", f"{count} aluno(s) matriculado(s) com sucesso!")
+
                 self.populate_student_list()
                 self.populate_report_student_combo()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao matricular alunos: {e}")
 
-        dropdowns = {"student": ("Aluno", student_names)}
-        AddDialog(self, "Matricular Novo Aluno", fields={}, dropdowns=dropdowns, save_callback=save_callback)
+        EnrollmentDialog(
+            self,
+            title="Matricular Alunos",
+            students=unenrolled_students,
+            enroll_callback=enroll_callback
+        )
 
     # Preenche a lista de alunos matriculados.
     def populate_student_list(self):

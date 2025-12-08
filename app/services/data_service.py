@@ -460,6 +460,36 @@ class DataService:
             if enrollment:
                 enrollment.status = status
 
+    # Método para matricular múltiplos alunos de uma vez em uma turma.
+    def enroll_students(self, class_id: int, student_ids: list[int]):
+        with self._get_db() as db:
+            # Pega o próximo número de chamada inicial.
+            next_call_number = self._get_next_call_number(db, class_id)
+
+            for student_id in student_ids:
+                # Verifica se já está matriculado
+                existing = db.query(ClassEnrollment).filter_by(student_id=student_id, class_id=class_id).first()
+                if existing:
+                    # Se já existe (talvez inativo), reativa e atualiza número.
+                    existing.status = "Active"
+                    # Opcional: atualizar call_number ou manter o antigo?
+                    # Para simplificar e evitar buracos/conflitos, vamos atribuir um novo número sequencial
+                    # se estivermos tratando como uma "nova matrícula".
+                    existing.call_number = next_call_number
+                else:
+                    new_enrollment = ClassEnrollment(
+                        class_id=class_id,
+                        student_id=student_id,
+                        call_number=next_call_number,
+                        status="Active"
+                    )
+                    db.add(new_enrollment)
+
+                next_call_number += 1
+
+            # Persiste as mudanças na sessão (necessário para testes com autoflush=False e para garantir visibilidade)
+            db.flush()
+
     # Método privado para calcular o próximo número de chamada disponível em uma turma.
     @staticmethod
     def _get_next_call_number(db: Session, class_id: int) -> int:
