@@ -116,6 +116,109 @@ def get_class_roster(class_name: str) -> str:
     except Exception as e:
         return f"Erro ao obter lista de alunos: {e}"
 
+@tool
+def get_incidents_for_class(class_name: str) -> str:
+    """
+    Lista todos os incidentes registrados para uma turma.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+
+        incidents = data_service.get_incidents_for_class(cls['id'])
+        if not incidents: return f"Nenhum incidente registrado para a turma '{class_name}'."
+
+        result = [f"Incidentes da turma {class_name}:"]
+        for inc in incidents:
+            date_fmt = datetime.strptime(inc['date'], "%Y-%m-%d").strftime("%d/%m/%Y")
+            result.append(f"- {date_fmt}: {inc['student_first_name']} {inc['student_last_name']} - {inc['description']}")
+        return "\n".join(result)
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def get_assessments_for_subject(class_name: str, subject_name: str) -> str:
+    """
+    Lista as avaliações cadastradas em uma disciplina de uma turma.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+
+        if not target_subject: return f"Disciplina '{subject_name}' não encontrada na turma."
+
+        assessments = data_service.get_assessments_for_subject(target_subject['id'])
+        if not assessments: return f"Nenhuma avaliação cadastrada para {subject_name}."
+
+        result = [f"Avaliações de {subject_name} ({class_name}):"]
+        for a in assessments:
+            result.append(f"- {a['name']} (Peso: {a['weight']})")
+        return "\n".join(result)
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def get_lessons_for_subject(class_name: str, subject_name: str) -> str:
+    """
+    Lista as aulas registradas em uma disciplina de uma turma.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina '{subject_name}' não encontrada na turma."
+
+        lessons = data_service.get_lessons_for_subject(target_subject['id'])
+        if not lessons: return f"Nenhuma aula registrada para {subject_name}."
+
+        result = [f"Aulas de {subject_name} ({class_name}):"]
+        for l in lessons:
+            date_fmt = datetime.strptime(l['date'], "%Y-%m-%d").strftime("%d/%m/%Y")
+            result.append(f"- {date_fmt}: {l['title']} - {l['content']}")
+        return "\n".join(result)
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def get_unenrolled_students(class_name: str) -> str:
+    """
+    Lista alunos que NÃO estão matriculados na turma especificada.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+
+        students = data_service.get_unenrolled_students(cls['id'])
+        if not students: return "Todos os alunos do sistema já estão matriculados nesta turma."
+
+        return "Alunos não matriculados:\n" + "\n".join([f"- {s['first_name']} {s['last_name']}" for s in students])
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def get_students_with_birthday_today() -> str:
+    """
+    Lista os alunos que fazem aniversário hoje.
+    """
+    try:
+        students = data_service.get_students_with_birthday_today()
+        if not students: return "Nenhum aluno faz aniversário hoje."
+        return "Aniversariantes de hoje:\n" + "\n".join([f"- {s['name']} (Turma: {s['class_name']}) - {s['age']} anos" for s in students])
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def search_students(search_term: str) -> str:
+    """
+    Busca alunos pelo nome (parcial).
+    """
+    try:
+        result = data_service.get_paginated_students(page=1, page_size=50, search_term=search_term)
+        students = result['students']
+        if not students: return f"Nenhum aluno encontrado com '{search_term}'."
+        return "\n".join([f"- {s['first_name']} {s['last_name']}" for s in students])
+    except Exception as e: return f"Erro: {e}"
+
 # --- WRITE TOOLS ---
 
 @tool
@@ -161,6 +264,19 @@ def add_new_student(first_name: str, last_name: str, date_of_birth: str = None, 
         return f"Erro: Ocorreu um erro inesperado: {e}"
 
 @tool
+def delete_student(student_name: str) -> str:
+    """
+    Deleta um aluno do sistema. CUIDADO: Esta ação é irreversível e remove todas as notas e histórico.
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student: return f"Aluno '{student_name}' não encontrado."
+
+        data_service.delete_student(student['id'])
+        return f"Aluno '{student_name}' e todos os seus registros foram removidos com sucesso."
+    except Exception as e: return f"Erro ao deletar aluno: {e}"
+
+@tool
 def create_new_class(class_name: str) -> str:
     """
     Cria uma nova turma (sem disciplinas inicialmente).
@@ -182,6 +298,30 @@ def create_new_class(class_name: str) -> str:
             return "Erro: Falha ao criar a turma."
     except Exception as e:
         return f"Erro inesperado ao criar turma: {e}"
+
+@tool
+def update_class(current_name: str, new_name: str) -> str:
+    """
+    Atualiza o nome de uma turma.
+    """
+    try:
+        cls = data_service.get_class_by_name(current_name)
+        if not cls: return f"Turma '{current_name}' não encontrada."
+        data_service.update_class(cls['id'], new_name)
+        return f"Turma renomeada para '{new_name}'."
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def delete_class(class_name: str) -> str:
+    """
+    Deleta uma turma. CUIDADO: Remove matrículas associadas.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+        data_service.delete_class(cls['id'])
+        return f"Turma '{class_name}' deletada com sucesso."
+    except Exception as e: return f"Erro: {e}"
 
 @tool
 def add_subject_to_class(class_name: str, course_name: str) -> str:
@@ -243,6 +383,52 @@ def add_new_lesson(class_name: str, subject_name: str, topic: str, content: str,
         return f"Erro: Ocorreu um erro inesperado: {e}"
 
 @tool
+def update_lesson(class_name: str, subject_name: str, current_topic: str, new_topic: str, new_content: str, new_date_str: str) -> str:
+    """
+    Atualiza uma aula existente.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina não encontrada."
+
+        lessons = data_service.get_lessons_for_subject(target_subject['id'])
+        target_lesson = next((l for l in lessons if l['title'].lower() == current_topic.lower()), None)
+        if not target_lesson: return f"Aula '{current_topic}' não encontrada."
+
+        try:
+            lesson_date = datetime.strptime(new_date_str, "%d/%m/%Y").date()
+        except ValueError: return f"Data inválida."
+
+        data_service.update_lesson(target_lesson['id'], new_topic, new_content, lesson_date)
+        return f"Aula atualizada com sucesso."
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def delete_lesson(class_name: str, subject_name: str, topic: str) -> str:
+    """
+    Deleta uma aula.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina não encontrada."
+
+        lessons = data_service.get_lessons_for_subject(target_subject['id'])
+        target_lesson = next((l for l in lessons if l['title'].lower() == topic.lower()), None)
+        if not target_lesson: return f"Aula não encontrada."
+
+        data_service.delete_lesson(target_lesson['id'])
+        return f"Aula '{topic}' deletada."
+    except Exception as e: return f"Erro: {e}"
+
+@tool
 def create_new_assessment(class_name: str, subject_name: str, assessment_name: str, weight: float) -> str:
     """
     Cria uma avaliação para uma disciplina de uma turma.
@@ -268,6 +454,48 @@ def create_new_assessment(class_name: str, subject_name: str, assessment_name: s
         return "Erro ao criar avaliação."
     except Exception as e:
         return f"Erro: {e}"
+
+@tool
+def update_assessment(class_name: str, subject_name: str, current_name: str, new_name: str, new_weight: float) -> str:
+    """
+    Atualiza uma avaliação (nome e peso).
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina não encontrada."
+
+        assessments = data_service.get_assessments_for_subject(target_subject['id'])
+        target_assessment = next((a for a in assessments if a['name'].lower() == current_name.lower()), None)
+        if not target_assessment: return f"Avaliação '{current_name}' não encontrada."
+
+        data_service.update_assessment(target_assessment['id'], new_name, new_weight)
+        return f"Avaliação atualizada para '{new_name}' (Peso: {new_weight})."
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def delete_assessment(class_name: str, subject_name: str, assessment_name: str) -> str:
+    """
+    Deleta uma avaliação e todas as notas associadas.
+    """
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina não encontrada."
+
+        assessments = data_service.get_assessments_for_subject(target_subject['id'])
+        target_assessment = next((a for a in assessments if a['name'].lower() == assessment_name.lower()), None)
+        if not target_assessment: return f"Avaliação '{assessment_name}' não encontrada."
+
+        data_service.delete_assessment(target_assessment['id'])
+        return f"Avaliação '{assessment_name}' deletada."
+    except Exception as e: return f"Erro: {e}"
 
 @tool
 def add_new_grade(student_name: str, class_name: str, subject_name: str, assessment_name: str, score: float) -> str:
@@ -300,6 +528,39 @@ def add_new_grade(student_name: str, class_name: str, subject_name: str, assessm
         return "Erro ao adicionar nota."
     except Exception as e:
         return f"Erro: {e}"
+
+@tool
+def delete_grade(student_name: str, class_name: str, subject_name: str, assessment_name: str) -> str:
+    """
+    Deleta uma nota de um aluno.
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student: return f"Aluno não encontrado."
+
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina não encontrada."
+
+        assessments = data_service.get_assessments_for_subject(target_subject['id'])
+        target_assessment = next((a for a in assessments if a['name'].lower() == assessment_name.lower()), None)
+        if not target_assessment: return f"Avaliação não encontrada."
+
+        # Busca nota especifica (não temos get_grade_by_... direto, então vamos iterar ou melhorar o service no futuro)
+        # Por enquanto vou usar get_grades_for_subject e filtrar
+        grades = data_service.get_grades_for_subject(target_subject['id'])
+        target_grade = next((g for g in grades if g['student_id'] == student['id'] and g['assessment_id'] == target_assessment['id']), None)
+
+        if target_grade:
+            data_service.delete_grade(target_grade['id'])
+            return f"Nota de {student_name} em {assessment_name} deletada."
+        else:
+            return f"Nota não encontrada."
+
+    except Exception as e: return f"Erro: {e}"
 
 @tool
 def register_incident(student_name: str, class_name: str, description: str, date_str: str) -> str:
@@ -339,6 +600,30 @@ def add_new_course(course_name: str, course_code: str) -> str:
         return "Erro ao criar disciplina."
     except Exception as e:
         return f"Erro: {e}"
+
+@tool
+def update_course(current_name: str, new_name: str, new_code: str) -> str:
+    """
+    Atualiza uma disciplina no catálogo.
+    """
+    try:
+        course = data_service.get_course_by_name(current_name)
+        if not course: return f"Disciplina não encontrada."
+        data_service.update_course(course['id'], new_name, new_code)
+        return f"Disciplina atualizada para '{new_name}' ({new_code})."
+    except Exception as e: return f"Erro: {e}"
+
+@tool
+def delete_course(course_name: str) -> str:
+    """
+    Deleta uma disciplina do catálogo. Falha se estiver em uso por alguma turma.
+    """
+    try:
+        course = data_service.get_course_by_name(course_name)
+        if not course: return f"Disciplina não encontrada."
+        data_service.delete_course(course['id'])
+        return f"Disciplina '{course_name}' deletada."
+    except Exception as e: return f"Erro: {e}"
 
 # --- MAINTENANCE TOOLS ---
 
