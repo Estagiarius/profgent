@@ -741,6 +741,133 @@ class DataService:
         # Retorna a média ponderada.
         return weighted_sum / total_weight
 
+    # Método para obter estatísticas globais do sistema.
+    def get_global_dashboard_stats(self) -> dict:
+        with self._get_db() as db:
+            active_students = db.query(ClassEnrollment.student_id).filter(ClassEnrollment.status == 'Active').distinct().count()
+            total_classes = db.query(Class.id).count()
+            total_courses = db.query(Course.id).count()
+            total_incidents = db.query(Incident.id).count()
+
+            return {
+                "active_students": active_students,
+                "total_classes": total_classes,
+                "total_courses": total_courses,
+                "total_incidents": total_incidents
+            }
+
+    # Método para obter o ranking de incidentes por turma.
+    def get_class_incident_ranking(self, limit: int = 5) -> list[dict]:
+        with self._get_db() as db:
+            # Query grouped by Class.id, ordering by count descending
+            ranking = (
+                db.query(Class.name, func.count(Incident.id).label('count'))
+                .join(Incident, Class.id == Incident.class_id)
+                .group_by(Class.id)
+                .order_by(func.count(Incident.id).desc())
+                .limit(limit)
+                .all()
+            )
+            return [{"class_name": r.name, "count": r.count} for r in ranking]
+
+    # Método para calcular as médias finais de todos os alunos ativos em um curso.
+    def get_course_averages(self, course_id: int) -> list[float]:
+        """Calcula as médias finais ponderadas para todos os alunos ativos em um curso."""
+        averages = []
+        with self._get_db() as db:
+            # Busca todas as disciplinas (turmas) associadas a este curso.
+            subjects = db.query(ClassSubject).filter(ClassSubject.course_id == course_id).all()
+
+            for subject in subjects:
+                # Busca as avaliações da disciplina.
+                assessments = db.query(Assessment).filter(Assessment.class_subject_id == subject.id).all()
+                assessments_data = [{"id": a.id, "weight": a.weight} for a in assessments]
+
+                # Se não houver avaliações, não há médias para calcular nesta disciplina.
+                if not assessments_data:
+                    continue
+
+                # Busca matrículas ativas nesta turma.
+                active_enrollments = db.query(ClassEnrollment).filter(
+                    ClassEnrollment.class_id == subject.class_id,
+                    ClassEnrollment.status == 'Active'
+                ).all()
+
+                assessment_ids = [a['id'] for a in assessments_data]
+
+                # Busca todas as notas para essas avaliações de uma vez.
+                grades = db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).all()
+                grades_data = [{"assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id} for g in grades]
+
+                # Calcula a média para cada aluno matriculado.
+                for enrollment in active_enrollments:
+                    avg = self.calculate_weighted_average(enrollment.student_id, grades_data, assessments_data)
+                    averages.append(avg)
+
+        return averages
+
+    # Método para calcular a taxa de aprovação global baseada em todas as disciplinas e alunos ativos.
+    def get_global_performance_stats(self) -> dict:
+        """Calcula taxas globais de aprovação/reprovação e lista alunos em risco e destaque."""
+        total_enrollments_analyzed = 0
+        approved_count = 0
+        failed_details = []
+        honor_roll_details = []
+
+        with self._get_db() as db:
+            # Itera sobre todas as disciplinas existentes.
+            # Eager load class and course to avoid N+1 inside the loop
+            subjects = db.query(ClassSubject).options(
+                joinedload(ClassSubject.class_),
+                joinedload(ClassSubject.course)
+            ).all()
+
+            for subject in subjects:
+                assessments = db.query(Assessment).filter(Assessment.class_subject_id == subject.id).all()
+                if not assessments: continue
+
+                assessments_data = [{"id": a.id, "weight": a.weight} for a in assessments]
+                assessment_ids = [a['id'] for a in assessments_data]
+
+                grades = db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).all()
+                grades_data = [{"assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id} for g in grades]
+
+                # Eager load Student to get names easily
+                active_enrollments = db.query(ClassEnrollment).options(joinedload(ClassEnrollment.student)).filter(
+                    ClassEnrollment.class_id == subject.class_id,
+                    ClassEnrollment.status == 'Active'
+                ).all()
+
+                for enrollment in active_enrollments:
+                    avg = self.calculate_weighted_average(enrollment.student_id, grades_data, assessments_data)
+                    total_enrollments_analyzed += 1
+                    if avg >= 5.0:
+                        approved_count += 1
+                        # Check for Honor Roll (>= 9.0)
+                        if avg >= 9.0:
+                             honor_roll_details.append({
+                                "student_name": f"{enrollment.student.first_name} {enrollment.student.last_name}",
+                                "class_name": subject.class_.name,
+                                "course_name": subject.course.course_name,
+                                "average": round(avg, 2)
+                            })
+                    else:
+                        failed_details.append({
+                            "student_name": f"{enrollment.student.first_name} {enrollment.student.last_name}",
+                            "class_name": subject.class_.name,
+                            "course_name": subject.course.course_name,
+                            "average": round(avg, 2)
+                        })
+
+        return {
+            "total_analyzed": total_enrollments_analyzed,
+            "approved": approved_count,
+            "failed": total_enrollments_analyzed - approved_count,
+            "approval_rate": (approved_count / total_enrollments_analyzed * 100) if total_enrollments_analyzed > 0 else 0.0,
+            "failed_details": failed_details,
+            "honor_roll_details": honor_roll_details
+        }
+
     # Método privado para inserir/atualizar alunos e matrículas em lote (usado pela importação de CSV).
     def _batch_upsert_students_and_enroll(self, db: Session, class_id: int, student_data_list: list[dict]):
         # Garante que cada aluno no CSV seja processado apenas uma vez, mesmo que haja duplicatas no arquivo.
