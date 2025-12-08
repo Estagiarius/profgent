@@ -6,6 +6,50 @@ from app.services import data_service
 # --- READ TOOLS ---
 
 @tool
+def global_search_tool(search_term: str) -> str:
+    """
+    Realiza uma busca global no sistema por um termo.
+    Procura em Alunos, Turmas e Disciplinas.
+
+    :param search_term: O termo a ser pesquisado (ex: "Ana", "Matemática").
+    :return: Um resumo dos resultados encontrados.
+    """
+    try:
+        results = []
+        term = search_term.lower()
+
+        # Busca em Alunos
+        students = data_service.get_paginated_students(1, 100, search_term=term)['students']
+        if students:
+            results.append("Alunos encontrados:")
+            for s in students:
+                results.append(f"- {s['first_name']} {s['last_name']}")
+
+        # Busca em Turmas (filtro simples em memória pois não temos search_classes no service ainda)
+        all_classes = data_service.get_all_classes()
+        found_classes = [c for c in all_classes if term in c['name'].lower()]
+        if found_classes:
+            results.append("\nTurmas encontradas:")
+            for c in found_classes:
+                results.append(f"- {c['name']}")
+
+        # Busca em Disciplinas
+        all_courses = data_service.get_all_courses()
+        found_courses = [c for c in all_courses if term in c['course_name'].lower() or term in c['course_code'].lower()]
+        if found_courses:
+            results.append("\nDisciplinas encontradas:")
+            for c in found_courses:
+                results.append(f"- {c['course_name']} ({c['course_code']})")
+
+        if not results:
+            return f"Nenhum resultado encontrado para '{search_term}' em Alunos, Turmas ou Disciplinas."
+
+        return "\n".join(results)
+
+    except Exception as e:
+        return f"Erro na busca global: {e}"
+
+@tool
 def get_student_grades_by_course(student_name: str, course_name: str) -> str:
     """
     Obtém as notas de um aluno específico em uma disciplina (curso) específica.
