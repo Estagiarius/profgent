@@ -641,15 +641,20 @@ class DataService:
             return {"id": new_assessment.id, "name": new_assessment.name}
 
     # Método para atualizar uma avaliação.
-    def update_assessment(self, assessment_id: int, name: str, weight: float):
+    def update_assessment(self, assessment_id: int, name: str, weight: float, grading_period: int = None):
         if weight < 0:
             raise ValueError("Assessment weight must be non-negative.")
+
+        if grading_period is not None and not (1 <= grading_period <= 5):
+             raise ValueError("Grading period must be between 1 and 5.")
 
         with self._get_db() as db:
             assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
             if assessment:
                 assessment.name = name
                 assessment.weight = weight
+                if grading_period is not None:
+                    assessment.grading_period = grading_period
 
     # Método para deletar uma avaliação.
     def delete_assessment(self, assessment_id: int):

@@ -12,10 +12,9 @@ def migrate_database(engine):
 
         if 'grading_period' not in columns:
             logging.info("Applying migration: Adding 'grading_period' column to 'assessments' table.")
-            with engine.connect() as conn:
+            with engine.begin() as conn:
                 # Add the column with a default value of 1 (1st Bimester)
                 conn.execute(text("ALTER TABLE assessments ADD COLUMN grading_period INTEGER DEFAULT 1 NOT NULL"))
-                conn.commit()
             logging.info("Migration applied successfully.")
         else:
             logging.info("Schema check: 'grading_period' column already exists.")

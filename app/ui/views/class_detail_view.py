@@ -790,21 +790,40 @@ class ClassDetailView(ctk.CTkFrame):
         def save_callback(assessment_id, data):
             name = data.get("name")
             weight_str = data.get("weight")
+            period_str = data.get("period")
+
+            period_map = {"1º Bimestre": 1, "2º Bimestre": 2, "3º Bimestre": 3, "4º Bimestre": 4}
+            grading_period = period_map.get(period_str, assessment.get('grading_period', 1))
+
             if name and weight_str:
                 try:
                     weight = parse_float_input(weight_str)
-                    data_service.update_assessment(assessment_id, name, weight)
+                    # Note: update_assessment needs to support grading_period update now.
+                    # Currently data_service.update_assessment does NOT support it.
+                    # We need to update DataService too!
+                    data_service.update_assessment(assessment_id, name, weight, grading_period)
                     self.populate_assessment_list()
+                    self.populate_grade_grid()
                 except ValueError as e:
                     messagebox.showerror("Erro", f"Erro ao editar avaliação: {e}")
 
         fields = {"name": "Nome da Avaliação", "weight": "Peso"}
+
+        # Determine initial period string
+        current_period_id = assessment.get('grading_period', 1)
+        reverse_period_map = {1: "1º Bimestre", 2: "2º Bimestre", 3: "3º Bimestre", 4: "4º Bimestre"}
+        current_period_str = reverse_period_map.get(current_period_id, "1º Bimestre")
+
         initial_data = {
             "id": assessment['id'],
             "name": assessment['name'],
-            "weight": format_float_output(assessment['weight'])
+            "weight": format_float_output(assessment['weight']),
+            "period": current_period_str
         }
-        EditDialog(self, "Editar Avaliação", fields, initial_data, save_callback)
+
+        dropdowns = {"period": ("Bimestre", ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"])}
+
+        EditDialog(self, "Editar Avaliação", fields, initial_data, save_callback, dropdowns=dropdowns)
 
     # Abre o pop-up para matricular um aluno existente na turma.
     def enroll_student_popup(self):
