@@ -1,11 +1,8 @@
-# Importa a classe 'date' e 'datetime' para manipulação de datas.
-from datetime import date, datetime
-# Importa a função 'func' do SQLAlchemy para usar funções SQL como COUNT, MAX, etc.
-from sqlalchemy import func
-# Importa 'joinedload' para carregamento otimizado de relacionamentos (evita N+1 queries) e 'Session' para type hinting.
-from sqlalchemy.orm import joinedload, Session
-# Importa o gerenciador de contexto para obter uma sessão de banco de dados.
-from app.data.database import get_db_session
+from datetime import date, datetime # Importa a classe 'date' e 'datetime' para manipulação de datas.
+from sqlalchemy import func # Importa a função 'func' do SQLAlchemy para usar funções SQL como COUNT, MAX, etc.
+from sqlalchemy.orm import joinedload, Session # Importa 'joinedload' para carregamento otimizado de relacionamentos (evita N+1 queries) e 'Session' para type hinting.
+from app.data.database import get_db_session # Importa o gerenciador de contexto para obter uma sessão de banco de dados.
+
 # Importa todos os modelos de dados necessários para as operações do serviço.
 from app.models.student import Student
 from app.models.course import Course
@@ -16,23 +13,20 @@ from app.models.class_enrollment import ClassEnrollment
 from app.models.assessment import Assessment
 from app.models.lesson import Lesson
 from app.models.incident import Incident
-# Importa a função de parsing de CSV de alunos.
-from app.utils.student_csv_parser import parse_student_csv
-# Importa o gerenciador de contexto para criar blocos 'with'.
-from contextlib import contextmanager
+from app.utils.student_csv_parser import parse_student_csv # Importa a função de parsing de CSV de alunos.
+from contextlib import contextmanager # Importa o gerenciador de contexto para criar blocos 'with'.
 
 # Define a classe DataService, que encapsula toda a lógica de acesso e manipulação de dados.
 class DataService:
     """
-    Serviço responsável por gerenciar operações relacionadas a estudantes, incluindo
-    importação de dados, criação, atualização, exclusão e consultas.
+    Classe que fornece métodos para manipulação de dados de estudantes, tais como
+    importação, criação, atualização, deleção e recuperação de informações. Suporta
+    operações em lote e integrações com banco de dados via sessões do SQLAlchemy.
 
-    Esse serviço abstrai a manipulação direta com o banco de dados, permitindo
-    que as operações sejam realizadas com sessões de banco de dados injetáveis
-    para facilitar testes e integração.
-
-    :ivar _db_session: Sessão injetada do banco de dados, utilizada se provida.
-    :type _db_session: Session
+    :ivar _db_session: Sessão de banco de dados injetada no construtor para fins de
+        teste ou execução customizada. Se não fornecida, uma nova sessão será gerada
+        ao longo das operações.
+    :type _db_session: Session | None
     """
     # O construtor permite a injeção de uma sessão de banco de dados, útil para testes.
     def __init__(self, db_session: Session = None):
@@ -156,7 +150,10 @@ class DataService:
             return None
 
     # Método para atualizar os dados de um aluno.
-    def update_student(self, student_id: int, first_name: str, last_name: str):
+    def update_student(self, student_id: int, first_name: str, last_name: str, birth_date: date | None = None):
+        if birth_date and birth_date > date.today():
+            raise ValueError("Birth date cannot be in the future.")
+
         with self._get_db() as db:
             # Busca o aluno pelo ID.
             student = db.query(Student).filter(Student.id == student_id).first()
@@ -164,6 +161,7 @@ class DataService:
             if student:
                 student.first_name = first_name
                 student.last_name = last_name
+                student.birth_date = birth_date
 
     # Método para deletar um aluno.
     def delete_student(self, student_id: int):
