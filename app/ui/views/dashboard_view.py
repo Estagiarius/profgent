@@ -8,32 +8,6 @@ class DashboardView(ctk.CTkFrame):
     # Método construtor.
     def __init__(self, parent, main_app):
         super().__init__(parent)
-        self.chart_image = None
-        self.chart_label = None
-        self.chart_frame = None
-        self.course_menu = None
-        self.course_label = None
-        self.controls_frame = None
-        self.incidents_list_frame = None
-        self.incidents_frame = None
-        self.honor_list_frame = None
-        self.honor_count_label = None
-        self.honor_frame = None
-        self.honor_roll_data = None
-        self.failed_details_data = None
-        self.failed_details_data = None
-        self.pie_chart_image = None # Prevent GC
-        self.pie_chart_label = None
-        self.pie_chart_container = None
-        self.btn_details = None
-        self.approval_detail_label = None
-        self.approval_label = None
-        self.approval_frame = None
-        self.card_incidents = None
-        self.card_courses = None
-        self.card_classes = None
-        self.card_students = None
-        self.stats_frame = None
         self.main_app = main_app
         self.data_service = self.main_app.data_service # Obtém a instância do DataService a partir da aplicação principal.
         self.courses = [] # Lista para armazenar os cursos carregados do banco.
@@ -123,6 +97,7 @@ class DashboardView(ctk.CTkFrame):
 
         self.pie_chart_label = ctk.CTkLabel(self.pie_chart_container, text="")
         self.pie_chart_label.pack(expand=True)
+        self.pie_chart_image = None # Prevent GC
 
         # Armazena os dados detalhados para o modal
         self.failed_details_data = []
@@ -224,58 +199,58 @@ class DashboardView(ctk.CTkFrame):
         self.chart_label.pack(expand=True, fill="both")
         self.chart_image = None
 
- #   def setup_overview_tab(self):
- #       """Configura os elementos da aba Visão Geral."""
- #       self.tab_overview.grid_columnconfigure(1, weight=1)
- #       self.tab_overview.grid_rowconfigure(1, weight=1)
+    def setup_overview_tab(self):
+        """Configura os elementos da aba Visão Geral."""
+        self.tab_overview.grid_columnconfigure(0, weight=1)
+        self.tab_overview.grid_columnconfigure(1, weight=1)
+        self.tab_overview.grid_rowconfigure(1, weight=1)
 
- #       # Cards de Estatísticas
- #       self.stats_frame = ctk.CTkFrame(self.tab_overview)
- #       self.stats_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
+        # Cards de Estatísticas
+        self.stats_frame = ctk.CTkFrame(self.tab_overview)
+        self.stats_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
         # Grid para os cards dentro do frame
- #       self.stats_frame.grid_columnconfigure((0, 1), weight=1)
+        self.stats_frame.grid_columnconfigure((0, 1), weight=1)
 
- #       self.card_students = self._create_stat_card(self.stats_frame, "Alunos Ativos", "0", 0, 0)
- #       self.card_classes = self._create_stat_card(self.stats_frame, "Turmas", "0", 0, 1)
- #       self.card_courses = self._create_stat_card(self.stats_frame, "Disciplinas", "0", 1, 0)
- #       self.card_incidents = self._create_stat_card(self.stats_frame, "Incidentes", "0", 1, 1)
+        self.card_students = self._create_stat_card(self.stats_frame, "Alunos Ativos", "0", 0, 0)
+        self.card_classes = self._create_stat_card(self.stats_frame, "Turmas", "0", 0, 1)
+        self.card_courses = self._create_stat_card(self.stats_frame, "Disciplinas", "0", 1, 0)
+        self.card_incidents = self._create_stat_card(self.stats_frame, "Incidentes", "0", 1, 1)
 
         # Seção de Aprovação Global
- #       self.approval_frame = ctk.CTkFrame(self.tab_overview)
- #       self.approval_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=20, sticky="nsew")
+        self.approval_frame = ctk.CTkFrame(self.tab_overview)
+        self.approval_frame.grid(row=1, column=0, columnspan=2, padx=10, pady=20, sticky="nsew")
 
         # Layout: Coluna 0 (Texto), Coluna 1 (Gráfico Pizza)
- #       self.approval_frame.grid_columnconfigure(0, weight=1)
- #       self.approval_frame.grid_columnconfigure(1, weight=1)
+        self.approval_frame.grid_columnconfigure(0, weight=1)
+        self.approval_frame.grid_columnconfigure(1, weight=1)
 
         # -- Coluna 0: Texto e Botão --
- #       text_container = ctk.CTkFrame(self.approval_frame, fg_color="transparent")
- #       text_container.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+        text_container = ctk.CTkFrame(self.approval_frame, fg_color="transparent")
+        text_container.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
- #       ctk.CTkLabel(text_container, text="Índice Global de Aprovação\n(Média >= 5.0)", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 5))
+        ctk.CTkLabel(text_container, text="Índice Global de Aprovação\n(Média >= 5.0)", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 5))
 
- #       self.approval_label = ctk.CTkLabel(text_container, text="--%", font=ctk.CTkFont(size=40, weight="bold"))
- #       self.approval_label.pack(pady=10)
+        self.approval_label = ctk.CTkLabel(text_container, text="--%", font=ctk.CTkFont(size=40, weight="bold"))
+        self.approval_label.pack(pady=10)
 
- #       self.approval_detail_label = ctk.CTkLabel(text_container, text="Aprovados: 0 | Abaixo da Média: 0", text_color="gray")
- #       self.approval_detail_label.pack(pady=(0, 20))
+        self.approval_detail_label = ctk.CTkLabel(text_container, text="Aprovados: 0 | Abaixo da Média: 0", text_color="gray")
+        self.approval_detail_label.pack(pady=(0, 20))
 
- #       self.btn_details = ctk.CTkButton(text_container, text="Ver Alunos em Risco", command=self.open_risk_details_dialog, fg_color="red", hover_color="#d32f2f")
- #       self.btn_details.pack(pady=10)
+        self.btn_details = ctk.CTkButton(text_container, text="Ver Alunos em Risco", command=self.open_risk_details_dialog, fg_color="red", hover_color="#d32f2f")
+        self.btn_details.pack(pady=10)
 
         # -- Coluna 1: Gráfico Pizza --
- #       self.pie_chart_container = ctk.CTkFrame(self.approval_frame, fg_color="#DCB538")
- #       self.pie_chart_container.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+        self.pie_chart_container = ctk.CTkFrame(self.approval_frame, fg_color="#DCB538")
+        self.pie_chart_container.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
 
- #       self.pie_chart_label = ctk.CTkLabel(self.pie_chart_container, text="")
- #       self.pie_chart_label.pack(expand=True)
- #       self.pie_chart_image = None # Prevent GC
+        self.pie_chart_label = ctk.CTkLabel(self.pie_chart_container, text="")
+        self.pie_chart_label.pack(expand=True)
+        self.pie_chart_image = None # Prevent GC
 
         # Armazena os dados detalhados para o modal
- #       self.failed_details_data = []
- #       self.honor_roll_data = []
-    
+        self.failed_details_data = []
+        self.honor_roll_data = []
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs):
         _ = kwargs

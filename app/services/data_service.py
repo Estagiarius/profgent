@@ -145,9 +145,26 @@ class DataService:
     # Método para buscar um aluno pelo nome completo.
     def get_student_by_name(self, name: str) -> dict | None:
         with self._get_db() as db:
-            # Filtra pelo nome completo, ignorando maiúsculas/minúsculas.
-            student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == name.lower()).first()
-            # Se encontrar, retorna os dados em formato de dicionário.
+            # Otimização 6: Tenta dividir o nome para buscar por colunas indexáveis primeiro.
+            # Evita 'func.lower(col1+col2)' que causa full table scan.
+
+            name = name.strip()
+            parts = name.split(' ', 1)
+
+            student = None
+            if len(parts) == 2:
+                first, last = parts
+                student = db.query(Student).filter(
+                    and_(
+                        func.lower(Student.first_name) == first.lower(),
+                        func.lower(Student.last_name) == last.lower()
+                    )
+                ).first()
+
+            # Fallback se a busca dividida falhar (ex: nome do meio, ou formato incomum), ou se não tiver sobrenome
+            if not student:
+                 student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == name.lower()).first()
+
             if student:
                 return {
                     "id": student.id, "first_name": student.first_name,
@@ -208,7 +225,14 @@ class DataService:
             query = db.query(Student)
 
             if active_only:
-                query = query.join(ClassEnrollment).filter(ClassEnrollment.status == 'Active').distinct()
+                # Otimização 2: Usar EXISTS ao invés de JOIN + DISTINCT para performance
+                # SELECT * FROM students s WHERE EXISTS (SELECT 1 FROM enrollments e WHERE e.student_id = s.id AND status = 'Active')
+                query = query.filter(
+                    db.query(ClassEnrollment.id).filter(
+                        ClassEnrollment.student_id == Student.id,
+                        ClassEnrollment.status == 'Active'
+                    ).exists()
+                )
 
             if search_term:
                 search_pattern = f"%{search_term.lower()}%"
@@ -243,10 +267,12 @@ class DataService:
     # Método para buscar alunos que não estão matriculados em uma turma específica.
     def get_unenrolled_students(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
-            # Cria uma subconsulta para obter os IDs de todos os alunos já matriculados na turma.
-            enrolled_student_ids = db.query(ClassEnrollment.student_id).filter(ClassEnrollment.class_id == class_id)
-            # Busca todos os alunos cujo ID não está na lista de IDs de matriculados.
-            students = db.query(Student).filter(Student.id.notin_(enrolled_student_ids)).all()
+            # Otimização 3: Usar LEFT JOIN ... WHERE NULL ao invés de NOT IN (Subquery)
+            # Isso geralmente performa melhor em bancos SQL para datasets maiores.
+            students = (db.query(Student)
+                        .outerjoin(ClassEnrollment, (ClassEnrollment.student_id == Student.id) & (ClassEnrollment.class_id == class_id))
+                        .filter(ClassEnrollment.id == None)
+                        .all())
             return [{"id": s.id, "first_name": s.first_name, "last_name": s.last_name} for s in students]
 
     # Método para buscar alunos (ativos) que fazem aniversário no dia de hoje.
@@ -408,10 +434,14 @@ class DataService:
     # Método para buscar todas as turmas.
     def get_all_classes(self) -> list[dict]:
         with self._get_db() as db:
-            # Carrega as matrículas relacionadas para evitar consultas extras.
-            classes = db.query(Class).options(joinedload(Class.enrollments)).order_by(Class.name).all()
-            # Calcula a contagem de alunos para cada turma.
-            return [{"id": c.id, "name": c.name, "student_count": len(c.enrollments)} for c in classes]
+            # Otimização 1: Calcular contagem via SQL aggregation ao invés de carregar objetos em memória.
+            results = (db.query(Class, func.count(ClassEnrollment.id).label('count'))
+                       .outerjoin(ClassEnrollment, Class.id == ClassEnrollment.class_id)
+                       .group_by(Class.id)
+                       .order_by(Class.name)
+                       .all())
+
+            return [{"id": c.id, "name": c.name, "student_count": count} for c, count in results]
 
     # Método para buscar uma turma pelo ID.
     def get_class_by_id(self, class_id: int) -> dict | None:
@@ -525,25 +555,27 @@ class DataService:
             # Mapeia por student_id para acesso rápido.
             existing_map = {e.student_id: e for e in existing_enrollments}
 
+            new_enrollments_data = []
+
             for student_id in student_ids:
                 existing = existing_map.get(student_id)
                 if existing:
                     # Se já existe (talvez inativo), reativa e atualiza número.
                     existing.status = "Active"
-                    # Opcional: atualizar call_number ou manter o antigo?
-                    # Para simplificar e evitar buracos/conflitos, vamos atribuir um novo número sequencial
-                    # se estivermos tratando como uma "nova matrícula".
                     existing.call_number = next_call_number
                 else:
-                    new_enrollment = ClassEnrollment(
-                        class_id=class_id,
-                        student_id=student_id,
-                        call_number=next_call_number,
-                        status="Active"
-                    )
-                    db.add(new_enrollment)
+                    # Otimização 5: Preparar inserção em lote
+                    new_enrollments_data.append({
+                        "class_id": class_id,
+                        "student_id": student_id,
+                        "call_number": next_call_number,
+                        "status": "Active"
+                    })
 
                 next_call_number += 1
+
+            if new_enrollments_data:
+                db.bulk_insert_mappings(ClassEnrollment, new_enrollments_data)
 
             # Persiste as mudanças na sessão (necessário para testes com autoflush=False e para garantir visibilidade)
             db.flush()
@@ -852,33 +884,53 @@ class DataService:
     # Método para inserir ou atualizar notas em lote para uma disciplina de uma turma (upsert).
     def upsert_grades_for_subject(self, class_subject_id: int, grades_data: list[dict]):
         with self._get_db() as db:
-            # Busca todas as notas existentes para a disciplina e as armazena em um mapa para acesso rápido.
+            # Otimização 4: Batch Update/Insert para alta performance
+
+            # 1. Identificar existentes
             existing_grades_query = db.query(Grade).join(Assessment).filter(Assessment.class_subject_id == class_subject_id)
             existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
-            # Itera sobre os novos dados de nota.
+
+            to_insert = []
+            to_update = []
+
+            today_str = date.today().isoformat()
+
             for grade_info in grades_data:
-                # Garante que os IDs sejam inteiros para evitar duplicações causadas por incompatibilidade de tipos (ex: string vs int).
                 try:
                     student_id = int(grade_info['student_id'])
                     assessment_id = int(grade_info['assessment_id'])
                 except (ValueError, TypeError):
-                    # Se a conversão falhar, pula este registro para evitar inconsistências.
                     continue
 
                 score = grade_info['score']
-
                 if not (0 <= score <= 10):
                     raise ValueError(f"Score must be between 0 and 10.")
 
                 existing_grade = existing_grades_map.get((student_id, assessment_id))
-                # Se a nota já existe, atualiza o valor se for diferente.
+
                 if existing_grade:
                     if existing_grade.score != score:
-                        existing_grade.score = score
-                # Se a nota não existe, cria um novo registro.
+                        # Para update em lote, precisamos do ID primário
+                        to_update.append({
+                            "id": existing_grade.id,
+                            "score": score
+                        })
                 else:
-                    new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today().isoformat())
-                    db.add(new_grade)
+                    to_insert.append({
+                        "student_id": student_id,
+                        "assessment_id": assessment_id,
+                        "score": score,
+                        "date_recorded": today_str
+                    })
+
+            # Executar em lote
+            if to_insert:
+                db.bulk_insert_mappings(Grade, to_insert)
+            if to_update:
+                db.bulk_update_mappings(Grade, to_update)
+
+            # Commit é gerenciado pelo context manager, mas se estivermos em transação manual:
+            db.flush()
 
     # Método para calcular a média ponderada de um aluno.
     @staticmethod
@@ -896,16 +948,17 @@ class DataService:
     # Método para obter estatísticas globais do sistema.
     def get_global_dashboard_stats(self) -> dict:
         with self._get_db() as db:
-            active_students = db.query(ClassEnrollment.student_id).filter(ClassEnrollment.status == 'Active').distinct().count()
-            total_classes = db.query(Class.id).count()
-            total_courses = db.query(Course.id).count()
-            total_incidents = db.query(Incident.id).count()
+            # Otimização 7: Count distinct direto no SQL, evitando fetch.
+            active_students = db.query(func.count(func.distinct(ClassEnrollment.student_id))).filter(ClassEnrollment.status == 'Active').scalar()
+            total_classes = db.query(func.count(Class.id)).scalar()
+            total_courses = db.query(func.count(Course.id)).scalar()
+            total_incidents = db.query(func.count(Incident.id)).scalar()
 
             return {
-                "active_students": active_students,
-                "total_classes": total_classes,
-                "total_courses": total_courses,
-                "total_incidents": total_incidents
+                "active_students": active_students or 0,
+                "total_classes": total_classes or 0,
+                "total_courses": total_courses or 0,
+                "total_incidents": total_incidents or 0
             }
 
     # Método para obter o ranking de incidentes por turma.
