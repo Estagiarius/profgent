@@ -32,6 +32,8 @@ class Assessment(Base):
     name = Column(String, nullable=False)
     # Define a coluna 'weight' como um número de ponto flutuante (decimal), obrigatório, com valor padrão 1.0.
     weight = Column(Float, nullable=False, default=1.0)
+    # Define o período de avaliação (1, 2, 3, 4 para bimestres, 5 para final).
+    grading_period = Column(Integer, nullable=False, default=1)
     # Define a coluna 'class_subject_id' como um inteiro que é uma chave estrangeira.
     class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False)
 
