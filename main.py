@@ -6,6 +6,7 @@ from app.data.database import engine, Base
 from app.services import data_service
 # Importa o AssistantService
 from app.services.assistant_service import AssistantService
+from app.data.migrations import migrate_database
 
 # Configuração básica de logging
 logging.basicConfig(
@@ -49,6 +50,7 @@ def main():
 
         # 1. Inicializa a camada de dados
         initialize_database()
+        migrate_database(engine)
 
         # 2. Inicializa os serviços
         # O data_service já foi importado como singleton.

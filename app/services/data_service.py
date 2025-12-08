@@ -594,18 +594,51 @@ class DataService:
             return self._get_next_call_number(db, class_id)
 
     # Método para adicionar uma nova avaliação a uma disciplina de uma turma.
-    def add_assessment(self, class_subject_id: int, name: str, weight: float) -> dict | None:
+    def add_assessment(self, class_subject_id: int, name: str, weight: float, grading_period: int = 1) -> dict | None:
         if not all([class_subject_id, name, weight is not None]): return None
 
         if weight < 0:
             raise ValueError("Assessment weight must be non-negative.")
 
-        assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight)
+        if not (1 <= grading_period <= 5):
+             raise ValueError("Grading period must be between 1 and 5.")
+
+        assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight, grading_period=grading_period)
         with self._get_db() as db:
             db.add(assessment)
             db.flush()
             db.refresh(assessment)
-            return {"id": assessment.id, "name": assessment.name, "weight": assessment.weight, "class_subject_id": assessment.class_subject_id}
+            return {
+                "id": assessment.id,
+                "name": assessment.name,
+                "weight": assessment.weight,
+                "class_subject_id": assessment.class_subject_id,
+                "grading_period": assessment.grading_period
+            }
+
+    # Método auxiliar para garantir que a avaliação final (período 5) exista.
+    def ensure_final_assessment(self, class_subject_id: int) -> dict:
+        with self._get_db() as db:
+            # Procura por uma avaliação existente no período 5
+            assessment = db.query(Assessment).filter(
+                Assessment.class_subject_id == class_subject_id,
+                Assessment.grading_period == 5
+            ).first()
+
+            if assessment:
+                return {"id": assessment.id, "name": assessment.name}
+
+            # Se não existir, cria uma nova
+            new_assessment = Assessment(
+                class_subject_id=class_subject_id,
+                name="Média Final (Manual)",
+                weight=1.0,
+                grading_period=5
+            )
+            db.add(new_assessment)
+            db.flush()
+            db.refresh(new_assessment)
+            return {"id": new_assessment.id, "name": new_assessment.name}
 
     # Método para atualizar uma avaliação.
     def update_assessment(self, assessment_id: int, name: str, weight: float):
@@ -630,8 +663,8 @@ class DataService:
     # Método para buscar avaliações de uma disciplina da turma.
     def get_assessments_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
-            return [{"id": a.id, "name": a.name, "weight": a.weight} for a in assessments]
+            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).order_by(Assessment.grading_period, Assessment.name).all()
+            return [{"id": a.id, "name": a.name, "weight": a.weight, "grading_period": a.grading_period} for a in assessments]
 
     # Método para buscar todas as notas (geralmente para fins administrativos).
     def get_all_grades(self) -> list[dict]:
@@ -654,6 +687,69 @@ class DataService:
                 {"id": g.id, "student_id": g.student_id, "assessment_id": g.assessment_id, "score": g.score, "assessment_name": g.assessment.name}
                 for g in grades
             ]
+
+    def get_student_period_averages(self, student_id: int, class_subject_id: int) -> dict:
+        """
+        Calcula as médias para cada bimestre (1-4) e a média final.
+        Retorna um dicionário com as médias e a nota final sobrescrita (se houver).
+        """
+        with self._get_db() as db:
+            # Busca todas as avaliações desta disciplina
+            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
+            if not assessments:
+                return {}
+
+            # Busca notas do aluno
+            assessment_ids = [a.id for a in assessments]
+            grades = db.query(Grade).filter(
+                Grade.student_id == student_id,
+                Grade.assessment_id.in_(assessment_ids)
+            ).all()
+
+            # Organiza dados
+            grades_map = {g.assessment_id: g.score for g in grades}
+
+            results = {}
+            final_sum = 0.0
+            periods_count = 0
+
+            # Processa bimestres 1 a 4
+            for period in range(1, 5):
+                period_assessments = [a for a in assessments if a.grading_period == period]
+                if not period_assessments:
+                    results[period] = None
+                    # Se não tem avaliação no bimestre, considera média 0 para o final?
+                    # Ou ignora no cálculo? "média simples das médias finais"
+                    # Geralmente, se o bimestre passou, a média é 0. Se não passou, é null.
+                    # Vamos assumir 0 para o cálculo final por enquanto.
+                    final_sum += 0.0
+                    periods_count += 1
+                else:
+                    assessments_data = [{"id": a.id, "weight": a.weight} for a in period_assessments]
+                    # Simula a estrutura de grades esperada pelo calculate_weighted_average (lista de dicts)
+                    # Mas calculate_weighted_average espera LISTA de grades.
+                    student_grades_list = [
+                        {"assessment_id": a.id, "score": grades_map.get(a.id, 0.0), "student_id": student_id}
+                        for a in period_assessments if a.id in grades_map
+                    ]
+
+                    avg = self.calculate_weighted_average(student_id, student_grades_list, assessments_data)
+                    results[period] = avg
+                    final_sum += avg
+                    periods_count += 1
+
+            # Calcula média final (aritmética)
+            calculated_final = final_sum / 4.0 if periods_count > 0 else 0.0
+            results["final_calculated"] = calculated_final
+
+            # Verifica override (período 5)
+            final_assessment = next((a for a in assessments if a.grading_period == 5), None)
+            if final_assessment and final_assessment.id in grades_map:
+                results["final_override"] = grades_map[final_assessment.id]
+            else:
+                results["final_override"] = None
+
+            return results
 
     # Método para buscar todas as notas com detalhes completos (aluno, avaliação, turma, curso).
     def get_all_grades_with_details(self) -> list[dict]:

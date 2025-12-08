@@ -106,16 +106,28 @@ class ClassDetailView(ctk.CTkFrame):
 
         # --- Aba de Avaliações ---
         assessments_tab = self.tab_view.tab("Avaliações")
-        assessments_tab.grid_rowconfigure(0, weight=1)
+        assessments_tab.grid_rowconfigure(1, weight=1)
         assessments_tab.grid_columnconfigure(0, weight=1)
 
-        # Frame com rolagem para a lista de avaliações.
-        self.assessment_list_frame = ctk.CTkScrollableFrame(assessments_tab)
-        self.assessment_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        # Tabview interno para separar avaliações por bimestre
+        self.assessments_tabview = ctk.CTkTabview(assessments_tab, height=400)
+        self.assessments_tabview.grid(row=1, column=0, padx=10, pady=5, sticky="nsew")
+        self.assessments_tabview.add("1º Bimestre")
+        self.assessments_tabview.add("2º Bimestre")
+        self.assessments_tabview.add("3º Bimestre")
+        self.assessments_tabview.add("4º Bimestre")
+
+        # Configura as abas
+        for tab_name in ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"]:
+            tab = self.assessments_tabview.tab(tab_name)
+            tab.grid_rowconfigure(0, weight=1)
+            tab.grid_columnconfigure(0, weight=1)
+            frame = ctk.CTkScrollableFrame(tab)
+            frame.grid(row=0, column=0, sticky="nsew")
 
         # Botão para adicionar uma nova avaliação.
         self.add_assessment_button = ctk.CTkButton(assessments_tab, text="Adicionar Nova Avaliação", command=self.add_assessment_popup)
-        self.add_assessment_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+        self.add_assessment_button.grid(row=0, column=0, padx=10, pady=(10, 5), sticky="ew")
 
         # --- Aba de Aulas ---
         lessons_tab = self.tab_view.tab("Aulas")
@@ -181,7 +193,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         # --- Aba do Quadro de Notas ---
         grade_grid_tab = self.tab_view.tab("Quadro de Notas")
-        grade_grid_tab.grid_rowconfigure(1, weight=1)
+        grade_grid_tab.grid_rowconfigure(2, weight=1)
         grade_grid_tab.grid_columnconfigure(0, weight=1)
 
         # Frame para opções (filtro).
@@ -197,11 +209,31 @@ class ClassDetailView(ctk.CTkFrame):
         self.show_active_only_grades_checkbox.pack(side="left", padx=10, pady=5)
         self.show_active_only_grades_checkbox.select() # Marcado por padrão.
 
-        self.grade_grid_frame = ctk.CTkScrollableFrame(grade_grid_tab)
-        self.grade_grid_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        # Tabview para os bimestres e resultados finais
+        self.grades_tabview = ctk.CTkTabview(grade_grid_tab, command=self.populate_grade_grid)
+        self.grades_tabview.grid(row=2, column=0, padx=10, pady=5, sticky="nsew")
+        self.grades_tabview.add("1º Bimestre")
+        self.grades_tabview.add("2º Bimestre")
+        self.grades_tabview.add("3º Bimestre")
+        self.grades_tabview.add("4º Bimestre")
+        self.grades_tabview.add("Resultados Finais")
 
-        self.save_grades_button = ctk.CTkButton(grade_grid_tab, text="Salvar Todas as Alterações", command=self.save_all_grades)
-        self.save_grades_button.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
+        # Configura as sub-abas do quadro de notas
+        for tab_name in ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre", "Resultados Finais"]:
+            tab = self.grades_tabview.tab(tab_name)
+            tab.grid_rowconfigure(0, weight=1)
+            tab.grid_columnconfigure(0, weight=1)
+            # Frame scrollable para o conteúdo de cada aba
+            frame = ctk.CTkScrollableFrame(tab)
+            frame.grid(row=0, column=0, sticky="nsew")
+            # Adiciona atributo dinâmico para acessar o frame depois
+            # Ex: self.grade_frames["1º Bimestre"] = frame
+            if not hasattr(self, "grade_frames"):
+                 self.grade_frames = {}
+            self.grade_frames[tab_name] = frame
+
+        self.save_grades_button = ctk.CTkButton(grade_grid_tab, text="Salvar Alterações da Aba Atual", command=self.save_all_grades)
+        self.save_grades_button.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
 
         # --- Aba de Relatórios ---
         reports_tab = self.tab_view.tab("Relatórios")
@@ -379,96 +411,188 @@ class ClassDetailView(ctk.CTkFrame):
              messagebox.showwarning("Aviso", "Selecione uma disciplina antes de salvar notas.")
              return
 
-        # Lista para armazenar os dados das notas a serem salvas (upsert).
+        current_tab = self.grades_tabview.get()
+
+        # Se estiver na aba "Resultados Finais", a lógica de salvamento é ligeiramente diferente (salva no período 5)
+        if current_tab == "Resultados Finais":
+             self.save_final_grades()
+             return
+
+        # Lógica padrão para bimestres 1-4
         grades_to_upsert = []
-        # Itera sobre os widgets de entrada de nota que foram criados.
         for (student_id, assessment_id), entry_widget in self.grade_entries.items():
+            # Filtra apenas entries que pertencem à aba atual (embora grade_entries contenha tudo se não limparmos,
+            # mas vamos garantir limpando no populate ou filtrando aqui se necessário).
+            # Como populate_grade_grid limpa self.grade_entries, aqui só temos os widgets visíveis da aba atual.
+
             score_str = entry_widget.get()
-            # Ignora campos de nota vazios.
-            if not score_str:
-                continue
+            if not score_str: continue
 
             try:
-                # Tenta converter o valor para um número float.
                 score = parse_float_input(score_str)
-                # Valida se a nota está no intervalo permitido (0 a 10).
                 if not (0 <= score <= 10):
                     messagebox.showerror("Nota Inválida", f"Nota inválida '{score}'. As notas devem ser entre 0 e 10.")
-                    return # Interrompe a operação se uma nota for inválida.
-                # Adiciona a nota válida à lista.
+                    return
                 grades_to_upsert.append({'student_id': student_id, 'assessment_id': assessment_id, 'score': score})
             except ValueError:
-                # Se a conversão para float falhar.
                 messagebox.showerror("Nota Inválida", f"Nota inválida '{score_str}'. As notas devem ser numéricas.")
                 return
 
-        # Se não houver notas para salvar, informa o usuário.
         if not grades_to_upsert:
             messagebox.showinfo("Nenhuma Mudança", "Nenhuma nota nova ou modificada para salvar.")
             return
 
-        # Chama o DataService para salvar os dados em lote (agora por disciplina/class_subject).
         data_service.upsert_grades_for_subject(self.current_subject_id, grades_to_upsert)
+        messagebox.showinfo("Sucesso", "Notas salvas com sucesso.")
+        self.populate_grade_grid() # Atualiza para refletir mudanças (médias)
 
-        messagebox.showinfo("Sucesso", "Todas as notas foram salvas com sucesso.")
-        # Atualiza o quadro de notas para recalcular e exibir as médias.
-        self.populate_grade_grid()
+    def save_final_grades(self):
+        """Salva as notas finais sobrescritas na aba 'Resultados Finais'."""
+        # Garante que a avaliação final (grading_period=5) existe
+        final_assessment = data_service.ensure_final_assessment(self.current_subject_id)
+        final_assessment_id = final_assessment['id']
+
+        grades_to_upsert = []
+        for (student_id, _), entry_widget in self.grade_entries.items():
+            score_str = entry_widget.get()
+            if not score_str: continue # Se vazio, não salva nada (mantém calculado se já existia, ou deleta? Upsert não deleta.)
+
+            # Se o usuário apagou o valor, talvez devesse deletar a nota?
+            # Por enquanto, assumimos que ele digita um valor.
+
+            try:
+                score = parse_float_input(score_str)
+                if not (0 <= score <= 10):
+                    messagebox.showerror("Nota Inválida", f"Nota inválida '{score}'.")
+                    return
+
+                grades_to_upsert.append({
+                    'student_id': student_id,
+                    'assessment_id': final_assessment_id,
+                    'score': score
+                })
+            except ValueError:
+                messagebox.showerror("Nota Inválida", f"Valor inválido '{score_str}'.")
+                return
+
+        if grades_to_upsert:
+            data_service.upsert_grades_for_subject(self.current_subject_id, grades_to_upsert)
+            messagebox.showinfo("Sucesso", "Notas finais salvas com sucesso.")
+            self.populate_grade_grid()
+        else:
+            messagebox.showinfo("Aviso", "Nenhuma nota final para salvar.")
 
     # Método para construir e preencher o quadro de notas.
     def populate_grade_grid(self):
-        # Limpa todos os widgets existentes no frame do quadro.
-        for widget in self.grade_grid_frame.winfo_children():
+        # Identifica a aba atual
+        current_tab_name = self.grades_tabview.get()
+        frame = self.grade_frames[current_tab_name]
+
+        # Limpa o frame atual
+        for widget in frame.winfo_children():
             widget.destroy()
 
-        if not self.class_id: return
-        if not self.current_subject_id:
-            ctk.CTkLabel(self.grade_grid_frame, text="Selecione ou adicione uma disciplina para ver o quadro de notas.").pack(pady=20)
+        # Limpa entradas antigas para não salvar dados de abas invisíveis
+        self.grade_entries = {}
+
+        if not self.class_id or not self.current_subject_id:
+            ctk.CTkLabel(frame, text="Selecione uma disciplina.").pack(pady=20)
             return
 
-        # Busca os dados necessários do banco.
+        # Busca alunos
         enrollments = data_service.get_enrollments_for_class(self.class_id)
-
-        # Filtra por alunos ativos se o checkbox estiver marcado.
         if self.show_active_only_grades_checkbox.get():
             enrollments = [e for e in enrollments if e['status'] == 'Active']
 
-        # Busca avaliações específicas desta disciplina
-        assessments = data_service.get_assessments_for_subject(self.current_subject_id)
+        # Lógica para Abas de Bimestre (1-4)
+        if current_tab_name != "Resultados Finais":
+            period_map = {"1º Bimestre": 1, "2º Bimestre": 2, "3º Bimestre": 3, "4º Bimestre": 4}
+            target_period = period_map.get(current_tab_name, 1)
 
-        # Cria o cabeçalho da tabela.
-        headers = ["Nome do Aluno"] + [a['name'] for a in assessments] + ["Média Final"]
-        for col, header in enumerate(headers):
-            label = ctk.CTkLabel(self.grade_grid_frame, text=header, font=ctk.CTkFont(weight="bold"))
-            label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
+            # Busca avaliações DO PERÍODO
+            all_assessments = data_service.get_assessments_for_subject(self.current_subject_id)
+            period_assessments = [a for a in all_assessments if a.get('grading_period', 1) == target_period]
 
-        # Cria as linhas, uma para cada aluno.
-        # Dicionário para guardar a referência dos widgets de entrada de nota.
-        self.grade_entries = {}
-        grades = data_service.get_grades_for_subject(self.current_subject_id)
+            if not period_assessments:
+                ctk.CTkLabel(frame, text="Nenhuma avaliação cadastrada neste bimestre.").pack(pady=20)
+                return
 
-        for row, enrollment in enumerate(enrollments, start=1):
-            student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
-            name_label = ctk.CTkLabel(self.grade_grid_frame, text=student_name)
-            name_label.grid(row=row, column=0, padx=5, pady=5, sticky="w")
+            # Headers
+            headers = ["Nome do Aluno"] + [a['name'] for a in period_assessments] + ["Média Bimestre"]
+            for col, header in enumerate(headers):
+                label = ctk.CTkLabel(frame, text=header, font=ctk.CTkFont(weight="bold"))
+                label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
 
-            # Cria os campos de entrada para cada avaliação.
-            for col, assessment in enumerate(assessments, start=1):
-                entry = ctk.CTkEntry(self.grade_grid_frame, width=80)
-                entry.grid(row=row, column=col, padx=5, pady=5)
+            # Dados
+            grades = data_service.get_grades_for_subject(self.current_subject_id)
 
-                # Procura a nota existente para este aluno e avaliação.
-                existing_grade = next((g for g in grades if g['student_id'] == enrollment['student_id'] and g['assessment_id'] == assessment['id']), None)
-                if existing_grade:
-                    # Se existir, preenche o campo com o valor formatado.
-                    entry.insert(0, format_float_output(existing_grade['score']))
+            for row, enrollment in enumerate(enrollments, start=1):
+                student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
+                ctk.CTkLabel(frame, text=student_name).grid(row=row, column=0, padx=5, pady=5, sticky="w")
 
-                # Armazena a referência do widget de entrada.
-                self.grade_entries[(enrollment['student_id'], assessment['id'])] = entry
+                student_grades_for_avg = [] # Para cálculo da média local da linha
 
-            # Calcula e exibe a média final ponderada do aluno para esta disciplina.
-            average = data_service.calculate_weighted_average(enrollment['student_id'], grades, assessments)
-            average_label = ctk.CTkLabel(self.grade_grid_frame, text=format_float_output(average, precision=2))
-            average_label.grid(row=row, column=len(assessments) + 1, padx=5, pady=5, sticky="w")
+                for col, assessment in enumerate(period_assessments, start=1):
+                    entry = ctk.CTkEntry(frame, width=80)
+                    entry.grid(row=row, column=col, padx=5, pady=5)
+
+                    existing_grade = next((g for g in grades if g['student_id'] == enrollment['student_id'] and g['assessment_id'] == assessment['id']), None)
+                    if existing_grade:
+                        entry.insert(0, format_float_output(existing_grade['score']))
+                        student_grades_for_avg.append({"assessment_id": assessment['id'], "score": existing_grade['score']})
+
+                    self.grade_entries[(enrollment['student_id'], assessment['id'])] = entry
+
+                # Calcula Média do Bimestre
+                # Precisamos passar apenas os assessments deste bimestre para o cálculo ficar correto como média deste bimestre
+                period_assessments_data = [{"id": a['id'], "weight": a['weight']} for a in period_assessments]
+                avg = data_service.calculate_weighted_average(enrollment['student_id'], [{"student_id": enrollment['student_id'], "assessment_id": x['assessment_id'], "score": x['score']} for x in student_grades_for_avg], period_assessments_data)
+
+                ctk.CTkLabel(frame, text=format_float_output(avg, precision=2)).grid(row=row, column=len(period_assessments)+1, padx=5, pady=5)
+
+        # Lógica para Aba "Resultados Finais"
+        else:
+            headers = ["Nome do Aluno", "Média Calculada (4 Bim.)", "Nota Final (Editável)", "Ações"]
+            for col, header in enumerate(headers):
+                label = ctk.CTkLabel(frame, text=header, font=ctk.CTkFont(weight="bold"))
+                label.grid(row=0, column=col, padx=10, pady=5, sticky="w")
+
+            for row, enrollment in enumerate(enrollments, start=1):
+                student_id = enrollment['student_id']
+                averages = data_service.get_student_period_averages(student_id, self.current_subject_id)
+
+                calc_avg = averages.get("final_calculated", 0.0)
+                override_avg = averages.get("final_override")
+
+                student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
+
+                # Col 0: Nome
+                ctk.CTkLabel(frame, text=student_name).grid(row=row, column=0, padx=10, pady=5, sticky="w")
+
+                # Col 1: Média Calculada
+                ctk.CTkLabel(frame, text=format_float_output(calc_avg, precision=2)).grid(row=row, column=1, padx=10, pady=5)
+
+                # Col 2: Nota Final (Editável)
+                entry = ctk.CTkEntry(frame, width=80)
+                entry.grid(row=row, column=2, padx=10, pady=5)
+
+                # Valor inicial: Se tiver override, mostra ele. Se não, mostra a calculada.
+                current_val = override_avg if override_avg is not None else calc_avg
+                entry.insert(0, format_float_output(current_val, precision=2))
+
+                # Armazena entry com chave 'None' para assessment_id, pois tratamos especial no save_final_grades
+                self.grade_entries[(student_id, None)] = entry
+
+                # Col 3: Botão Recalcular (Reset)
+                # Só faz sentido se tiver um override. Se não tiver, o valor já é o calculado.
+                # Mas para simplificar, o botão sempre copia o valor calculado para o entry.
+                recalc_btn = ctk.CTkButton(frame, text="Recalcular", width=80,
+                                           command=lambda e=entry, val=calc_avg: self._reset_final_grade(e, val))
+                recalc_btn.grid(row=row, column=3, padx=10, pady=5)
+
+    def _reset_final_grade(self, entry_widget, calculated_value):
+        entry_widget.delete(0, "end")
+        entry_widget.insert(0, format_float_output(calculated_value, precision=2))
 
     # Abre o pop-up para adicionar um novo incidente.
     def add_incident_popup(self):
@@ -589,45 +713,69 @@ class ClassDetailView(ctk.CTkFrame):
         def save_callback(data):
             name = data.get("name")
             weight_str = data.get("weight")
+            period_str = data.get("period") # Ex: "1º Bimestre"
+
+            period_map = {"1º Bimestre": 1, "2º Bimestre": 2, "3º Bimestre": 3, "4º Bimestre": 4}
+            grading_period = period_map.get(period_str, 1)
+
             if name and weight_str:
                 try:
                     weight = parse_float_input(weight_str)
-                    data_service.add_assessment(self.current_subject_id, name, weight)
+                    data_service.add_assessment(self.current_subject_id, name, weight, grading_period)
                     self.populate_assessment_list()
+                    self.populate_grade_grid() # Atualiza também o quadro de notas para aparecer a nova coluna
                 except ValueError as e:
                     messagebox.showerror("Erro", f"Erro ao adicionar avaliação: {e}")
 
         fields = {"name": "Nome da Avaliação", "weight": "Peso"}
-        AddDialog(self, "Adicionar Nova Avaliação", fields=fields, save_callback=save_callback)
+        dropdowns = {"period": ("Bimestre", ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"])}
 
-    # Preenche a lista de avaliações.
+        AddDialog(self, "Adicionar Nova Avaliação", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
+
+    # Preenche a lista de avaliações separada por bimestres.
     def populate_assessment_list(self):
-        for widget in self.assessment_list_frame.winfo_children(): widget.destroy()
-        if not self.class_id: return
+        # Limpa todas as abas
+        tab_names = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"]
+        frames = {}
+        for name in tab_names:
+            frame = self.assessments_tabview.tab(name).winfo_children()[0] # Pega o ScrollableFrame dentro da aba
+            for widget in frame.winfo_children(): widget.destroy()
+            frames[name] = frame
 
+        if not self.class_id: return
         if not self.current_subject_id:
-             ctk.CTkLabel(self.assessment_list_frame, text="Selecione ou adicione uma disciplina.").pack(pady=10)
+             # Mostra aviso na primeira aba apenas
+             ctk.CTkLabel(frames["1º Bimestre"], text="Selecione ou adicione uma disciplina.").pack(pady=10)
              return
 
         assessments = data_service.get_assessments_for_subject(self.current_subject_id)
 
-        headers = ["Nome da Avaliação", "Peso", "Ações"]
-        for i, header in enumerate(headers):
-            label = ctk.CTkLabel(self.assessment_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
-            label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
+        # Filtra e popula cada aba
+        for period_idx, tab_name in enumerate(tab_names, start=1):
+            period_assessments = [a for a in assessments if a.get('grading_period', 1) == period_idx]
+            frame = frames[tab_name]
 
-        for i, assessment in enumerate(assessments, start=1):
-            ctk.CTkLabel(self.assessment_list_frame, text=assessment['name']).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.assessment_list_frame, text=format_float_output(assessment['weight'])).grid(row=i, column=1, padx=10, pady=5, sticky="w")
+            if not period_assessments:
+                ctk.CTkLabel(frame, text="Nenhuma avaliação neste bimestre.").pack(pady=10)
+                continue
 
-            actions_frame = ctk.CTkFrame(self.assessment_list_frame)
-            actions_frame.grid(row=i, column=2, padx=5, pady=5, sticky="e")
+            headers = ["Nome da Avaliação", "Peso", "Ações"]
+            for i, header in enumerate(headers):
+                label = ctk.CTkLabel(frame, text=header, font=ctk.CTkFont(weight="bold"))
+                label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
 
-            edit_button = ctk.CTkButton(actions_frame, text="Editar", command=lambda a=assessment: self.edit_assessment_popup(a))
-            edit_button.pack(side="left", padx=5)
+            for i, assessment in enumerate(period_assessments, start=1):
+                ctk.CTkLabel(frame, text=assessment['name']).grid(row=i, column=0, padx=10, pady=5, sticky="w")
+                ctk.CTkLabel(frame, text=format_float_output(assessment['weight'])).grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
-            delete_button = ctk.CTkButton(actions_frame, text="Excluir", fg_color="red", command=lambda a_id=assessment['id']: self.delete_assessment_action(a_id))
-            delete_button.pack(side="left", padx=5)
+                actions_frame = ctk.CTkFrame(frame)
+                actions_frame.grid(row=i, column=2, padx=5, pady=5, sticky="e")
+
+                edit_button = ctk.CTkButton(actions_frame, text="Editar", command=lambda a=assessment: self.edit_assessment_popup(a))
+                edit_button.pack(side="left", padx=5)
+
+                delete_button = ctk.CTkButton(actions_frame, text="Excluir", fg_color="red", command=lambda a_id=assessment['id']: self.delete_assessment_action(a_id))
+                delete_button.pack(side="left", padx=5)
 
     # Ação de deletar uma avaliação após confirmação.
     def delete_assessment_action(self, assessment_id):
