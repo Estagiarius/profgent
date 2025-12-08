@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from typing import List, Dict, Callable, Any
+from typing import List, Dict, Callable, Any, Set
 
 class EnrollmentDialog(ctk.CTkToplevel):
     def __init__(self, parent, title: str, students: List[Dict[str, Any]], enroll_callback: Callable[[List[int]], None]):
@@ -10,11 +10,17 @@ class EnrollmentDialog(ctk.CTkToplevel):
         self.students = students
         self.enroll_callback = enroll_callback
 
-        # Store checkboxes to retrieve values later
-        # Key: student_id, Value: ctk.CTkCheckBox (or StringVar/BooleanVar linked to it)
-        self.check_vars: Dict[int, ctk.BooleanVar] = {}
+        # Performance limit
+        self.DISPLAY_LIMIT = 50
+
+        # Debounce timer
+        self._search_job = None
+
+        # Independent set to track selected IDs across filters/renders
+        self.selected_ids: Set[int] = set()
 
         self._setup_ui()
+        # Initial population
         self._populate_list()
 
         # Bring to front
@@ -33,8 +39,8 @@ class EnrollmentDialog(ctk.CTkToplevel):
 
         self.search_entry = ctk.CTkEntry(self.search_frame, placeholder_text="Buscar aluno por nome...")
         self.search_entry.pack(side="left", fill="x", expand=True, padx=5, pady=5)
-        # Bind key release to filter in real-time
-        self.search_entry.bind("<KeyRelease>", self._on_search_change)
+        # Bind key release to filter with debounce
+        self.search_entry.bind("<KeyRelease>", self._on_search_key)
 
         # --- List Area ---
         self.list_frame = ctk.CTkScrollableFrame(self)
@@ -50,6 +56,19 @@ class EnrollmentDialog(ctk.CTkToplevel):
         self.cancel_button = ctk.CTkButton(self.actions_frame, text="Cancelar", command=self.destroy, fg_color="transparent", border_width=1)
         self.cancel_button.pack(side="right", padx=10, pady=10)
 
+    def _on_search_key(self, event):
+        """Schedule the search to run after a delay (debounce)."""
+        if self._search_job:
+            self.after_cancel(self._search_job)
+        self._search_job = self.after(300, lambda: self._populate_list(self.search_entry.get()))
+
+    def _toggle_selection(self, student_id: int, var: ctk.BooleanVar):
+        """Callback to update the independent set of selected IDs."""
+        if var.get():
+            self.selected_ids.add(student_id)
+        else:
+            self.selected_ids.discard(student_id)
+
     def _populate_list(self, filter_text: str = ""):
         # Clear existing widgets in the scrollable frame
         for widget in self.list_frame.winfo_children():
@@ -61,16 +80,22 @@ class EnrollmentDialog(ctk.CTkToplevel):
         header_frame = ctk.CTkFrame(self.list_frame, fg_color="transparent")
         header_frame.pack(fill="x", padx=5, pady=2)
 
-        # We use a dummy checkbox for spacing alignment if needed, or just labels
         ctk.CTkLabel(header_frame, text="Nome", font=ctk.CTkFont(weight="bold")).pack(side="left", padx=(35, 10))
         ctk.CTkLabel(header_frame, text="Nascimento", font=ctk.CTkFont(weight="bold")).pack(side="right", padx=10)
 
-        # Filter and display students
-        row_count = 0
+        count = 0
+        total_matches = 0
+
         for student in self.students:
             full_name = f"{student['first_name']} {student['last_name']}"
 
             if filter_text and filter_text not in full_name.lower():
+                continue
+
+            total_matches += 1
+
+            # Stop rendering if limit reached
+            if count >= self.DISPLAY_LIMIT:
                 continue
 
             student_id = student['id']
@@ -79,15 +104,18 @@ class EnrollmentDialog(ctk.CTkToplevel):
             row_frame = ctk.CTkFrame(self.list_frame)
             row_frame.pack(fill="x", padx=5, pady=2)
 
-            # Checkbox variable logic
-            # If we haven't seen this student before, init their var to False
-            if student_id not in self.check_vars:
-                self.check_vars[student_id] = ctk.BooleanVar(value=False)
+            # Initialize checkbox state based on persistent set
+            is_selected = student_id in self.selected_ids
+            check_var = ctk.BooleanVar(value=is_selected)
+
+            # Create closure to capture correct student_id and var
+            cmd = lambda s_id=student_id, v=check_var: self._toggle_selection(s_id, v)
 
             chk = ctk.CTkCheckBox(
                 row_frame,
                 text=full_name,
-                variable=self.check_vars[student_id],
+                variable=check_var,
+                command=cmd,
                 width=20,
                 height=20
             )
@@ -95,10 +123,8 @@ class EnrollmentDialog(ctk.CTkToplevel):
 
             # Birth Date Display
             birth_date_str = student.get('birth_date') or "N/A"
-            # Format if it looks like YYYY-MM-DD
             if birth_date_str != "N/A" and "-" in birth_date_str:
                 try:
-                    # Simple split/reorder to DD/MM/YYYY for display if needed
                     parts = birth_date_str.split("-")
                     if len(parts) == 3:
                         birth_date_str = f"{parts[2]}/{parts[1]}/{parts[0]}"
@@ -107,19 +133,17 @@ class EnrollmentDialog(ctk.CTkToplevel):
 
             ctk.CTkLabel(row_frame, text=birth_date_str).pack(side="right", padx=10)
 
-            row_count += 1
+            count += 1
 
-        if row_count == 0:
+        if total_matches == 0:
             ctk.CTkLabel(self.list_frame, text="Nenhum aluno encontrado.").pack(pady=20)
-
-    def _on_search_change(self, event):
-        self._populate_list(self.search_entry.get())
+        elif total_matches > self.DISPLAY_LIMIT:
+             diff = total_matches - self.DISPLAY_LIMIT
+             ctk.CTkLabel(self.list_frame, text=f"...e mais {diff} resultados. Digite para refinar.").pack(pady=10)
 
     def _on_enroll(self):
-        selected_ids = [s_id for s_id, var in self.check_vars.items() if var.get()]
+        if not self.selected_ids:
+            return
 
-        if not selected_ids:
-            return # Optionally show a warning "No students selected"
-
-        self.enroll_callback(selected_ids)
+        self.enroll_callback(list(self.selected_ids))
         self.destroy()
