@@ -36,26 +36,41 @@ class ReportService:
         :param class_id: ID of the class.
         :return: Path to the generated image file.
         """
-        student = next((g for g in self.data_service.get_all_students() if g['id'] == student_id), None)
-        class_info = self.data_service.get_class_by_id(class_id)
+        # Otimização 1: Usar o helper get_class_report_data para evitar queries em loop
+        report_data = self.data_service.get_class_report_data(class_id)
 
-        if not student or not class_info:
-            raise ValueError("Student or Class not found.")
+        # Encontra o aluno na lista de dados retornada (evita query extra)
+        student_data = next((s for s in report_data['students'] if s['student_id'] == student_id), None)
+        class_info = self.data_service.get_class_by_id(class_id) # Mantendo query leve por ID
 
-        # Fetch subjects for the class
-        subjects = self.data_service.get_subjects_for_class(class_id)
-        if not subjects:
+        if not student_data or not class_info:
+             # Fallback caso o aluno não esteja na lista (ex: foi deletado mas id passado)
+             # Mas report_data['students'] pega enrollments.
+             raise ValueError("Student or Class not found (or student not enrolled).")
+
+        subjects_data = report_data['subjects']
+        grades_map = report_data['grades_map']
+
+        if not subjects_data:
             raise ValueError(f"No subjects found for {class_info['name']}.")
 
         # Prepare data
         subject_names = []
         averages = []
 
-        for subject in subjects:
-            # For each subject, calculate the weighted average
-            assessments = self.data_service.get_assessments_for_subject(subject['id'])
-            grades = self.data_service.get_grades_for_subject(subject['id'])
-            student_grades = [g for g in grades if g['student_id'] == student_id]
+        for subject in subjects_data:
+            assessments = subject['assessments']
+
+            # Reconstrói lista de grades do aluno para esta matéria a partir do map global
+            student_grades = []
+            for assessment in assessments:
+                score = grades_map.get((student_id, assessment['id']))
+                if score is not None:
+                    student_grades.append({
+                        "assessment_id": assessment['id'],
+                        "score": score,
+                        "student_id": student_id
+                    })
 
             avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
             subject_names.append(subject['course_name'])
@@ -66,7 +81,7 @@ class ReportService:
         plt.bar(subject_names, averages, color='skyblue')
         plt.xlabel('Disciplinas')
         plt.ylabel('Média')
-        plt.title(f"Desempenho de {student['first_name']} {student['last_name']} - {class_info['name']}")
+        plt.title(f"Desempenho de {student_data['name']} - {class_info['name']}")
         plt.ylim(0, 10)
         plt.grid(axis='y', linestyle='--', alpha=0.7)
         plt.xticks(rotation=45, ha='right')
@@ -91,19 +106,31 @@ class ReportService:
         if not class_info:
             raise ValueError("Class not found.")
 
-        enrollments = self.data_service.get_enrollments_for_class(class_id)
-        subjects = self.data_service.get_subjects_for_class(class_id)
+        # Otimização 2: Usa o helper para evitar N+1 queries (Alunos x Disciplinas)
+        report_data = self.data_service.get_class_report_data(class_id)
+        students = report_data['students']
+        subjects = report_data['subjects']
+        grades_map = report_data['grades_map']
 
         global_averages = []
 
-        for enrollment in enrollments:
-            student_id = enrollment['student_id']
+        for student in students:
+            student_id = student['student_id']
             student_subject_averages = []
 
             for subject in subjects:
-                assessments = self.data_service.get_assessments_for_subject(subject['id'])
-                grades = self.data_service.get_grades_for_subject(subject['id'])
-                student_grades = [g for g in grades if g['student_id'] == student_id]
+                assessments = subject['assessments']
+
+                # Monta notas do aluno para essa matéria usando o mapa
+                student_grades = []
+                for assessment in assessments:
+                    score = grades_map.get((student_id, assessment['id']))
+                    if score is not None:
+                        student_grades.append({
+                            "assessment_id": assessment['id'],
+                            "score": score,
+                            "student_id": student_id
+                        })
 
                 avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
                 student_subject_averages.append(avg)
@@ -145,25 +172,36 @@ class ReportService:
         if not class_info:
             raise ValueError("Class not found.")
 
-        enrollments = self.data_service.get_enrollments_for_class(class_id)
-        subjects = self.data_service.get_subjects_for_class(class_id)
+        # Otimização 3: Usa o helper para evitar N+1 queries na exportação CSV
+        report_data = self.data_service.get_class_report_data(class_id)
+        students = report_data['students']
+        subjects = report_data['subjects']
+        grades_map = report_data['grades_map']
 
         # Prepare CSV Data
         # Header: Nº, Aluno, Subject 1 Avg, Subject 2 Avg, ..., Global Average
         header = ["Nº", "Aluno"] + [s['course_name'] for s in subjects] + ["Média Global"]
 
         rows = []
-        for enrollment in enrollments:
-            student_id = enrollment['student_id']
-            student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
+        for student in students:
+            student_id = student['student_id']
 
-            row = [enrollment['call_number'], student_name]
+            row = [student['call_number'], student['name']]
 
             subject_averages = []
             for subject in subjects:
-                assessments = self.data_service.get_assessments_for_subject(subject['id'])
-                grades = self.data_service.get_grades_for_subject(subject['id'])
-                student_grades = [g for g in grades if g['student_id'] == student_id]
+                assessments = subject['assessments']
+
+                # Monta notas do aluno para essa matéria usando o mapa
+                student_grades = []
+                for assessment in assessments:
+                    score = grades_map.get((student_id, assessment['id']))
+                    if score is not None:
+                        student_grades.append({
+                            "assessment_id": assessment['id'],
+                            "score": score,
+                            "student_id": student_id
+                        })
 
                 avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
                 row.append(f"{avg:.2f}")
@@ -196,22 +234,36 @@ class ReportService:
         :param class_id: ID of the class.
         :return: Path to the generated text file.
         """
+        # Otimização 4 e 5: Usar helper de dados em lote para buscar estrutura e notas,
+        # e usar novo método específico para incidentes do aluno.
+        report_data = self.data_service.get_class_report_data(class_id)
+
+        # Dados da turma e aluno
         class_info = self.data_service.get_class_by_id(class_id)
-        student_obj = next((s for s in self.data_service.get_all_students() if s['id'] == student_id), None)
+        student_data = next((s for s in report_data['students'] if s['student_id'] == student_id), None)
 
-        if not class_info or not student_obj:
-            raise ValueError("Class or Student not found.")
+        if not class_info or not student_data:
+             # Tenta buscar aluno isolado se não estiver matriculado/ativo no report data
+             # Fallback otimizado: Busca apenas o aluno específico pelo ID
+             student_obj = self.data_service.get_student_by_id(student_id)
+             if not student_obj:
+                raise ValueError("Class or Student not found.")
+             student_name = f"{student_obj['first_name']} {student_obj['last_name']}"
+        else:
+             student_name = student_data['name']
 
-        subjects = self.data_service.get_subjects_for_class(class_id)
-        incidents = self.data_service.get_incidents_for_class(class_id)
-        student_incidents = [i for i in incidents if i['student_id'] == student_id]
+        subjects_data = report_data['subjects']
+        grades_map = report_data['grades_map']
+
+        # Otimização 5: Buscar apenas incidentes deste aluno, não da turma toda
+        student_incidents = self.data_service.get_student_incidents(student_id, class_id)
 
         # Build Report Content
         lines = [
             "=" * 50,
             "BOLETIM ESCOLAR",
             "=" * 50,
-            f"Aluno: {student_obj['first_name']} {student_obj['last_name']}",
+            f"Aluno: {student_name}",
             f"Turma: {class_info['name']}",
             f"Data de Emissão: {datetime.now().strftime('%d/%m/%Y')}",
             "-" * 50,
@@ -219,22 +271,31 @@ class ReportService:
             ""
         ]
 
-        if not subjects:
+        if not subjects_data:
             lines.append("Nenhuma disciplina cadastrada nesta turma.")
 
-        for subject in subjects:
+        for subject in subjects_data:
             lines.append(f"DISCIPLINA: {subject['course_name'].upper()}")
 
-            assessments = self.data_service.get_assessments_for_subject(subject['id'])
-            grades = self.data_service.get_grades_for_subject(subject['id'])
-            student_grades = [g for g in grades if g['student_id'] == student_id]
+            assessments = subject['assessments']
+
+            # Monta notas do aluno para essa matéria usando o mapa
+            student_grades = []
+            for assessment in assessments:
+                score = grades_map.get((student_id, assessment['id']))
+                if score is not None:
+                    student_grades.append({
+                        "assessment_id": assessment['id'],
+                        "score": score,
+                        "student_id": student_id
+                    })
 
             if not assessments:
                 lines.append("  - Nenhuma avaliação registrada.")
             else:
                 for assessment in assessments:
-                    grade_item = next((g for g in student_grades if g['assessment_id'] == assessment['id']), None)
-                    score_str = f"{grade_item['score']:.2f}" if grade_item else "N/A"
+                    score = grades_map.get((student_id, assessment['id']))
+                    score_str = f"{score:.2f}" if score is not None else "N/A"
                     lines.append(f"  - {assessment['name']} (Peso {assessment['weight']}): {score_str}")
 
             avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)

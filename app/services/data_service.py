@@ -155,6 +155,17 @@ class DataService:
                 }
             return None
 
+    # Método para buscar um aluno pelo ID.
+    def get_student_by_id(self, student_id: int) -> dict | None:
+        with self._get_db() as db:
+            student = db.query(Student).filter(Student.id == student_id).first()
+            if student:
+                return {
+                    "id": student.id, "first_name": student.first_name,
+                    "last_name": student.last_name, "birth_date": student.birth_date.isoformat() if student.birth_date else None
+                }
+            return None
+
     # Método para atualizar os dados de um aluno.
     def update_student(self, student_id: int, first_name: str, last_name: str, birth_date: date | None = None):
         if birth_date and birth_date > date.today():
@@ -172,9 +183,12 @@ class DataService:
     # Método para deletar um aluno.
     def delete_student(self, student_id: int):
         with self._get_db() as db:
-            # Deleta manualmente os registros dependentes (notas, matrículas) para evitar erros de chave estrangeira.
+            # Otimização 6: Cascade Delete completo para garantir integridade e evitar dados órfãos.
+            # Deleta manualmente os registros dependentes (incidentes, notas, matrículas)
+            db.query(Incident).filter(Incident.student_id == student_id).delete()
             db.query(Grade).filter(Grade.student_id == student_id).delete()
             db.query(ClassEnrollment).filter(ClassEnrollment.student_id == student_id).delete()
+
             # Busca o aluno pelo ID.
             student = db.query(Student).filter(Student.id == student_id).first()
             # Se encontrar, deleta o aluno.
@@ -417,8 +431,40 @@ class DataService:
     # Método para deletar uma turma.
     def delete_class(self, class_id: int):
         with self._get_db() as db:
-            # Deleta as matrículas associadas antes de deletar a turma.
-            db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete()
+            # Otimização 7: Deep Cascade Delete para Turma.
+            # Uma turma tem Subjects, que tem Assessments, que tem Grades.
+            # Uma turma tem Incidents.
+            # Uma turma tem Enrollments.
+            # Uma turma tem Lessons (via Subject).
+
+            # 1. Deletar Grades e Lessons e Assessments (via Subjects)
+            subjects = db.query(ClassSubject).filter(ClassSubject.class_id == class_id).all()
+            subject_ids = [s.id for s in subjects]
+
+            if subject_ids:
+                 assessments = db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).all()
+                 assessment_ids = [a.id for a in assessments]
+
+                 if assessment_ids:
+                     # Deletar notas dessas avaliações
+                     db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).delete(synchronize_session=False)
+
+                 # Deletar avaliações
+                 db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
+
+                 # Deletar aulas
+                 db.query(Lesson).filter(Lesson.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
+
+                 # Deletar os subjects em si
+                 db.query(ClassSubject).filter(ClassSubject.class_id == class_id).delete(synchronize_session=False)
+
+            # 2. Deletar Incidentes
+            db.query(Incident).filter(Incident.class_id == class_id).delete(synchronize_session=False)
+
+            # 3. Deletar Matrículas
+            db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete(synchronize_session=False)
+
+            # 4. Finalmente, deletar a turma
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 db.delete(class_)
@@ -768,6 +814,19 @@ class DataService:
                 } for i in incidents
             ]
 
+    # Método para buscar incidentes de um aluno específico em uma turma (Otimização para Boletim).
+    def get_student_incidents(self, student_id: int, class_id: int) -> list[dict]:
+        with self._get_db() as db:
+            incidents = db.query(Incident).filter(
+                Incident.student_id == student_id,
+                Incident.class_id == class_id
+            ).order_by(Incident.date.desc()).all()
+
+            return [
+                {"id": i.id, "description": i.description, "date": i.date.isoformat()}
+                for i in incidents
+            ]
+
     # Método para adicionar uma nova nota.
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
         if not all([student_id, assessment_id, score is not None]): return None
@@ -862,6 +921,66 @@ class DataService:
                 .all()
             )
             return [{"class_name": r.name, "count": r.count} for r in ranking]
+
+    # Método auxiliar para buscar dados completos de uma turma para relatórios (Optimized Fetch).
+    def get_class_report_data(self, class_id: int) -> dict:
+        """
+        Busca todos os dados necessários para gerar relatórios de uma turma (Disciplinas, Avaliações, Notas, Alunos)
+        em poucas queries otimizadas, evitando o problema de N+1 queries.
+        """
+        with self._get_db() as db:
+            # 1. Buscar Disciplinas e Avaliações
+            subjects = (db.query(ClassSubject)
+                        .options(joinedload(ClassSubject.assessments), joinedload(ClassSubject.course))
+                        .filter(ClassSubject.class_id == class_id)
+                        .all())
+
+            # Estruturar disciplinas e avaliações
+            subjects_data = []
+            all_assessment_ids = []
+
+            for s in subjects:
+                assessments = [{"id": a.id, "name": a.name, "weight": a.weight} for a in s.assessments]
+                all_assessment_ids.extend([a['id'] for a in assessments])
+                subjects_data.append({
+                    "id": s.id,
+                    "course_name": s.course.course_name,
+                    "assessments": assessments
+                })
+
+            # 2. Buscar Alunos (Matrículas Ativas)
+            enrollments = (db.query(ClassEnrollment)
+                           .options(joinedload(ClassEnrollment.student))
+                           .filter(ClassEnrollment.class_id == class_id) # Pega todos (ativos e inativos) para histórico ou só ativos? Relatórios costumam ser de ativos.
+                           .order_by(ClassEnrollment.call_number)
+                           .all())
+
+            students_data = []
+            student_ids = []
+            for e in enrollments:
+                student_ids.append(e.student_id)
+                students_data.append({
+                    "student_id": e.student_id,
+                    "name": f"{e.student.first_name} {e.student.last_name}",
+                    "call_number": e.call_number,
+                    "status": e.status
+                })
+
+            # 3. Buscar Notas
+            grades_map = {} # (student_id, assessment_id) -> score
+            if all_assessment_ids and student_ids:
+                 grades = db.query(Grade).filter(
+                     Grade.assessment_id.in_(all_assessment_ids),
+                     Grade.student_id.in_(student_ids)
+                 ).all()
+                 for g in grades:
+                     grades_map[(g.student_id, g.assessment_id)] = g.score
+
+            return {
+                "subjects": subjects_data,
+                "students": students_data,
+                "grades_map": grades_map
+            }
 
     # Método para calcular as médias finais de todos os alunos ativos em um curso.
     def get_course_averages(self, course_id: int) -> list[float]:
