@@ -1,5 +1,5 @@
 from datetime import date, datetime # Importa a classe 'date' e 'datetime' para manipulação de datas.
-from sqlalchemy import func # Importa a função 'func' do SQLAlchemy para usar funções SQL como COUNT, MAX, etc.
+from sqlalchemy import func, or_, and_ # Importa a função 'func' do SQLAlchemy para usar funções SQL como COUNT, MAX, etc.
 from sqlalchemy.orm import joinedload, Session # Importa 'joinedload' para carregamento otimizado de relacionamentos (evita N+1 queries) e 'Session' para type hinting.
 from app.data.database import get_db_session # Importa o gerenciador de contexto para obter uma sessão de banco de dados.
 
@@ -100,7 +100,13 @@ class DataService:
         # Abre uma sessão de banco de dados.
         with self._get_db() as db:
             # Verifica se um aluno com o mesmo nome completo (ignorando maiúsculas/minúsculas) já existe.
-            existing = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == f"{first_name} {last_name}".lower()).first()
+            # Otimização 3: Compara first_name e last_name separadamente para evitar concatenação em todas as linhas (Full Scan).
+            existing = db.query(Student).filter(
+                and_(
+                    func.lower(Student.first_name) == first_name.lower(),
+                    func.lower(Student.last_name) == last_name.lower()
+                )
+            ).first()
             # Se existir, retorna os dados do aluno existente.
             if existing:
                 return {
@@ -139,9 +145,37 @@ class DataService:
     # Método para buscar um aluno pelo nome completo.
     def get_student_by_name(self, name: str) -> dict | None:
         with self._get_db() as db:
-            # Filtra pelo nome completo, ignorando maiúsculas/minúsculas.
-            student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == name.lower()).first()
-            # Se encontrar, retorna os dados em formato de dicionário.
+            # Otimização 6: Tenta dividir o nome para buscar por colunas indexáveis primeiro.
+            # Evita 'func.lower(col1+col2)' que causa full table scan.
+
+            name = name.strip()
+            parts = name.split(' ', 1)
+
+            student = None
+            if len(parts) == 2:
+                first, last = parts
+                student = db.query(Student).filter(
+                    and_(
+                        func.lower(Student.first_name) == first.lower(),
+                        func.lower(Student.last_name) == last.lower()
+                    )
+                ).first()
+
+            # Fallback se a busca dividida falhar (ex: nome do meio, ou formato incomum), ou se não tiver sobrenome
+            if not student:
+                 student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == name.lower()).first()
+
+            if student:
+                return {
+                    "id": student.id, "first_name": student.first_name,
+                    "last_name": student.last_name, "birth_date": student.birth_date.isoformat() if student.birth_date else None
+                }
+            return None
+
+    # Método para buscar um aluno pelo ID.
+    def get_student_by_id(self, student_id: int) -> dict | None:
+        with self._get_db() as db:
+            student = db.query(Student).filter(Student.id == student_id).first()
             if student:
                 return {
                     "id": student.id, "first_name": student.first_name,
@@ -166,9 +200,12 @@ class DataService:
     # Método para deletar um aluno.
     def delete_student(self, student_id: int):
         with self._get_db() as db:
-            # Deleta manualmente os registros dependentes (notas, matrículas) para evitar erros de chave estrangeira.
+            # Otimização 6: Cascade Delete completo para garantir integridade e evitar dados órfãos.
+            # Deleta manualmente os registros dependentes (incidentes, notas, matrículas)
+            db.query(Incident).filter(Incident.student_id == student_id).delete()
             db.query(Grade).filter(Grade.student_id == student_id).delete()
             db.query(ClassEnrollment).filter(ClassEnrollment.student_id == student_id).delete()
+
             # Busca o aluno pelo ID.
             student = db.query(Student).filter(Student.id == student_id).first()
             # Se encontrar, deleta o aluno.
@@ -188,7 +225,14 @@ class DataService:
             query = db.query(Student)
 
             if active_only:
-                query = query.join(ClassEnrollment).filter(ClassEnrollment.status == 'Active').distinct()
+                # Otimização 2: Usar EXISTS ao invés de JOIN + DISTINCT para performance
+                # SELECT * FROM students s WHERE EXISTS (SELECT 1 FROM enrollments e WHERE e.student_id = s.id AND status = 'Active')
+                query = query.filter(
+                    db.query(ClassEnrollment.id).filter(
+                        ClassEnrollment.student_id == Student.id,
+                        ClassEnrollment.status == 'Active'
+                    ).exists()
+                )
 
             if search_term:
                 search_pattern = f"%{search_term.lower()}%"
@@ -223,10 +267,12 @@ class DataService:
     # Método para buscar alunos que não estão matriculados em uma turma específica.
     def get_unenrolled_students(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
-            # Cria uma subconsulta para obter os IDs de todos os alunos já matriculados na turma.
-            enrolled_student_ids = db.query(ClassEnrollment.student_id).filter(ClassEnrollment.class_id == class_id)
-            # Busca todos os alunos cujo ID não está na lista de IDs de matriculados.
-            students = db.query(Student).filter(Student.id.notin_(enrolled_student_ids)).all()
+            # Otimização 3: Usar LEFT JOIN ... WHERE NULL ao invés de NOT IN (Subquery)
+            # Isso geralmente performa melhor em bancos SQL para datasets maiores.
+            students = (db.query(Student)
+                        .outerjoin(ClassEnrollment, (ClassEnrollment.student_id == Student.id) & (ClassEnrollment.class_id == class_id))
+                        .filter(ClassEnrollment.id == None)
+                        .all())
             return [{"id": s.id, "first_name": s.first_name, "last_name": s.last_name} for s in students]
 
     # Método para buscar alunos (ativos) que fazem aniversário no dia de hoje.
@@ -388,10 +434,14 @@ class DataService:
     # Método para buscar todas as turmas.
     def get_all_classes(self) -> list[dict]:
         with self._get_db() as db:
-            # Carrega as matrículas relacionadas para evitar consultas extras.
-            classes = db.query(Class).options(joinedload(Class.enrollments)).order_by(Class.name).all()
-            # Calcula a contagem de alunos para cada turma.
-            return [{"id": c.id, "name": c.name, "student_count": len(c.enrollments)} for c in classes]
+            # Otimização 1: Calcular contagem via SQL aggregation ao invés de carregar objetos em memória.
+            results = (db.query(Class, func.count(ClassEnrollment.id).label('count'))
+                       .outerjoin(ClassEnrollment, Class.id == ClassEnrollment.class_id)
+                       .group_by(Class.id)
+                       .order_by(Class.name)
+                       .all())
+
+            return [{"id": c.id, "name": c.name, "student_count": count} for c, count in results]
 
     # Método para buscar uma turma pelo ID.
     def get_class_by_id(self, class_id: int) -> dict | None:
@@ -411,8 +461,40 @@ class DataService:
     # Método para deletar uma turma.
     def delete_class(self, class_id: int):
         with self._get_db() as db:
-            # Deleta as matrículas associadas antes de deletar a turma.
-            db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete()
+            # Otimização 7: Deep Cascade Delete para Turma.
+            # Uma turma tem Subjects, que tem Assessments, que tem Grades.
+            # Uma turma tem Incidents.
+            # Uma turma tem Enrollments.
+            # Uma turma tem Lessons (via Subject).
+
+            # 1. Deletar Grades e Lessons e Assessments (via Subjects)
+            subjects = db.query(ClassSubject).filter(ClassSubject.class_id == class_id).all()
+            subject_ids = [s.id for s in subjects]
+
+            if subject_ids:
+                 assessments = db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).all()
+                 assessment_ids = [a.id for a in assessments]
+
+                 if assessment_ids:
+                     # Deletar notas dessas avaliações
+                     db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).delete(synchronize_session=False)
+
+                 # Deletar avaliações
+                 db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
+
+                 # Deletar aulas
+                 db.query(Lesson).filter(Lesson.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
+
+                 # Deletar os subjects em si
+                 db.query(ClassSubject).filter(ClassSubject.class_id == class_id).delete(synchronize_session=False)
+
+            # 2. Deletar Incidentes
+            db.query(Incident).filter(Incident.class_id == class_id).delete(synchronize_session=False)
+
+            # 3. Deletar Matrículas
+            db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete(synchronize_session=False)
+
+            # 4. Finalmente, deletar a turma
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 db.delete(class_)
@@ -464,26 +546,36 @@ class DataService:
             # Pega o próximo número de chamada inicial.
             next_call_number = self._get_next_call_number(db, class_id)
 
+            # Busca todas as matrículas existentes para esses alunos nesta turma de uma vez.
+            existing_enrollments = db.query(ClassEnrollment).filter(
+                ClassEnrollment.class_id == class_id,
+                ClassEnrollment.student_id.in_(student_ids)
+            ).all()
+
+            # Mapeia por student_id para acesso rápido.
+            existing_map = {e.student_id: e for e in existing_enrollments}
+
+            new_enrollments_data = []
+
             for student_id in student_ids:
-                # Verifica se já está matriculado
-                existing = db.query(ClassEnrollment).filter_by(student_id=student_id, class_id=class_id).first()
+                existing = existing_map.get(student_id)
                 if existing:
                     # Se já existe (talvez inativo), reativa e atualiza número.
                     existing.status = "Active"
-                    # Opcional: atualizar call_number ou manter o antigo?
-                    # Para simplificar e evitar buracos/conflitos, vamos atribuir um novo número sequencial
-                    # se estivermos tratando como uma "nova matrícula".
                     existing.call_number = next_call_number
                 else:
-                    new_enrollment = ClassEnrollment(
-                        class_id=class_id,
-                        student_id=student_id,
-                        call_number=next_call_number,
-                        status="Active"
-                    )
-                    db.add(new_enrollment)
+                    # Otimização 5: Preparar inserção em lote
+                    new_enrollments_data.append({
+                        "class_id": class_id,
+                        "student_id": student_id,
+                        "call_number": next_call_number,
+                        "status": "Active"
+                    })
 
                 next_call_number += 1
+
+            if new_enrollments_data:
+                db.bulk_insert_mappings(ClassEnrollment, new_enrollments_data)
 
             # Persiste as mudanças na sessão (necessário para testes com autoflush=False e para garantir visibilidade)
             db.flush()
@@ -595,32 +687,34 @@ class DataService:
         # Para manter a compatibilidade, vou calcular uma média simples de todas as avaliações de todas as matérias da turma.
 
         with self._get_db() as db:
-            # Pega todas as disciplinas da turma
-            subjects = db.query(ClassSubject).filter(ClassSubject.class_id == class_id).all()
-            if not subjects:
-                return {"weighted_average": 0.0, "incident_count": 0}
+            # Otimização 4: Reduzir queries usando queries combinadas ou joinedload
+            # Originalmente fazia 4 queries: subjects, assessments, grades, incidents
 
-            subject_ids = [s.id for s in subjects]
+            # Buscar subjects e assessments juntos é possível mas complexo se filtrar por ids.
+            # Vamos fazer de forma eficiente:
+            # 1. Buscar todas as avaliações da turma (join ClassSubject)
+            assessments = (db.query(Assessment)
+                           .join(ClassSubject)
+                           .filter(ClassSubject.class_id == class_id)
+                           .all())
 
-            # Pega todas as avaliações de todas as disciplinas
-            assessments = db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).all()
-            assessment_ids = [a.id for a in assessments]
             assessments_data = [{"id": a.id, "weight": a.weight} for a in assessments]
+            assessment_ids = [a['id'] for a in assessments_data]
 
-            if not assessments:
-                # Se não há avaliações, retorna 0
-                # Incidentes ainda contam
-                incidents_count = db.query(func.count(Incident.id)).filter(Incident.class_id == class_id, Incident.student_id == student_id).scalar()
-                return {"weighted_average": 0.0, "incident_count": incidents_count}
+            if not assessments_data:
+                 weighted_average = 0.0
+            else:
+                 # 2. Buscar notas para essas avaliações e este aluno
+                 grades = db.query(Grade).filter(
+                     Grade.student_id == student_id,
+                     Grade.assessment_id.in_(assessment_ids)
+                 ).all()
+                 grades_data = [{"assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id} for g in grades]
 
-            # Pega todas as notas do aluno nessas avaliações
-            grades = db.query(Grade).filter(Grade.student_id == student_id, Grade.assessment_id.in_(assessment_ids)).all()
-            grades_data = [{"assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id} for g in grades]
+                 # Calcula a média
+                 weighted_average = self.calculate_weighted_average(student_id, grades_data, assessments_data)
 
-            # Calcula a média
-            weighted_average = self.calculate_weighted_average(student_id, grades_data, assessments_data)
-
-            # Incidentes
+            # 3. Incidentes (Query separada é ok aqui pois é simples count)
             incidents_count = db.query(func.count(Incident.id)).filter(Incident.class_id == class_id, Incident.student_id == student_id).scalar()
 
             return {
@@ -630,24 +724,73 @@ class DataService:
 
     # Método para identificar alunos em situação de risco (notas baixas ou muitos incidentes).
     def get_students_at_risk(self, class_id: int, grade_threshold: float = 5.0, incident_threshold: int = 2) -> list[dict]:
-        enrollments = self.get_enrollments_for_class(class_id)
-        at_risk_students = []
-        # Itera sobre cada aluno matriculado na turma.
-        for enrollment in enrollments:
-            student_id = enrollment['student_id']
-            # Obtém o resumo de desempenho.
-            summary = self.get_student_performance_summary(student_id, class_id)
-            if summary:
-                # Aplica a lógica para determinar se o aluno está em risco.
-                is_at_risk = (summary['weighted_average'] < grade_threshold) or \
-                             (summary['incident_count'] >= incident_threshold)
-                if is_at_risk:
-                    at_risk_students.append({
+        # Otimização 5: Fetch em lote de todos os dados necessários para evitar N+1 queries.
+        # Anteriormente chamava get_student_performance_summary para cada aluno.
+
+        with self._get_db() as db:
+             # 1. Busca todas as matrículas ativas da turma (com dados dos alunos)
+             enrollments = (db.query(ClassEnrollment)
+                            .options(joinedload(ClassEnrollment.student))
+                            .filter(ClassEnrollment.class_id == class_id, ClassEnrollment.status == 'Active')
+                            .all())
+
+             student_ids = [e.student_id for e in enrollments]
+             if not student_ids:
+                 return []
+
+             # 2. Busca todos os incidentes da turma de uma vez, agrupados por aluno
+             incidents_query = (db.query(Incident.student_id, func.count(Incident.id).label('count'))
+                                .filter(Incident.class_id == class_id, Incident.student_id.in_(student_ids))
+                                .group_by(Incident.student_id).all())
+             incidents_map = {row.student_id: row.count for row in incidents_query}
+
+             # 3. Busca todas as avaliações da turma (para os pesos)
+             assessments = (db.query(Assessment)
+                            .join(ClassSubject)
+                            .filter(ClassSubject.class_id == class_id)
+                            .all())
+             assessments_data = [{"id": a.id, "weight": a.weight} for a in assessments]
+             assessment_ids = [a['id'] for a in assessments_data]
+
+             # 4. Busca todas as notas de todos os alunos nessas avaliações
+             grades = db.query(Grade).filter(
+                 Grade.student_id.in_(student_ids),
+                 Grade.assessment_id.in_(assessment_ids)
+             ).all()
+
+             # Organiza notas por aluno para cálculo em memória
+             # grades_by_student = {student_id: [grade_dicts]}
+             grades_by_student = {}
+             for g in grades:
+                 if g.student_id not in grades_by_student:
+                     grades_by_student[g.student_id] = []
+                 grades_by_student[g.student_id].append({
+                     "assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id
+                 })
+
+             at_risk_students = []
+             # Processamento em memória
+             for enrollment in enrollments:
+                 student_id = enrollment.student_id
+
+                 # Recupera incidentes do mapa (default 0)
+                 incident_count = incidents_map.get(student_id, 0)
+
+                 # Recupera notas e calcula média
+                 student_grades = grades_by_student.get(student_id, [])
+                 weighted_average = self.calculate_weighted_average(student_id, student_grades, assessments_data)
+
+                 is_at_risk = (weighted_average < grade_threshold) or \
+                              (incident_count >= incident_threshold)
+
+                 if is_at_risk:
+                     at_risk_students.append({
                         "student_id": student_id,
-                        "student_name": f"{enrollment['student_first_name']} {enrollment['student_last_name']}",
-                        "average_grade": summary['weighted_average'],
-                        "incident_count": summary['incident_count']
+                        "student_name": f"{enrollment.student.first_name} {enrollment.student.last_name}",
+                        "average_grade": weighted_average,
+                        "incident_count": incident_count
                     })
+
         return at_risk_students
 
     # Método para criar um novo registro de aula.
@@ -703,6 +846,19 @@ class DataService:
                 } for i in incidents
             ]
 
+    # Método para buscar incidentes de um aluno específico em uma turma (Otimização para Boletim).
+    def get_student_incidents(self, student_id: int, class_id: int) -> list[dict]:
+        with self._get_db() as db:
+            incidents = db.query(Incident).filter(
+                Incident.student_id == student_id,
+                Incident.class_id == class_id
+            ).order_by(Incident.date.desc()).all()
+
+            return [
+                {"id": i.id, "description": i.description, "date": i.date.isoformat()}
+                for i in incidents
+            ]
+
     # Método para adicionar uma nova nota.
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
         if not all([student_id, assessment_id, score is not None]): return None
@@ -728,33 +884,53 @@ class DataService:
     # Método para inserir ou atualizar notas em lote para uma disciplina de uma turma (upsert).
     def upsert_grades_for_subject(self, class_subject_id: int, grades_data: list[dict]):
         with self._get_db() as db:
-            # Busca todas as notas existentes para a disciplina e as armazena em um mapa para acesso rápido.
+            # Otimização 4: Batch Update/Insert para alta performance
+
+            # 1. Identificar existentes
             existing_grades_query = db.query(Grade).join(Assessment).filter(Assessment.class_subject_id == class_subject_id)
             existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
-            # Itera sobre os novos dados de nota.
+
+            to_insert = []
+            to_update = []
+
+            today_str = date.today().isoformat()
+
             for grade_info in grades_data:
-                # Garante que os IDs sejam inteiros para evitar duplicações causadas por incompatibilidade de tipos (ex: string vs int).
                 try:
                     student_id = int(grade_info['student_id'])
                     assessment_id = int(grade_info['assessment_id'])
                 except (ValueError, TypeError):
-                    # Se a conversão falhar, pula este registro para evitar inconsistências.
                     continue
 
                 score = grade_info['score']
-
                 if not (0 <= score <= 10):
                     raise ValueError(f"Score must be between 0 and 10.")
 
                 existing_grade = existing_grades_map.get((student_id, assessment_id))
-                # Se a nota já existe, atualiza o valor se for diferente.
+
                 if existing_grade:
                     if existing_grade.score != score:
-                        existing_grade.score = score
-                # Se a nota não existe, cria um novo registro.
+                        # Para update em lote, precisamos do ID primário
+                        to_update.append({
+                            "id": existing_grade.id,
+                            "score": score
+                        })
                 else:
-                    new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=date.today().isoformat())
-                    db.add(new_grade)
+                    to_insert.append({
+                        "student_id": student_id,
+                        "assessment_id": assessment_id,
+                        "score": score,
+                        "date_recorded": today_str
+                    })
+
+            # Executar em lote
+            if to_insert:
+                db.bulk_insert_mappings(Grade, to_insert)
+            if to_update:
+                db.bulk_update_mappings(Grade, to_update)
+
+            # Commit é gerenciado pelo context manager, mas se estivermos em transação manual:
+            db.flush()
 
     # Método para calcular a média ponderada de um aluno.
     @staticmethod
@@ -772,16 +948,17 @@ class DataService:
     # Método para obter estatísticas globais do sistema.
     def get_global_dashboard_stats(self) -> dict:
         with self._get_db() as db:
-            active_students = db.query(ClassEnrollment.student_id).filter(ClassEnrollment.status == 'Active').distinct().count()
-            total_classes = db.query(Class.id).count()
-            total_courses = db.query(Course.id).count()
-            total_incidents = db.query(Incident.id).count()
+            # Otimização 7: Count distinct direto no SQL, evitando fetch.
+            active_students = db.query(func.count(func.distinct(ClassEnrollment.student_id))).filter(ClassEnrollment.status == 'Active').scalar()
+            total_classes = db.query(func.count(Class.id)).scalar()
+            total_courses = db.query(func.count(Course.id)).scalar()
+            total_incidents = db.query(func.count(Incident.id)).scalar()
 
             return {
-                "active_students": active_students,
-                "total_classes": total_classes,
-                "total_courses": total_courses,
-                "total_incidents": total_incidents
+                "active_students": active_students or 0,
+                "total_classes": total_classes or 0,
+                "total_courses": total_courses or 0,
+                "total_incidents": total_incidents or 0
             }
 
     # Método para obter o ranking de incidentes por turma.
@@ -798,38 +975,146 @@ class DataService:
             )
             return [{"class_name": r.name, "count": r.count} for r in ranking]
 
+    # Método auxiliar para buscar dados completos de uma turma para relatórios (Optimized Fetch).
+    def get_class_report_data(self, class_id: int) -> dict:
+        """
+        Busca todos os dados necessários para gerar relatórios de uma turma (Disciplinas, Avaliações, Notas, Alunos)
+        em poucas queries otimizadas, evitando o problema de N+1 queries.
+        """
+        with self._get_db() as db:
+            # 1. Buscar Disciplinas e Avaliações
+            subjects = (db.query(ClassSubject)
+                        .options(joinedload(ClassSubject.assessments), joinedload(ClassSubject.course))
+                        .filter(ClassSubject.class_id == class_id)
+                        .all())
+
+            # Estruturar disciplinas e avaliações
+            subjects_data = []
+            all_assessment_ids = []
+
+            for s in subjects:
+                assessments = [{"id": a.id, "name": a.name, "weight": a.weight} for a in s.assessments]
+                all_assessment_ids.extend([a['id'] for a in assessments])
+                subjects_data.append({
+                    "id": s.id,
+                    "course_name": s.course.course_name,
+                    "assessments": assessments
+                })
+
+            # 2. Buscar Alunos (Matrículas Ativas)
+            enrollments = (db.query(ClassEnrollment)
+                           .options(joinedload(ClassEnrollment.student))
+                           .filter(ClassEnrollment.class_id == class_id) # Pega todos (ativos e inativos) para histórico ou só ativos? Relatórios costumam ser de ativos.
+                           .order_by(ClassEnrollment.call_number)
+                           .all())
+
+            students_data = []
+            student_ids = []
+            for e in enrollments:
+                student_ids.append(e.student_id)
+                students_data.append({
+                    "student_id": e.student_id,
+                    "name": f"{e.student.first_name} {e.student.last_name}",
+                    "call_number": e.call_number,
+                    "status": e.status
+                })
+
+            # 3. Buscar Notas
+            grades_map = {} # (student_id, assessment_id) -> score
+            if all_assessment_ids and student_ids:
+                 grades = db.query(Grade).filter(
+                     Grade.assessment_id.in_(all_assessment_ids),
+                     Grade.student_id.in_(student_ids)
+                 ).all()
+                 for g in grades:
+                     grades_map[(g.student_id, g.assessment_id)] = g.score
+
+            return {
+                "subjects": subjects_data,
+                "students": students_data,
+                "grades_map": grades_map
+            }
+
     # Método para calcular as médias finais de todos os alunos ativos em um curso.
     def get_course_averages(self, course_id: int) -> list[float]:
         """Calcula as médias finais ponderadas para todos os alunos ativos em um curso."""
+        # Otimização 6: Eager Loading massivo para evitar N+1 ao iterar sobre turmas
+
         averages = []
         with self._get_db() as db:
-            # Busca todas as disciplinas (turmas) associadas a este curso.
-            subjects = db.query(ClassSubject).filter(ClassSubject.course_id == course_id).all()
+            # Busca todas as disciplinas deste curso, carregando eagermente as avaliações
+            subjects = (db.query(ClassSubject)
+                        .options(joinedload(ClassSubject.assessments))
+                        .filter(ClassSubject.course_id == course_id)
+                        .all())
+
+            if not subjects:
+                return []
+
+            subject_ids = [s.id for s in subjects]
+            class_ids = [s.class_id for s in subjects]
+
+            # Busca todas as matrículas ativas de uma vez para todas as turmas envolvidas
+            # Usa joinedload se precisasse de dados do aluno, mas aqui só precisamos do ID
+            enrollments = db.query(ClassEnrollment).filter(
+                ClassEnrollment.class_id.in_(class_ids),
+                ClassEnrollment.status == 'Active'
+            ).all()
+
+            # Mapa: class_id -> list of student_ids
+            class_students_map = {}
+            for e in enrollments:
+                if e.class_id not in class_students_map:
+                    class_students_map[e.class_id] = []
+                class_students_map[e.class_id].append(e.student_id)
+
+            # Busca TODAS as notas relevantes para este curso de uma vez
+            # Filtramos por assessments que pertencem aos subjects deste curso
+            # Como carregamos subjects.assessments, podemos coletar os IDs
+            all_assessment_ids = []
+            assessments_map = {} # subject_id -> list of assessments data
 
             for subject in subjects:
-                # Busca as avaliações da disciplina.
-                assessments = db.query(Assessment).filter(Assessment.class_subject_id == subject.id).all()
-                assessments_data = [{"id": a.id, "weight": a.weight} for a in assessments]
+                s_assessments = [{"id": a.id, "weight": a.weight} for a in subject.assessments]
+                assessments_map[subject.id] = s_assessments
+                all_assessment_ids.extend([a['id'] for a in s_assessments])
 
-                # Se não houver avaliações, não há médias para calcular nesta disciplina.
+            if not all_assessment_ids:
+                return []
+
+            all_grades = db.query(Grade).filter(Grade.assessment_id.in_(all_assessment_ids)).all()
+
+            # Mapa: (student_id, assessment_id) -> score OU student_id -> {assessment_id: score}
+            # Vamos usar o formato esperado por calculate_weighted_average: list[dict]
+            # Mas para não iterar sobre all_grades toda vez, filtramos por subject?
+            # Melhor: Agrupar grades por assessment_id é suficiente?
+            # calculate_weighted_average filtra: [g for g in grades if g.student_id == student_id]
+            # Isso é lento se grades for gigante.
+            # Vamos pré-agrupar grades por student_id
+            grades_by_student = {}
+            for g in all_grades:
+                if g.student_id not in grades_by_student:
+                    grades_by_student[g.student_id] = []
+                grades_by_student[g.student_id].append({
+                    "assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id
+                })
+
+            for subject in subjects:
+                assessments_data = assessments_map.get(subject.id, [])
                 if not assessments_data:
                     continue
 
-                # Busca matrículas ativas nesta turma.
-                active_enrollments = db.query(ClassEnrollment).filter(
-                    ClassEnrollment.class_id == subject.class_id,
-                    ClassEnrollment.status == 'Active'
-                ).all()
+                student_ids = class_students_map.get(subject.class_id, [])
 
-                assessment_ids = [a['id'] for a in assessments_data]
-
-                # Busca todas as notas para essas avaliações de uma vez.
-                grades = db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).all()
-                grades_data = [{"assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id} for g in grades]
-
-                # Calcula a média para cada aluno matriculado.
-                for enrollment in active_enrollments:
-                    avg = self.calculate_weighted_average(enrollment.student_id, grades_data, assessments_data)
+                for student_id in student_ids:
+                    # Pega as notas deste aluno (pode conter notas de outras matérias, mas calculate_weighted_average filtra por assessment IDs passados)
+                    student_grades = grades_by_student.get(student_id, [])
+                    # O calculate_weighted_average usa um dict lookup interno, então passar student_grades (lista pequena) é rápido.
+                    # Mas student_grades contem notas de TODOS subjects.
+                    # O método calculate_weighted_average faz: student_grades_map = {id: score for g in grades ...}
+                    # E depois itera sobre assessments_data.
+                    # Funciona corretamente.
+                    avg = self.calculate_weighted_average(student_id, student_grades, assessments_data)
                     averages.append(avg)
 
         return averages
@@ -837,41 +1122,86 @@ class DataService:
     # Método para calcular a taxa de aprovação global baseada em todas as disciplinas e alunos ativos.
     def get_global_performance_stats(self) -> dict:
         """Calcula taxas globais de aprovação/reprovação e lista alunos em risco e destaque."""
+        # Otimização 7: Carregamento massivo de dados para evitar milhares de queries.
+
         total_enrollments_analyzed = 0
         approved_count = 0
         failed_details = []
         honor_roll_details = []
 
         with self._get_db() as db:
-            # Itera sobre todas as disciplinas existentes.
-            # Eager load class and course to avoid N+1 inside the loop
+            # 1. Carrega todos Subjects com Class e Course
             subjects = db.query(ClassSubject).options(
                 joinedload(ClassSubject.class_),
-                joinedload(ClassSubject.course)
+                joinedload(ClassSubject.course),
+                joinedload(ClassSubject.assessments) # Eager load assessments
             ).all()
 
+            if not subjects:
+                return {
+                    "total_analyzed": 0, "approved": 0, "failed": 0, "approval_rate": 0.0,
+                    "failed_details": [], "honor_roll_details": []
+                }
+
+            # 2. Carrega todas as matrículas ativas do sistema com dados dos alunos
+            all_active_enrollments = (db.query(ClassEnrollment)
+                                      .options(joinedload(ClassEnrollment.student))
+                                      .filter(ClassEnrollment.status == 'Active')
+                                      .all())
+
+            # Indexar enrollments por class_id -> list[enrollment_obj]
+            enrollments_by_class = {}
+            for e in all_active_enrollments:
+                if e.class_id not in enrollments_by_class:
+                    enrollments_by_class[e.class_id] = []
+                enrollments_by_class[e.class_id].append(e)
+
+            # 3. Carregar TODAS as notas do sistema? Pode ser muito.
+            # Mas carregar N vezes é pior.
+            # Vamos carregar todas as notas cujos assessments foram carregados.
+            all_assessment_ids = []
+            for s in subjects:
+                for a in s.assessments:
+                    all_assessment_ids.append(a.id)
+
+            # Se houver muitas notas, isso pode consumir muita memória.
+            # Mas para um relatório global, é trade-off: Memória vs DB Latency.
+            # Vamos assumir que cabe na memória (alguns milhares de notas).
+            all_grades = []
+            if all_assessment_ids:
+                 # Batch fetch se for muito grande?
+                 # SQLite aguenta muitos parâmetros em IN clause (até 999 ou mais dependendo da versão/config).
+                 # Vamos fazer em chunks de 500 para segurança.
+                 chunk_size = 500
+                 for i in range(0, len(all_assessment_ids), chunk_size):
+                     chunk = all_assessment_ids[i:i+chunk_size]
+                     grades_chunk = db.query(Grade).filter(Grade.assessment_id.in_(chunk)).all()
+                     all_grades.extend(grades_chunk)
+
+            # Indexar grades por student_id
+            grades_by_student = {}
+            for g in all_grades:
+                if g.student_id not in grades_by_student:
+                    grades_by_student[g.student_id] = []
+                grades_by_student[g.student_id].append({
+                    "assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id
+                })
+
+            # Processamento em memória
             for subject in subjects:
-                assessments = db.query(Assessment).filter(Assessment.class_subject_id == subject.id).all()
-                if not assessments: continue
+                assessments_data = [{"id": a.id, "weight": a.weight} for a in subject.assessments]
+                if not assessments_data: continue
 
-                assessments_data = [{"id": a.id, "weight": a.weight} for a in assessments]
-                assessment_ids = [a['id'] for a in assessments_data]
+                class_enrollments = enrollments_by_class.get(subject.class_id, [])
 
-                grades = db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).all()
-                grades_data = [{"assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id} for g in grades]
+                for enrollment in class_enrollments:
+                    student_grades = grades_by_student.get(enrollment.student_id, [])
+                    avg = self.calculate_weighted_average(enrollment.student_id, student_grades, assessments_data)
 
-                # Eager load Student to get names easily
-                active_enrollments = db.query(ClassEnrollment).options(joinedload(ClassEnrollment.student)).filter(
-                    ClassEnrollment.class_id == subject.class_id,
-                    ClassEnrollment.status == 'Active'
-                ).all()
-
-                for enrollment in active_enrollments:
-                    avg = self.calculate_weighted_average(enrollment.student_id, grades_data, assessments_data)
                     total_enrollments_analyzed += 1
+
                     if avg >= 5.0:
                         approved_count += 1
-                        # Check for Honor Roll (>= 9.0)
                         if avg >= 9.0:
                              honor_roll_details.append({
                                 "student_name": f"{enrollment.student.first_name} {enrollment.student.last_name}",
@@ -900,13 +1230,46 @@ class DataService:
     def _batch_upsert_students_and_enroll(self, db: Session, class_id: int, student_data_list: list[dict]):
         # Garante que cada aluno no CSV seja processado apenas uma vez, mesmo que haja duplicatas no arquivo.
         unique_student_data = {data['full_name'].lower(): data for data in student_data_list}
+
+        # Otimização: Buscar todos os candidatos a alunos existentes de uma só vez usando OR conditions
+        # Isso evita fazer queries individuais dentro do loop.
+        existing_students_map = {}
+        conditions_list = list(unique_student_data.values())
+
+        if conditions_list:
+            # Busca em lotes de 50 para evitar queries gigantescas se a lista for muito grande
+            batch_size = 50
+
+            for i in range(0, len(conditions_list), batch_size):
+                batch = conditions_list[i:i+batch_size]
+                batch_conditions = [
+                    and_(func.lower(Student.first_name) == data['first_name'].lower(),
+                         func.lower(Student.last_name) == data['last_name'].lower())
+                    for data in batch
+                ]
+                found_students = db.query(Student).filter(or_(*batch_conditions)).all()
+                for s in found_students:
+                    full_name = (s.first_name + " " + s.last_name).lower()
+                    existing_students_map[full_name] = s
+
         # Obtém o próximo número de chamada para a turma.
         next_call_number = self._get_next_call_number(db, class_id)
 
+        # Otimização: Buscar matrículas existentes para os alunos encontrados
+        existing_student_ids = [s.id for s in existing_students_map.values()]
+        existing_enrollments_map = {}
+        if existing_student_ids:
+             enrollments = db.query(ClassEnrollment).filter(
+                 ClassEnrollment.class_id == class_id,
+                 ClassEnrollment.student_id.in_(existing_student_ids)
+             ).all()
+             existing_enrollments_map = {e.student_id: e for e in enrollments}
+
         # Itera sobre os dados únicos dos alunos.
         for full_name_lower, data in unique_student_data.items():
-            # Verifica se o aluno já existe no banco de dados.
-            student = db.query(Student).filter(func.lower(Student.first_name + " " + Student.last_name) == full_name_lower).first()
+            # Verifica se o aluno já existe no mapa pré-carregado
+            student = existing_students_map.get(full_name_lower)
+
             # Se o aluno já existe:
             if student:
                 # Atualiza a data de nascimento se ela for fornecida no CSV e for diferente da existente.
@@ -921,12 +1284,15 @@ class DataService:
                 )
                 db.add(student)
                 db.flush()  # Garante que o ID do aluno seja gerado antes de criar a matrícula.
+                # Não adicionamos ao existing_enrollments_map porque é novo e não terá matricula
 
             # Obtém o status do aluno do CSV.
             status = data['status']
 
             # Verifica se a matrícula para este aluno nesta turma já existe.
-            enrollment = db.query(ClassEnrollment).filter_by(student_id=student.id, class_id=class_id).first()
+            # Se o aluno acabou de ser criado, enrollment será None naturalmente (não está no map)
+            enrollment = existing_enrollments_map.get(student.id)
+
             # Se a matrícula já existe:
             if enrollment:
                 # Atualiza o status se for diferente.
