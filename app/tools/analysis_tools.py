@@ -87,3 +87,44 @@ def get_students_at_risk_tool(class_name: str) -> str:
         return json.dumps(students_at_risk, indent=2)
     except Exception as e:
         return f"Erro: Ocorreu um erro inesperado: {e}"
+
+@tool
+def get_global_dashboard_stats_tool() -> str:
+    """
+    Obtém estatísticas globais do sistema, como total de alunos ativos, turmas, disciplinas e incidentes.
+    Use esta ferramenta para responder perguntas como "Como está a escola hoje?" ou "Quantos alunos temos?".
+    """
+    try:
+        stats = data_service.get_global_dashboard_stats()
+        return json.dumps(stats, indent=2)
+    except Exception as e:
+        return f"Erro ao obter estatísticas do painel: {e}"
+
+@tool
+def get_global_performance_stats_tool() -> str:
+    """
+    Obtém estatísticas globais de desempenho, incluindo taxa de aprovação, contagem de aprovados/reprovados,
+    e listas de alunos em recuperação (Failed) ou destaque (Honor Roll).
+    Use para visão geral da qualidade do ensino.
+    """
+    try:
+        stats = data_service.get_global_performance_stats()
+        return json.dumps(stats, indent=2)
+    except Exception as e:
+        return f"Erro ao obter estatísticas de desempenho: {e}"
+
+@tool
+def get_class_incident_ranking_tool(limit: int = 5) -> str:
+    """
+    Obtém o ranking das turmas com maior número de incidentes registrados.
+    Útil para identificar turmas problemáticas.
+
+    :param limit: Número de turmas para listar (padrão 5).
+    """
+    try:
+        ranking = data_service.get_class_incident_ranking(limit=limit)
+        if not ranking:
+            return "Nenhum incidente registrado no sistema."
+        return json.dumps(ranking, indent=2)
+    except Exception as e:
+        return f"Erro ao obter ranking de incidentes: {e}"
