@@ -56,6 +56,10 @@ class ScrollableCanvasFrame(ctk.CTkFrame):
 
     def _apply_appearance_mode(self, mode_string):
         super()._apply_appearance_mode(mode_string)
+
+        if not hasattr(self, "canvas"):
+            return
+
         # Attempt to match canvas background to the frame's background
         try:
             # CTk themes store colors as tuples (light, dark) or single strings
