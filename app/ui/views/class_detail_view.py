@@ -14,6 +14,9 @@ from customtkinter import CTkInputDialog
 from app.utils.async_utils import run_async_task
 from app.utils.import_utils import async_import_students
 from app.utils.format_utils import parse_float_input, format_float_output
+# Importa widgets e utilitários de UI
+from app.ui.widgets.scrollable_canvas_frame import ScrollableCanvasFrame
+from app.ui.ui_utils import bind_global_mouse_scroll
 # Importa o serviço de relatórios.
 from app.services.report_service import ReportService
 import os
@@ -89,6 +92,7 @@ class ClassDetailView(ctk.CTkFrame):
         # Frame com rolagem para exibir a lista de alunos.
         self.student_list_frame = ctk.CTkScrollableFrame(students_tab)
         self.student_list_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        bind_global_mouse_scroll(self.student_list_frame)
 
         # Frame para os botões de controle (matricular, importar).
         self.controls_frame = ctk.CTkFrame(students_tab)
@@ -124,6 +128,7 @@ class ClassDetailView(ctk.CTkFrame):
             tab.grid_columnconfigure(0, weight=1)
             frame = ctk.CTkScrollableFrame(tab)
             frame.grid(row=0, column=0, sticky="nsew")
+            bind_global_mouse_scroll(frame)
 
         # Botão para adicionar uma nova avaliação.
         self.add_assessment_button = ctk.CTkButton(assessments_tab, text="Adicionar Nova Avaliação", command=self.add_assessment_popup)
@@ -148,6 +153,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         self.lesson_list_frame = ctk.CTkScrollableFrame(self.lesson_list_view)
         self.lesson_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        bind_global_mouse_scroll(self.lesson_list_frame)
 
         self.add_lesson_button = ctk.CTkButton(self.lesson_list_view, text="Adicionar Nova Aula", command=self.show_lesson_editor)
         self.add_lesson_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
@@ -187,6 +193,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         self.incident_list_frame = ctk.CTkScrollableFrame(incidents_tab)
         self.incident_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        bind_global_mouse_scroll(self.incident_list_frame)
 
         self.add_incident_button = ctk.CTkButton(incidents_tab, text="Adicionar Novo Incidente", command=self.add_incident_popup)
         self.add_incident_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
@@ -223,14 +230,18 @@ class ClassDetailView(ctk.CTkFrame):
             tab = self.grades_tabview.tab(tab_name)
             tab.grid_rowconfigure(0, weight=1)
             tab.grid_columnconfigure(0, weight=1)
-            # Frame scrollable para o conteúdo de cada aba
-            frame = ctk.CTkScrollableFrame(tab)
-            frame.grid(row=0, column=0, sticky="nsew")
-            # Adiciona atributo dinâmico para acessar o frame depois
-            # Ex: self.grade_frames["1º Bimestre"] = frame
+
+            # Utiliza o componente customizado com rolagem 2D (Horizontal + Vertical)
+            canvas_frame = ScrollableCanvasFrame(tab)
+            canvas_frame.grid(row=0, column=0, sticky="nsew")
+
+            # Aplica binding de rolagem (recursivo)
+            canvas_frame.bind_mouse_wheel(canvas_frame.canvas)
+
             if not hasattr(self, "grade_frames"):
                  self.grade_frames = {}
-            self.grade_frames[tab_name] = frame
+            # O dicionário armazena o frame interno, para compatibilidade com a lógica existente de populate
+            self.grade_frames[tab_name] = canvas_frame.scrollable_frame
 
         self.save_grades_button = ctk.CTkButton(grade_grid_tab, text="Salvar Alterações da Aba Atual", command=self.save_all_grades)
         self.save_grades_button.grid(row=3, column=0, padx=10, pady=10, sticky="ew")

@@ -4,6 +4,8 @@ from datetime import datetime
 # Importa as janelas de diálogo personalizadas para edição e adição.
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.add_dialog import AddDialog
+# Importa utilitário de rolagem
+from app.ui.ui_utils import bind_global_mouse_scroll
 # Importa o diálogo de entrada de texto padrão para confirmação de exclusão.
 from customtkinter import CTkInputDialog
 from tkinter import messagebox
@@ -71,6 +73,7 @@ class ManagementView(ctk.CTkFrame):
         # Frame com rolagem para a lista de alunos.
         self.students_frame = ctk.CTkScrollableFrame(students_tab)
         self.students_frame.grid(row=2, column=0, padx=10, pady=5, sticky="nsew")
+        bind_global_mouse_scroll(self.students_frame)
 
         # Frame de Paginação
         pagination_frame = ctk.CTkFrame(students_tab)
@@ -93,6 +96,7 @@ class ManagementView(ctk.CTkFrame):
         self.add_course_button.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         self.courses_frame = ctk.CTkScrollableFrame(courses_tab)
         self.courses_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        bind_global_mouse_scroll(self.courses_frame)
 
         # --- Aba de Notas (Código Legado - Comentado) ---
         # grades_tab = self.tab_view.tab("Notas")

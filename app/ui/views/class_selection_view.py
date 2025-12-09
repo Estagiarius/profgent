@@ -5,6 +5,8 @@ from app.services import data_service
 # Importa as janelas de diálogo personalizadas para adicionar e editar.
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
+# Importa utilitário de rolagem
+from app.ui.ui_utils import bind_global_mouse_scroll
 # Importa a janela de diálogo de entrada de texto padrão do customtkinter.
 from customtkinter import CTkInputDialog
 # Importa a biblioteca tkinter para exibir caixas de mensagem.
@@ -32,6 +34,7 @@ class ClassSelectionView(ctk.CTkFrame):
         self.scrollable_frame = ctk.CTkScrollableFrame(self, label_text="Selecione uma turma para ver os detalhes")
         self.scrollable_frame.grid(row=1, column=0, columnspan=2, padx=20, pady=10, sticky="nsew")
         self.scrollable_frame.grid_columnconfigure(0, weight=1) # Permite que os cards se expandam horizontalmente.
+        bind_global_mouse_scroll(self.scrollable_frame)
 
         # Chama o método para preencher a lista de turmas ao iniciar.
         self.populate_class_cards()
