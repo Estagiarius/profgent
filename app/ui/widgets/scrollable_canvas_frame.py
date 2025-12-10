@@ -57,6 +57,7 @@ class ScrollableCanvasFrame(ctk.CTkFrame):
     def _apply_appearance_mode(self, mode_string):
         super()._apply_appearance_mode(mode_string)
 
+        # Guard against early call from super().__init__ before self.canvas exists
         if not hasattr(self, "canvas"):
             return
 
