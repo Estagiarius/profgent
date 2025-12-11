@@ -401,6 +401,67 @@ class DataService:
             db.refresh(new_class)
             return {"id": new_class.id, "name": new_class.name}
 
+    # Método para copiar uma turma existente (estrutura e/ou alunos).
+    def copy_class(self, source_class_id: int, new_name: str, copy_subjects: bool = False, copy_assessments: bool = False, copy_students: bool = False) -> dict | None:
+        if not new_name:
+            raise ValueError("O nome da nova turma não pode ser vazio.")
+
+        with self._get_db() as db:
+            # Verifica turma de origem
+            source_class = db.query(Class).filter(Class.id == source_class_id).first()
+            if not source_class:
+                raise ValueError("Turma de origem não encontrada.")
+
+            # Verifica duplicidade de nome
+            if db.query(Class).filter(func.lower(Class.name) == func.lower(new_name)).first():
+                raise ValueError(f"Uma turma com o nome '{new_name}' já existe.")
+
+            # Cria nova turma
+            new_class = Class(name=new_name, calculation_method=source_class.calculation_method)
+            db.add(new_class)
+            db.flush() # Gera ID
+
+            # Copia Disciplinas (e Avaliações)
+            if copy_subjects:
+                source_subjects = db.query(ClassSubject).options(joinedload(ClassSubject.assessments)).filter(ClassSubject.class_id == source_class_id).all()
+
+                for source_subj in source_subjects:
+                    new_subj = ClassSubject(class_id=new_class.id, course_id=source_subj.course_id)
+                    db.add(new_subj)
+                    db.flush() # Gera ID para avaliações
+
+                    if copy_assessments:
+                        for source_assess in source_subj.assessments:
+                            new_assess = Assessment(
+                                class_subject_id=new_subj.id,
+                                name=source_assess.name,
+                                weight=source_assess.weight,
+                                grading_period=source_assess.grading_period
+                            )
+                            db.add(new_assess)
+
+            # Copia Alunos (apenas Ativos)
+            if copy_students:
+                source_enrollments = db.query(ClassEnrollment).filter(
+                    ClassEnrollment.class_id == source_class_id,
+                    ClassEnrollment.status == 'Active'
+                ).order_by(ClassEnrollment.call_number).all()
+
+                next_call = 1
+                for enroll in source_enrollments:
+                    new_enroll = ClassEnrollment(
+                        class_id=new_class.id,
+                        student_id=enroll.student_id,
+                        call_number=next_call,
+                        status='Active'
+                    )
+                    db.add(new_enroll)
+                    next_call += 1
+
+            db.flush()
+            db.refresh(new_class)
+            return {"id": new_class.id, "name": new_class.name}
+
     # Adiciona uma disciplina a uma turma.
     def add_subject_to_class(self, class_id: int, course_id: int) -> dict | None:
         if not all([class_id, course_id]): return None
