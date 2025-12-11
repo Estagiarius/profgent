@@ -1,4 +1,6 @@
 import customtkinter as ctk # Importa a biblioteca 'customtkinter' para os componentes da interface.
+# Importa utilitário de rolagem
+from app.ui.ui_utils import bind_global_mouse_scroll
 from app.utils.charts import create_grade_distribution_chart, create_approval_pie_chart # Importa a função utilitária que gera o gráfico de distribuição de notas.
 from PIL import Image # Importa a biblioteca Pillow (PIL) para manipulação de imagens.
 import os # Importa o módulo 'os' para interagir com o sistema de arquivos (verificar se o arquivo do gráfico existe).
@@ -16,6 +18,7 @@ class DashboardView(ctk.CTkFrame):
         # Configura o layout de grade da view.
         self.grid_columnconfigure(0, weight=3) # Coluna do gráfico (maior)
         self.grid_columnconfigure(1, weight=1) # Coluna dos aniversariantes (menor)
+        self.grid_rowconfigure(1, weight=1) # Linha 1 (Abas) se expande
         self.grid_rowconfigure(2, weight=1) # A linha 2 (onde fica o gráfico) se expande.
 
         # --- Título ---
@@ -49,6 +52,7 @@ class DashboardView(ctk.CTkFrame):
 
         self.birthdays_scrollable_frame = ctk.CTkScrollableFrame(self.birthdays_frame_container, label_text="")
         self.birthdays_scrollable_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
+        bind_global_mouse_scroll(self.birthdays_scrollable_frame)
 
     def setup_overview_tab(self):
         """Configura os elementos da aba Visão Geral."""
@@ -121,6 +125,7 @@ class DashboardView(ctk.CTkFrame):
         # Lista de Alunos Destaque (Embedded)
         self.honor_list_frame = ctk.CTkScrollableFrame(self.honor_frame)
         self.honor_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        bind_global_mouse_scroll(self.honor_list_frame)
 
         # --- Ranking de Incidentes (Coluna 1) ---
         self.incidents_frame = ctk.CTkFrame(self.tab_rankings)
@@ -131,6 +136,7 @@ class DashboardView(ctk.CTkFrame):
         # Lista de Incidentes (Embedded)
         self.incidents_list_frame = ctk.CTkScrollableFrame(self.incidents_frame)
         self.incidents_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        bind_global_mouse_scroll(self.incidents_list_frame)
 
 
     def open_risk_details_dialog(self):
@@ -156,6 +162,7 @@ class DashboardView(ctk.CTkFrame):
 
         scroll_frame = ctk.CTkScrollableFrame(dialog)
         scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        bind_global_mouse_scroll(scroll_frame)
 
         for item in data:
             row_frame = ctk.CTkFrame(scroll_frame)
