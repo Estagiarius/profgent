@@ -19,12 +19,12 @@ def bind_global_mouse_scroll(widget, command=None, recursive=True):
     else:
         # Try to find a default scroll function
         if isinstance(widget, ctk.CTkScrollableFrame):
-            try:
-                # Access internal canvas of CTkScrollableFrame (CTk 5.x)
-                # Note: Accessing protected member is necessary as it's not exposed publicly
+            # Access internal canvas of CTkScrollableFrame
+            # CTk 5.x usually uses _parent_canvas
+            if hasattr(widget, "_parent_canvas"):
                 scroll_func = widget._parent_canvas.yview_scroll
-            except AttributeError:
-                 pass
+            elif hasattr(widget, "_canvas"): # Fallback for other versions
+                scroll_func = widget._canvas.yview_scroll
         elif hasattr(widget, "yview_scroll"):
             scroll_func = widget.yview_scroll
 
@@ -59,5 +59,9 @@ def bind_global_mouse_scroll(widget, command=None, recursive=True):
 def _bind_recursive(widget, binding_func):
     """Helper to bind recursively"""
     binding_func(widget)
+    # CTkScrollableFrame puts content in a specific inner frame, we should bind that too if accessible?
+    # Actually, standard winfo_children should cover it if we are high enough.
+    # But recursively binding might be overkill if we just want the frame to scroll.
+    # However, if children capture events (like buttons/entries), binding them is good.
     for child in widget.winfo_children():
         _bind_recursive(child, binding_func)

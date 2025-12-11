@@ -41,6 +41,7 @@ class ScrollableCanvasFrame(ctk.CTkFrame):
         self.canvas.bind("<Configure>", self._on_canvas_configure)
 
         # Initial background color setup to match CTk theme
+        # We need to call this manually to apply the initial theme to the canvas
         self._apply_appearance_mode(ctk.get_appearance_mode())
 
     def _on_frame_configure(self, event=None):
@@ -55,29 +56,30 @@ class ScrollableCanvasFrame(ctk.CTkFrame):
         pass
 
     def _apply_appearance_mode(self, mode_string):
-        super()._apply_appearance_mode(mode_string)
+        # Call super implementation and capture the return value (color string)
+        color = super()._apply_appearance_mode(mode_string)
 
         # Guard against early call from super().__init__ before self.canvas exists
-        if not hasattr(self, "canvas"):
-            return
+        if hasattr(self, "canvas"):
+            # Attempt to match canvas background to the frame's background
+            try:
+                # CTk themes store colors as tuples (light, dark) or single strings
+                fg_color = ThemeManager.theme["CTkFrame"]["fg_color"]
 
-        # Attempt to match canvas background to the frame's background
-        try:
-            # CTk themes store colors as tuples (light, dark) or single strings
-            fg_color = ThemeManager.theme["CTkFrame"]["fg_color"]
+                if isinstance(fg_color, (list, tuple)):
+                    bg_color = fg_color[1] if mode_string.lower() == "dark" else fg_color[0]
+                else:
+                    bg_color = fg_color
 
-            if isinstance(fg_color, (list, tuple)):
-                bg_color = fg_color[1] if mode_string.lower() == "dark" else fg_color[0]
-            else:
-                bg_color = fg_color
+                self.canvas.configure(bg=bg_color)
+            except Exception:
+                # Fallback if theme structure is unexpected
+                 if mode_string.lower() == "dark":
+                    self.canvas.configure(bg="#2b2b2b")
+                 else:
+                    self.canvas.configure(bg="#f0f0f0")
 
-            self.canvas.configure(bg=bg_color)
-        except Exception:
-            # Fallback if theme structure is unexpected
-             if mode_string.lower() == "dark":
-                self.canvas.configure(bg="#2b2b2b")
-             else:
-                self.canvas.configure(bg="#f0f0f0")
+        return color
 
     def bind_mouse_wheel(self, widget):
         """Recursively bind mouse wheel events to a widget and its children."""
