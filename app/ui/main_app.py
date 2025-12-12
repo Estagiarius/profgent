@@ -108,6 +108,7 @@ class MainApp(ctk.CTk):
         self.navigation_frame = ctk.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew") # Posiciona o frame na grade.
         self.navigation_frame.grid_rowconfigure(8, weight=1) # Linha 8 do frame se expande para empurrar os botões para cima.
+        self.navigation_frame.grid_columnconfigure(0, weight=1)
 
         # Adiciona um rótulo de título ao painel de navegação.
         self.navigation_frame_label = ctk.CTkLabel(self.navigation_frame, text="Navegação",
@@ -116,19 +117,19 @@ class MainApp(ctk.CTk):
 
         # Adiciona os botões de navegação. Cada botão chama o método `show_view` com o nome da tela correspondente.
         self.dashboard_button = ctk.CTkButton(self.navigation_frame, text="Dashboard", command=lambda: self.show_view("dashboard"))
-        self.dashboard_button.grid(row=1, column=0, padx=20, pady=10)
+        self.dashboard_button.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
 
         self.management_button = ctk.CTkButton(self.navigation_frame, text="Gestão de Dados", command=lambda: self.show_view("management"))
-        self.management_button.grid(row=2, column=0, padx=20, pady=10)
+        self.management_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
 
         self.class_selection_button = ctk.CTkButton(self.navigation_frame, text="Minhas Turmas", command=lambda: self.show_view("class_selection"))
-        self.class_selection_button.grid(row=3, column=0, padx=20, pady=10)
+        self.class_selection_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
         self.assistant_button = ctk.CTkButton(self.navigation_frame, text="Assistente IA", command=lambda: self.show_view("assistant"))
-        self.assistant_button.grid(row=4, column=0, padx=20, pady=10)
+        self.assistant_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Configurações", command=lambda: self.show_view("settings"))
-        self.settings_button.grid(row=7, column=0, padx=20, pady=10)
+        self.settings_button.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
 
 
         # Cria o frame principal onde o conteúdo de cada tela será exibido.
