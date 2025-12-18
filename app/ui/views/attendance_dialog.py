@@ -54,6 +54,7 @@ class AttendanceDialog(ctk.CTkToplevel):
 
         # Mark all buttons
         ctk.CTkButton(self.actions_frame, text="Marcar Todos Presentes", command=lambda: self.set_all('P')).pack(side="left", padx=10, pady=10)
+        ctk.CTkButton(self.actions_frame, text="Marcar Todos Faltantes", fg_color="#D9534F", hover_color="#C9302C", command=lambda: self.set_all('F')).pack(side="left", padx=10, pady=10)
 
         self.transient(parent)
         self.grab_set()
