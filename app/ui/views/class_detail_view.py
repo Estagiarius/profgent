@@ -9,6 +9,7 @@ from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.enrollment_dialog import EnrollmentDialog
+from app.ui.views.attendance_dialog import AttendanceDialog
 from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
@@ -303,6 +304,7 @@ class ClassDetailView(ctk.CTkFrame):
             self.populate_assessment_list()
             self.populate_lesson_list()
             self.populate_grade_grid()
+            self.populate_student_list() # Atualiza lista de alunos para mostrar % de freq da matéria
 
     def add_subject_popup(self):
         if not self.class_id: return
@@ -878,7 +880,7 @@ class ClassDetailView(ctk.CTkFrame):
         if self.show_active_only_checkbox.get():
             enrollments = [e for e in enrollments if e['status'] == 'Active']
 
-        headers = ["Nº de Chamada", "Nome do Aluno", "Data de Nascimento", "Status", "Ações"]
+        headers = ["Nº de Chamada", "Nome do Aluno", "Freq. %", "Data de Nascimento", "Status", "Ações"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.student_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -887,6 +889,15 @@ class ClassDetailView(ctk.CTkFrame):
             ctk.CTkLabel(self.student_list_frame, text=str(enrollment['call_number'])).grid(row=i, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.student_list_frame, text=f"{enrollment['student_first_name']} {enrollment['student_last_name']}").grid(row=i, column=1, padx=10, pady=5, sticky="w")
 
+            # Coluna Frequência
+            freq_text = "-"
+            if self.current_subject_id and enrollment['status'] == 'Active':
+                stats = data_service.get_student_attendance_stats(enrollment['student_id'], self.current_subject_id)
+                if stats['total_lessons'] > 0:
+                    freq_text = f"{stats['percentage']:.1f}%"
+
+            ctk.CTkLabel(self.student_list_frame, text=freq_text).grid(row=i, column=2, padx=10, pady=5, sticky="w")
+
             birth_date_str = ""
             if enrollment['student_birth_date']:
                 try:
@@ -894,15 +905,15 @@ class ClassDetailView(ctk.CTkFrame):
                     birth_date_str = birth_date.strftime("%d/%m/%Y")
                 except (ValueError, TypeError):
                     birth_date_str = "Data Inválida"
-            ctk.CTkLabel(self.student_list_frame, text=birth_date_str).grid(row=i, column=2, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.student_list_frame, text=birth_date_str).grid(row=i, column=3, padx=10, pady=5, sticky="w")
 
             display_status = self.status_map_rev.get(enrollment['status'], enrollment['status'])
-            ctk.CTkLabel(self.student_list_frame, text=display_status).grid(row=i, column=3, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.student_list_frame, text=display_status).grid(row=i, column=4, padx=10, pady=5, sticky="w")
 
             status_menu = ctk.CTkOptionMenu(self.student_list_frame, values=["Ativo", "Inativo"],
                                             command=lambda status, eid=enrollment['id']: self.update_status(eid, status))
             status_menu.set(display_status)
-            status_menu.grid(row=i, column=4, padx=10, pady=5, sticky="w")
+            status_menu.grid(row=i, column=5, padx=10, pady=5, sticky="w")
 
     # Atualiza o status de uma matrícula.
     def update_status(self, enrollment_id, status):
@@ -993,8 +1004,47 @@ class ClassDetailView(ctk.CTkFrame):
         for i, lesson in enumerate(lessons, start=1):
             ctk.CTkLabel(self.lesson_list_frame, text=lesson['date']).grid(row=i, column=0, padx=10, pady=5, sticky="w")
             ctk.CTkLabel(self.lesson_list_frame, text=lesson['title']).grid(row=i, column=1, padx=10, pady=5, sticky="w")
-            edit_button = ctk.CTkButton(self.lesson_list_frame, text="Editar", command=lambda l=lesson: self.show_lesson_editor(l))
-            edit_button.grid(row=i, column=2, padx=10, pady=5, sticky="e")
+
+            actions_frame = ctk.CTkFrame(self.lesson_list_frame, fg_color="transparent")
+            actions_frame.grid(row=i, column=2, padx=10, pady=5, sticky="e")
+
+            # Botão de Chamada
+            chamada_btn = ctk.CTkButton(actions_frame, text="Chamada", width=80, fg_color="#2CC985", hover_color="#229A66",
+                                        command=lambda lid=lesson['id'], ltitle=lesson['title']: self.open_attendance_dialog(lid, ltitle))
+            chamada_btn.pack(side="left", padx=5)
+
+            edit_button = ctk.CTkButton(actions_frame, text="Editar", width=80, command=lambda l=lesson: self.show_lesson_editor(l))
+            edit_button.pack(side="left", padx=5)
+
+    def open_attendance_dialog(self, lesson_id, lesson_title):
+        if not self.class_id: return
+
+        # 1. Carrega alunos ativos
+        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        active_enrollments = [e for e in enrollments if e['status'] == 'Active']
+
+        if not active_enrollments:
+            messagebox.showwarning("Aviso", "Não há alunos ativos nesta turma para realizar a chamada.")
+            return
+
+        students = [{"id": e['student_id'], "name": f"{e['student_first_name']} {e['student_last_name']}"} for e in active_enrollments]
+
+        # 2. Carrega chamadas existentes
+        existing_records = data_service.get_lesson_attendance(lesson_id)
+        attendance_map = {r['student_id']: r['status'] for r in existing_records}
+
+        # 3. Callback de salvamento
+        def save_attendance(lid, data):
+            try:
+                data_service.register_attendance(lid, data)
+                messagebox.showinfo("Sucesso", "Chamada registrada com sucesso.")
+                # Atualiza a lista de alunos para refletir nova % de frequência
+                self.populate_student_list()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao salvar chamada: {e}")
+
+        # 4. Abre dialogo
+        AttendanceDialog(self, f"Chamada - {lesson_title}", lesson_id, students, attendance_map, save_attendance)
 
     # Método chamado quando esta view é exibida.
     def on_show(self, class_id=None):
