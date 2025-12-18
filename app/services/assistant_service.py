@@ -170,7 +170,10 @@ class AssistantService:
                 "3.  **Admita Limitações**: Se você não puder atender a uma solicitação com as ferramentas disponíveis, declare claramente que "
                 "não pode fazê-lo e explique a limitação. Não invente ferramentas ou funcionalidades.\n"
                 "4.  **Clareza e Confirmação**: Após executar uma ferramenta que modifica dados (ex: adicionar um aluno), "
-                "sempre confirme o sucesso da ação em uma mensagem clara e amigável, com base na saída da ferramenta."
+                "sempre confirme o sucesso da ação em uma mensagem clara e amigável, com base na saída da ferramenta.\n"
+                "5.  **Planejamento de Aulas**: Se o usuário solicitar a criação de um plano de aula, gere primeiro o conteúdo "
+                "estruturado (Objetivos, Conteúdo, Atividades, Avaliação) no chat. Após a aprovação do usuário, "
+                "use a ferramenta `add_new_lesson` para salvar esse conteúdo na disciplina e turma apropriadas."
             )
             # Inicia o histórico de mensagens com o prompt de sistema.
             self.messages = [{"role": "system", "content": system_prompt}]
@@ -231,3 +234,35 @@ class AssistantService:
         if self.provider:
             # Chama o método 'close' do provedor para liberar conexões de rede.
             await self.provider.close()
+
+    async def generate_lesson_content(self, topic: str, course_name: str, class_name: str) -> str:
+        """
+        Gera uma sugestão de plano de aula baseada no tópico, disciplina e turma.
+        """
+        if not self.provider:
+            self._initialize_provider()
+            if not self.provider:
+                return "Erro: Provedor de IA não configurado."
+
+        system_prompt = (
+            "Você é um especialista pedagógico. Sua tarefa é criar um plano de aula detalhado e estruturado. "
+            "A saída deve ser texto formatado (não Markdown complexo, mas com quebras de linha e seções claras) "
+            "adequado para ser colado em um campo de texto simples.\n"
+            "Estrutura Obrigatória:\n"
+            "1. Objetivos de Aprendizagem\n"
+            "2. Conteúdo/Tópicos a Abordar\n"
+            "3. Sugestão de Atividades Práticas\n"
+            "4. Avaliação/Verificação de Aprendizado\n\n"
+            "Seja direto e prático. Adapte a linguagem à disciplina e nível escolar (inferido pelo nome da turma)."
+        )
+
+        user_prompt = f"Crie um plano de aula para a disciplina '{course_name}' da turma '{class_name}' sobre o tema: '{topic}'."
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        # Chamada direta ao provedor, sem usar tools, pois queremos apenas geração de texto.
+        response = await self.provider.get_chat_response(messages)
+        return response.content if response.content else "Não foi possível gerar o conteúdo."
