@@ -44,6 +44,9 @@ class Lesson(Base):
     # Define o relacionamento com o modelo ClassSubject.
     class_subject = relationship("ClassSubject", back_populates="lessons")
 
+    # Define o relacionamento com o modelo Attendance.
+    attendance_records = relationship("Attendance", back_populates="lesson", cascade="all, delete-orphan")
+
     # Define uma representação em string para o objeto Lesson, útil para depuração.
     def __repr__(self):
         # Retorna uma string formatada com o id, título da aula e o ID da disciplina da turma.

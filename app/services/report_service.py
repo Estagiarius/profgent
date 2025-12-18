@@ -300,6 +300,14 @@ class ReportService:
 
             avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
             lines.append(f"  >> MÉDIA FINAL: {avg:.2f}")
+
+            # Adiciona Frequência
+            freq_stats = self.data_service.get_student_attendance_stats(student_id, subject['id'])
+            if freq_stats['total_lessons'] > 0:
+                lines.append(f"  >> FREQUÊNCIA: {freq_stats['percentage']:.1f}% ({freq_stats['present_count']} P / {freq_stats['total_lessons']} Aulas)")
+            else:
+                lines.append("  >> FREQUÊNCIA: N/A")
+
             lines.append("-" * 30)
 
         lines.extend([
