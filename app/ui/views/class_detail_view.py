@@ -182,6 +182,9 @@ class ClassDetailView(ctk.CTkFrame):
         self.save_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Salvar", command=self.save_lesson)
         self.save_lesson_button.pack(side="left", padx=5)
 
+        self.generate_ai_button = ctk.CTkButton(editor_buttons_frame, text="✨ Gerar com IA", fg_color="purple", command=self.generate_ai_content)
+        self.generate_ai_button.pack(side="left", padx=5)
+
         self.cancel_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Cancelar", command=self.hide_lesson_editor)
         self.cancel_lesson_button.pack(side="left", padx=5)
 
@@ -688,6 +691,54 @@ class ClassDetailView(ctk.CTkFrame):
         self.editing_lesson_id = None
         self.lesson_editor_view.grid_forget()
         self.lesson_list_view.grid(row=0, column=0, sticky="nsew")
+
+    def generate_ai_content(self):
+        """Dispara a geração de conteúdo de aula usando IA."""
+        title = self.lesson_editor_title_entry.get()
+        if not title:
+            # Se não houver título, pede um.
+            dialog = CTkInputDialog(text="Digite o tema da aula:", title="Gerar Conteúdo com IA")
+            title = dialog.get_input()
+            if not title: return
+            self.lesson_editor_title_entry.insert(0, title)
+
+        if not self.class_id or not self.current_subject_id:
+             messagebox.showerror("Erro", "Contexto de Turma ou Disciplina não encontrado.")
+             return
+
+        # Busca nomes para passar ao prompt
+        class_data = data_service.get_class_by_id(self.class_id)
+        # Precisamos buscar o nome do curso pelo ID da disciplina
+        subjects = data_service.get_subjects_for_class(self.class_id)
+        subject_data = next((s for s in subjects if s['id'] == self.current_subject_id), None)
+
+        if not class_data or not subject_data:
+             messagebox.showerror("Erro", "Dados da Turma/Disciplina incompletos.")
+             return
+
+        class_name = class_data['name']
+        course_name = subject_data['course_name']
+
+        # Feedback visual
+        self.generate_ai_button.configure(state="disabled", text="Gerando...")
+        self.lesson_editor_content_textbox.delete("1.0", "end")
+        self.lesson_editor_content_textbox.insert("1.0", "Gerando sugestão de aula... Por favor aguarde.")
+
+        # Executa assincronamente
+        coro = self.main_app.assistant_service.generate_lesson_content(title, course_name, class_name)
+        run_async_task(coro, self.main_app.loop, self.main_app.async_queue, self._on_ai_content_generated)
+
+    def _on_ai_content_generated(self, result):
+        """Callback após geração de conteúdo."""
+        self.generate_ai_button.configure(state="normal", text="✨ Gerar com IA")
+
+        if isinstance(result, Exception):
+            messagebox.showerror("Erro IA", f"Falha ao gerar conteúdo: {result}")
+            self.lesson_editor_content_textbox.delete("1.0", "end")
+            return
+
+        self.lesson_editor_content_textbox.delete("1.0", "end")
+        self.lesson_editor_content_textbox.insert("1.0", result)
 
     # Salva os dados da aula (criação ou atualização).
     def save_lesson(self):
