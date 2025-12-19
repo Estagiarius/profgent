@@ -22,7 +22,7 @@ class Lesson(Base):
     :type title: str
     :ivar content: Conteúdo descritivo da aula. Pode ser nulo.
     :type content: str | None
-    :ivar class_subject_id: Chave estrangeira que associa a aula a uma disciplina de uma turma.
+    :ivar class_subject_id: Chave estrangeira que associa a aula a uma disciplina de uma turma. Indexado.
     :type class_subject_id: int
     :ivar class_subject: Relacionamento que conecta a aula com a respectiva instância de ClassSubject.
     :type class_subject: ClassSubject
@@ -40,7 +40,8 @@ class Lesson(Base):
     content = Column(Text, nullable=True)
 
     # Define a coluna 'class_subject_id' como uma chave estrangeira para a tabela 'class_subjects'. Não pode ser nula.
-    class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False)
+    # index=True otimiza busca de aulas por disciplina.
+    class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False, index=True)
     # Define o relacionamento com o modelo ClassSubject.
     class_subject = relationship("ClassSubject", back_populates="lessons")
 

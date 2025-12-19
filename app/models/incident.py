@@ -21,9 +21,9 @@ class Incident(Base):
     :type date: Date
     :ivar description: Descrição detalhada do incidente. Este campo é obrigatório.
     :type description: Text
-    :ivar class_id: Identificador da turma associada ao incidente. Este campo é obrigatório.
+    :ivar class_id: Identificador da turma associada ao incidente. Este campo é obrigatório. Indexado.
     :type class_id: Integer
-    :ivar student_id: Identificador do aluno relacionado ao incidente. Este campo é obrigatório.
+    :ivar student_id: Identificador do aluno relacionado ao incidente. Este campo é obrigatório. Indexado.
     :type student_id: Integer
     :ivar class_: Relacionamento com o modelo 'Class', representando a turma associada.
     :type class_: relationship
@@ -41,9 +41,11 @@ class Incident(Base):
     description = Column(Text, nullable=False)
 
     # Define a coluna 'class_id' como uma chave estrangeira para a tabela 'classes'. Não pode ser nula.
-    class_id = Column(Integer, ForeignKey('classes.id'), nullable=False)
+    # index=True otimiza queries de ranking de incidentes por turma.
+    class_id = Column(Integer, ForeignKey('classes.id'), nullable=False, index=True)
     # Define a coluna 'student_id' como uma chave estrangeira para a tabela 'students'. Não pode ser nula.
-    student_id = Column(Integer, ForeignKey('students.id'), nullable=False)
+    # index=True otimiza queries de incidentes por aluno (ex: análise de risco).
+    student_id = Column(Integer, ForeignKey('students.id'), nullable=False, index=True)
 
     # Define o relacionamento com o modelo Class. 'back_populates' cria a referência inversa no modelo Class.
     class_ = relationship("Class", back_populates="incidents")

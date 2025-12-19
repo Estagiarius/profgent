@@ -819,6 +819,68 @@ class DataService:
 
             return results
 
+    def get_class_period_averages(self, class_subject_id: int) -> dict:
+        """
+        Calcula médias de todos os bimestres e final para todos os alunos da disciplina.
+        Retorna: { student_id: { 1: float, ..., "final_calculated": float, "final_override": float } }
+        """
+        with self._get_db() as db:
+            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
+            if not assessments: return {}
+
+            assessment_ids = [a.id for a in assessments]
+            # Fetch simple columns
+            grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(assessment_ids)).all()
+
+            # Map: student -> assessment_id -> score
+            student_grades = {}
+            for g in grades:
+                if g.student_id not in student_grades: student_grades[g.student_id] = {}
+                student_grades[g.student_id][g.assessment_id] = g.score
+
+            results = {}
+            # Group assessments by period
+            period_assessments = {1: [], 2: [], 3: [], 4: [], 5: []}
+            for a in assessments:
+                period_assessments[a.grading_period].append({"id": a.id, "weight": a.weight})
+
+            final_assessment_id = next((a.id for a in assessments if a.grading_period == 5), None)
+
+            for student_id, s_grades_map in student_grades.items():
+                s_results = {}
+                final_sum = 0.0
+                periods_count = 0
+
+                for period in range(1, 5):
+                    assessments_data = period_assessments[period]
+                    if not assessments_data:
+                        s_results[period] = None
+                        final_sum += 0.0
+                        periods_count += 1
+                        continue
+
+                    total_weight = sum(a['weight'] for a in assessments_data)
+                    if total_weight == 0:
+                        avg = 0.0
+                    else:
+                        weighted_sum = sum(s_grades_map.get(a['id'], 0.0) * a['weight'] for a in assessments_data)
+                        avg = weighted_sum / total_weight
+
+                    s_results[period] = avg
+                    final_sum += avg
+                    periods_count += 1
+
+                s_results["final_calculated"] = final_sum / 4.0 if periods_count > 0 else 0.0
+
+                if final_assessment_id and final_assessment_id in s_grades_map:
+                    s_results["final_override"] = s_grades_map[final_assessment_id]
+                else:
+                    s_results["final_override"] = None
+
+                results[student_id] = s_results
+
+            return results
+
     # Método para buscar todas as notas com detalhes completos (aluno, avaliação, turma, curso).
     def get_all_grades_with_details(self) -> list[dict]:
         with self._get_db() as db:
@@ -1145,6 +1207,46 @@ class DataService:
                 "percentage": percentage
             }
 
+    def get_class_attendance_stats(self, class_subject_id: int) -> dict:
+        """
+        Calcula estatísticas de frequência para todos os alunos de uma disciplina em lote.
+        Retorna: { student_id: { "total_lessons": int, "percentage": float, ... } }
+        """
+        with self._get_db() as db:
+            # Busca IDs das aulas
+            lessons = db.query(Lesson.id).filter(Lesson.class_subject_id == class_subject_id).all()
+            lesson_ids = [l.id for l in lessons]
+
+            if not lesson_ids:
+                return {}
+
+            # Busca todos os registros de presença dessas aulas de uma só vez
+            records = db.query(Attendance).filter(Attendance.lesson_id.in_(lesson_ids)).all()
+
+            stats = {} # student_id -> {present, absent, total}
+
+            for r in records:
+                if r.student_id not in stats:
+                    stats[r.student_id] = {'present': 0, 'absent': 0, 'total': 0}
+
+                stats[r.student_id]['total'] += 1
+                if r.status in ('P', 'A', 'J'):
+                    stats[r.student_id]['present'] += 1
+                elif r.status == 'F':
+                    stats[r.student_id]['absent'] += 1
+
+            result = {}
+            for sid, data in stats.items():
+                total = data['total']
+                pct = (data['present'] / total * 100) if total > 0 else 100.0
+                result[sid] = {
+                    "total_lessons": total,
+                    "present_count": data['present'],
+                    "absent_count": data['absent'],
+                    "percentage": pct
+                }
+            return result
+
     # Método para adicionar uma nova nota.
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
         if not all([student_id, assessment_id, score is not None]): return None
@@ -1368,7 +1470,8 @@ class DataService:
             if not all_assessment_ids:
                 return []
 
-            all_grades = db.query(Grade).filter(Grade.assessment_id.in_(all_assessment_ids)).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de objetos ORM
+            all_grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(all_assessment_ids)).all()
 
             # Mapa: (student_id, assessment_id) -> score OU student_id -> {assessment_id: score}
             # Vamos usar o formato esperado por calculate_weighted_average: list[dict]
@@ -1461,7 +1564,8 @@ class DataService:
                  chunk_size = 500
                  for i in range(0, len(all_assessment_ids), chunk_size):
                      chunk = all_assessment_ids[i:i+chunk_size]
-                     grades_chunk = db.query(Grade).filter(Grade.assessment_id.in_(chunk)).all()
+                     # Otimização: Seleciona apenas colunas necessárias
+                     grades_chunk = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(chunk)).all()
                      all_grades.extend(grades_chunk)
 
             # Indexar grades por student_id
