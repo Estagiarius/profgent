@@ -938,6 +938,11 @@ class ClassDetailView(ctk.CTkFrame):
         if self.show_active_only_checkbox.get():
             enrollments = [e for e in enrollments if e['status'] == 'Active']
 
+        # Carrega estatísticas de frequência em lote para evitar N+1 queries
+        batch_attendance_stats = {}
+        if self.current_subject_id:
+             batch_attendance_stats = data_service.get_class_attendance_stats(self.current_subject_id)
+
         headers = ["Nº de Chamada", "Nome do Aluno", "Freq. %", "Data de Nascimento", "Status", "Ações"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.student_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
@@ -950,8 +955,8 @@ class ClassDetailView(ctk.CTkFrame):
             # Coluna Frequência
             freq_text = "-"
             if self.current_subject_id and enrollment['status'] == 'Active':
-                stats = data_service.get_student_attendance_stats(enrollment['student_id'], self.current_subject_id)
-                if stats['total_lessons'] > 0:
+                stats = batch_attendance_stats.get(enrollment['student_id'])
+                if stats and stats['total_lessons'] > 0:
                     freq_text = f"{stats['percentage']:.1f}%"
 
             ctk.CTkLabel(self.student_list_frame, text=freq_text).grid(row=i, column=2, padx=10, pady=5, sticky="w")

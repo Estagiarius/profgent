@@ -9,6 +9,7 @@ def migrate_database(engine):
     2. Adding performance indexes to the 'grades' table.
     3. Adding performance indexes to the 'incidents' table.
     4. Adding performance indexes to 'class_enrollments' and 'class_subjects'.
+    5. Adding performance indexes to 'attendance', 'assessments', and 'lessons'.
     """
     try:
         inspector = inspect(engine)
@@ -88,6 +89,44 @@ def migrate_database(engine):
                 logging.info("Index 'ix_class_subjects_course_id' created.")
              else:
                  logging.info("Schema check: Index on 'class_subjects.course_id' already exists.")
+
+        # --- 5. Migration for Attendance, Assessment, Lesson ---
+
+        # Attendance: student_id
+        indexes_attendance = inspector.get_indexes('attendance')
+        has_att_index = lambda col_name: any(ix['column_names'] == [col_name] for ix in indexes_attendance)
+
+        with engine.begin() as conn:
+            if not has_att_index('student_id'):
+                logging.info("Applying migration: Adding index to 'attendance.student_id'.")
+                conn.execute(text("CREATE INDEX ix_attendance_student_id ON attendance (student_id)"))
+                logging.info("Index 'ix_attendance_student_id' created.")
+            else:
+                 logging.info("Schema check: Index on 'attendance.student_id' already exists.")
+
+        # Assessment: class_subject_id
+        indexes_assessments = inspector.get_indexes('assessments')
+        has_ass_index = lambda col_name: any(ix['column_names'] == [col_name] for ix in indexes_assessments)
+
+        with engine.begin() as conn:
+             if not has_ass_index('class_subject_id'):
+                logging.info("Applying migration: Adding index to 'assessments.class_subject_id'.")
+                conn.execute(text("CREATE INDEX ix_assessments_class_subject_id ON assessments (class_subject_id)"))
+                logging.info("Index 'ix_assessments_class_subject_id' created.")
+             else:
+                 logging.info("Schema check: Index on 'assessments.class_subject_id' already exists.")
+
+        # Lesson: class_subject_id
+        indexes_lessons = inspector.get_indexes('lessons')
+        has_lesson_index = lambda col_name: any(ix['column_names'] == [col_name] for ix in indexes_lessons)
+
+        with engine.begin() as conn:
+             if not has_lesson_index('class_subject_id'):
+                logging.info("Applying migration: Adding index to 'lessons.class_subject_id'.")
+                conn.execute(text("CREATE INDEX ix_lessons_class_subject_id ON lessons (class_subject_id)"))
+                logging.info("Index 'ix_lessons_class_subject_id' created.")
+             else:
+                 logging.info("Schema check: Index on 'lessons.class_subject_id' already exists.")
 
     except Exception as e:
         logging.error(f"Migration failed: {e}")
