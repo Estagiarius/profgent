@@ -10,6 +10,7 @@ from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.enrollment_dialog import EnrollmentDialog
 from app.ui.views.attendance_dialog import AttendanceDialog
+from app.ui.views.copy_lesson_dialog import CopyLessonDialog
 from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
@@ -156,8 +157,14 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_list_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
         bind_global_mouse_scroll(self.lesson_list_frame)
 
-        self.add_lesson_button = ctk.CTkButton(self.lesson_list_view, text="Adicionar Nova Aula", command=self.show_lesson_editor)
-        self.add_lesson_button.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+        self.lessons_actions_frame = ctk.CTkFrame(self.lesson_list_view, fg_color="transparent")
+        self.lessons_actions_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
+
+        self.add_lesson_button = ctk.CTkButton(self.lessons_actions_frame, text="Adicionar Nova Aula", command=self.show_lesson_editor)
+        self.add_lesson_button.pack(side="left", fill="x", expand=True, padx=(0, 5))
+
+        self.copy_lesson_button = ctk.CTkButton(self.lessons_actions_frame, text="Copiar para Outra Turma", fg_color="#555555", hover_color="#444444", command=self.open_copy_lesson_dialog)
+        self.copy_lesson_button.pack(side="left", fill="x", expand=True, padx=(5, 0))
 
         # --- Sub-view: Editor de Aulas ---
         self.lesson_editor_view = ctk.CTkFrame(self.lesson_container)
@@ -1066,6 +1073,16 @@ class ClassDetailView(ctk.CTkFrame):
 
             edit_button = ctk.CTkButton(actions_frame, text="Editar", width=80, command=lambda l=lesson: self.show_lesson_editor(l))
             edit_button.pack(side="left", padx=5)
+
+    def open_copy_lesson_dialog(self):
+        if not self.class_id: return
+        if not self.current_subject_id:
+             messagebox.showwarning("Aviso", "Selecione uma disciplina para copiar aulas.")
+             return
+
+        # Callback opcional se quisermos fazer algo após copiar (ex: logar ou atualizar algo)
+        # Por enquanto não precisa recarregar nada na view ATUAL, pois copiamos PARA outra turma.
+        CopyLessonDialog(self, self.class_id, self.current_subject_id)
 
     def open_attendance_dialog(self, lesson_id, lesson_title):
         if not self.class_id: return
