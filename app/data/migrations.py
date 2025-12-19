@@ -8,6 +8,7 @@ def migrate_database(engine):
     1. Adding 'grading_period' to the 'assessments' table.
     2. Adding performance indexes to the 'grades' table.
     3. Adding performance indexes to the 'incidents' table.
+    4. Adding performance indexes to 'class_enrollments' and 'class_subjects'.
     """
     try:
         inspector = inspect(engine)
@@ -60,6 +61,33 @@ def migrate_database(engine):
                 logging.info("Index 'ix_incidents_student_id' created.")
             else:
                 logging.info("Schema check: Index on 'incidents.student_id' already exists.")
+
+        # --- 4. Migration for Indexes on 'class_enrollments' and 'class_subjects' ---
+        # Checks if secondary foreign keys are indexed for reverse lookups.
+
+        # ClassEnrollment
+        indexes_enrollments = inspector.get_indexes('class_enrollments')
+        has_enroll_index = lambda col_name: any(ix['column_names'] == [col_name] for ix in indexes_enrollments)
+
+        with engine.begin() as conn:
+            if not has_enroll_index('student_id'):
+                logging.info("Applying migration: Adding index to 'class_enrollments.student_id'.")
+                conn.execute(text("CREATE INDEX ix_class_enrollments_student_id ON class_enrollments (student_id)"))
+                logging.info("Index 'ix_class_enrollments_student_id' created.")
+            else:
+                 logging.info("Schema check: Index on 'class_enrollments.student_id' already exists.")
+
+        # ClassSubject
+        indexes_subjects = inspector.get_indexes('class_subjects')
+        has_subject_index = lambda col_name: any(ix['column_names'] == [col_name] for ix in indexes_subjects)
+
+        with engine.begin() as conn:
+             if not has_subject_index('course_id'):
+                logging.info("Applying migration: Adding index to 'class_subjects.course_id'.")
+                conn.execute(text("CREATE INDEX ix_class_subjects_course_id ON class_subjects (course_id)"))
+                logging.info("Index 'ix_class_subjects_course_id' created.")
+             else:
+                 logging.info("Schema check: Index on 'class_subjects.course_id' already exists.")
 
     except Exception as e:
         logging.error(f"Migration failed: {e}")

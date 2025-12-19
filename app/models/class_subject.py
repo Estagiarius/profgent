@@ -9,13 +9,15 @@ class ClassSubject(Base):
 
     :ivar id: Identificador único da associação.
     :ivar class_id: ID da turma.
-    :ivar course_id: ID da disciplina.
+    :ivar course_id: ID da disciplina. Indexado.
     """
     __tablename__ = 'class_subjects'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     class_id = Column(Integer, ForeignKey('classes.id'), nullable=False)
-    course_id = Column(Integer, ForeignKey('courses.id'), nullable=False)
+    # index=True otimiza buscas reversas (Course -> ClassSubject), ex: estatísticas por disciplina.
+    # O índice composto (class_id, course_id) não cobre buscas apenas por course_id.
+    course_id = Column(Integer, ForeignKey('courses.id'), nullable=False, index=True)
 
     # Relacionamentos
     class_ = relationship("Class", back_populates="subjects")
