@@ -989,6 +989,29 @@ class DataService:
             lessons = db.query(Lesson).filter(Lesson.class_subject_id == class_subject_id).order_by(Lesson.date.desc()).all()
             return [{"id": l.id, "title": l.title, "content": l.content, "date": l.date.isoformat()} for l in lessons]
 
+    # Método para copiar aulas (conteúdo) para outra disciplina.
+    def copy_lessons(self, source_lesson_ids: list[int], target_class_subject_id: int) -> int:
+        if not source_lesson_ids or not target_class_subject_id:
+            return 0
+
+        with self._get_db() as db:
+            # Busca as aulas de origem
+            source_lessons = db.query(Lesson).filter(Lesson.id.in_(source_lesson_ids)).all()
+
+            count = 0
+            for src in source_lessons:
+                new_lesson = Lesson(
+                    class_subject_id=target_class_subject_id,
+                    title=src.title,
+                    content=src.content,
+                    date=src.date # Mantém a mesma data (pode ser editada depois)
+                )
+                db.add(new_lesson)
+                count += 1
+
+            db.flush()
+            return count
+
     # Método para criar um novo incidente.
     def create_incident(self, class_id: int, student_id: int, description: str, incident_date: date) -> dict | None:
         if not all([class_id, student_id, description, incident_date]): return None
