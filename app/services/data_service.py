@@ -794,14 +794,12 @@ class DataService:
                     periods_count += 1
                 else:
                     assessments_data = [{"id": a.id, "weight": a.weight} for a in period_assessments]
-                    # Simula a estrutura de grades esperada pelo calculate_weighted_average (lista de dicts)
-                    # Mas calculate_weighted_average espera LISTA de grades.
-                    student_grades_list = [
-                        {"assessment_id": a.id, "score": grades_map.get(a.id, 0.0), "student_id": student_id}
-                        for a in period_assessments if a.id in grades_map
-                    ]
 
-                    avg = self.calculate_weighted_average(student_id, student_grades_list, assessments_data)
+                    # Otimização: Passar grades_map diretamente e pré-calcular peso
+                    period_total_weight = sum(a['weight'] for a in assessments_data)
+
+                    # calculate_weighted_average agora aceita dict e total_weight
+                    avg = self.calculate_weighted_average(student_id, grades_map, assessments_data, total_weight=period_total_weight)
                     results[period] = avg
                     final_sum += avg
                     periods_count += 1
@@ -846,6 +844,12 @@ class DataService:
 
             final_assessment_id = next((a.id for a in assessments if a.grading_period == 5), None)
 
+            # Pre-calcular pesos por período
+            period_weights = {
+                p: sum(a['weight'] for a in period_assessments[p])
+                for p in range(1, 6)
+            }
+
             for student_id, s_grades_map in student_grades.items():
                 s_results = {}
                 final_sum = 0.0
@@ -859,12 +863,9 @@ class DataService:
                         periods_count += 1
                         continue
 
-                    total_weight = sum(a['weight'] for a in assessments_data)
-                    if total_weight == 0:
-                        avg = 0.0
-                    else:
-                        weighted_sum = sum(s_grades_map.get(a['id'], 0.0) * a['weight'] for a in assessments_data)
-                        avg = weighted_sum / total_weight
+                    # Otimização: Usar peso pré-calculado e chamar calculate_weighted_average otimizado
+                    total_weight = period_weights[period]
+                    avg = self.calculate_weighted_average(student_id, s_grades_map, assessments_data, total_weight=total_weight)
 
                     s_results[period] = avg
                     final_sum += avg
@@ -985,14 +986,15 @@ class DataService:
              ).all()
 
              # Organiza notas por aluno para cálculo em memória
-             # grades_by_student = {student_id: [grade_dicts]}
+             # grades_by_student = {student_id: {assessment_id: score}}
              grades_by_student = {}
              for g in grades:
                  if g.student_id not in grades_by_student:
-                     grades_by_student[g.student_id] = []
-                 grades_by_student[g.student_id].append({
-                     "assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id
-                 })
+                     grades_by_student[g.student_id] = {}
+                 grades_by_student[g.student_id][g.assessment_id] = g.score
+
+             # Pre-calcula peso total
+             total_weight = sum(a['weight'] for a in assessments_data)
 
              at_risk_students = []
              # Processamento em memória
@@ -1003,8 +1005,8 @@ class DataService:
                  incident_count = incidents_map.get(student_id, 0)
 
                  # Recupera notas e calcula média
-                 student_grades = grades_by_student.get(student_id, [])
-                 weighted_average = self.calculate_weighted_average(student_id, student_grades, assessments_data)
+                 student_grades = grades_by_student.get(student_id, {})
+                 weighted_average = self.calculate_weighted_average(student_id, student_grades, assessments_data, total_weight=total_weight)
 
                  is_at_risk = (weighted_average < grade_threshold) or \
                               (incident_count >= incident_threshold)
@@ -1322,12 +1324,18 @@ class DataService:
 
     # Método para calcular a média ponderada de um aluno.
     @staticmethod
-    def calculate_weighted_average(student_id: int, grades: list[dict], assessments: list[dict]) -> float:
+    def calculate_weighted_average(student_id: int, grades: list[dict] | dict[int, float], assessments: list[dict], total_weight: float = None) -> float:
         # Soma o peso de todas as avaliações da turma.
-        total_weight = sum(a['weight'] for a in assessments)
+        if total_weight is None:
+            total_weight = sum(a['weight'] for a in assessments)
         if total_weight == 0: return 0.0
-        # Cria um mapa das notas do aluno para acesso rápido.
-        student_grades = {g['assessment_id']: g['score'] for g in grades if g.get('student_id') == student_id}
+
+        # Cria um mapa das notas do aluno para acesso rápido, se não for passado um dict.
+        if isinstance(grades, dict):
+            student_grades = grades
+        else:
+            student_grades = {g['assessment_id']: g['score'] for g in grades if g.get('student_id') == student_id}
+
         # Calcula a soma ponderada das notas (nota * peso). Se uma nota não existir, considera como 0.
         weighted_sum = sum(student_grades.get(a['id'], 0.0) * a['weight'] for a in assessments)
         # Retorna a média ponderada.
@@ -1474,36 +1482,27 @@ class DataService:
             all_grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(all_assessment_ids)).all()
 
             # Mapa: (student_id, assessment_id) -> score OU student_id -> {assessment_id: score}
-            # Vamos usar o formato esperado por calculate_weighted_average: list[dict]
-            # Mas para não iterar sobre all_grades toda vez, filtramos por subject?
-            # Melhor: Agrupar grades por assessment_id é suficiente?
-            # calculate_weighted_average filtra: [g for g in grades if g.student_id == student_id]
-            # Isso é lento se grades for gigante.
-            # Vamos pré-agrupar grades por student_id
+            # Otimização: Usar dict para busca O(1) e evitar reprocessamento em calculate_weighted_average
             grades_by_student = {}
             for g in all_grades:
                 if g.student_id not in grades_by_student:
-                    grades_by_student[g.student_id] = []
-                grades_by_student[g.student_id].append({
-                    "assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id
-                })
+                    grades_by_student[g.student_id] = {}
+                grades_by_student[g.student_id][g.assessment_id] = g.score
 
             for subject in subjects:
                 assessments_data = assessments_map.get(subject.id, [])
                 if not assessments_data:
                     continue
 
+                # Pre-calcula peso total para o subject
+                total_weight = sum(a['weight'] for a in assessments_data)
+
                 student_ids = class_students_map.get(subject.class_id, [])
 
                 for student_id in student_ids:
-                    # Pega as notas deste aluno (pode conter notas de outras matérias, mas calculate_weighted_average filtra por assessment IDs passados)
-                    student_grades = grades_by_student.get(student_id, [])
-                    # O calculate_weighted_average usa um dict lookup interno, então passar student_grades (lista pequena) é rápido.
-                    # Mas student_grades contem notas de TODOS subjects.
-                    # O método calculate_weighted_average faz: student_grades_map = {id: score for g in grades ...}
-                    # E depois itera sobre assessments_data.
-                    # Funciona corretamente.
-                    avg = self.calculate_weighted_average(student_id, student_grades, assessments_data)
+                    # Passa o mapa de notas diretamente e o peso total
+                    student_grades = grades_by_student.get(student_id, {})
+                    avg = self.calculate_weighted_average(student_id, student_grades, assessments_data, total_weight=total_weight)
                     averages.append(avg)
 
         return averages
@@ -1568,25 +1567,26 @@ class DataService:
                      grades_chunk = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(chunk)).all()
                      all_grades.extend(grades_chunk)
 
-            # Indexar grades por student_id
+            # Indexar grades por student_id (Map para busca rápida O(1))
             grades_by_student = {}
             for g in all_grades:
                 if g.student_id not in grades_by_student:
-                    grades_by_student[g.student_id] = []
-                grades_by_student[g.student_id].append({
-                    "assessment_id": g.assessment_id, "score": g.score, "student_id": g.student_id
-                })
+                    grades_by_student[g.student_id] = {}
+                grades_by_student[g.student_id][g.assessment_id] = g.score
 
             # Processamento em memória
             for subject in subjects:
                 assessments_data = [{"id": a.id, "weight": a.weight} for a in subject.assessments]
                 if not assessments_data: continue
 
+                # Pre-calcula peso
+                total_weight = sum(a['weight'] for a in assessments_data)
+
                 class_enrollments = enrollments_by_class.get(subject.class_id, [])
 
                 for enrollment in class_enrollments:
-                    student_grades = grades_by_student.get(enrollment.student_id, [])
-                    avg = self.calculate_weighted_average(enrollment.student_id, student_grades, assessments_data)
+                    student_grades = grades_by_student.get(enrollment.student_id, {})
+                    avg = self.calculate_weighted_average(enrollment.student_id, student_grades, assessments_data, total_weight=total_weight)
 
                     total_enrollments_analyzed += 1
 
