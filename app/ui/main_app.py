@@ -11,6 +11,7 @@ from app.ui.views.settings_view import SettingsView
 from app.ui.views.management_view import ManagementView
 from app.ui.views.class_selection_view import ClassSelectionView
 from app.ui.views.class_detail_view import ClassDetailView
+from app.ui.views.schedule_view import ScheduleView
 from app.core.config import load_setting
 
 # Importa as classes de serviço que contêm a lógica de negócios e da IA.
@@ -47,6 +48,8 @@ class MainApp(ctk.CTk):
     :type navigation_frame_label: ctk.CTkLabel
     :ivar dashboard_button: Botão de navegação para o dashboard.
     :type dashboard_button: ctk.CTkButton
+    :ivar schedule_button: Botão de navegação para o horário escolar.
+    :type schedule_button: ctk.CTkButton
     :ivar management_button: Botão de navegação para a gestão de dados.
     :type management_button: ctk.CTkButton
     :ivar class_selection_button: Botão de navegação para a seleção de turmas.
@@ -119,14 +122,17 @@ class MainApp(ctk.CTk):
         self.dashboard_button = ctk.CTkButton(self.navigation_frame, text="Dashboard", command=lambda: self.show_view("dashboard"))
         self.dashboard_button.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
 
+        self.schedule_button = ctk.CTkButton(self.navigation_frame, text="Horário", command=lambda: self.show_view("schedule"))
+        self.schedule_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+
         self.management_button = ctk.CTkButton(self.navigation_frame, text="Gestão de Dados", command=lambda: self.show_view("management"))
-        self.management_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+        self.management_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
         self.class_selection_button = ctk.CTkButton(self.navigation_frame, text="Minhas Turmas", command=lambda: self.show_view("class_selection"))
-        self.class_selection_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
+        self.class_selection_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
 
         self.assistant_button = ctk.CTkButton(self.navigation_frame, text="Assistente IA", command=lambda: self.show_view("assistant"))
-        self.assistant_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
+        self.assistant_button.grid(row=5, column=0, padx=20, pady=10, sticky="ew")
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Configurações", command=lambda: self.show_view("settings"))
         self.settings_button.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
@@ -141,6 +147,7 @@ class MainApp(ctk.CTk):
         # Cria as instâncias de cada tela (view) e as armazena em um dicionário para fácil acesso.
         self.views = {
             "dashboard": DashboardView(self.main_frame, self),
+            "schedule": ScheduleView(self.main_frame, self),
             "management": ManagementView(self.main_frame, self),
             "class_selection": ClassSelectionView(self.main_frame, self),
             "class_detail": ClassDetailView(self.main_frame, self),

@@ -7,3 +7,4 @@ from .grade import Grade
 from .class_enrollment import ClassEnrollment
 from .lesson import Lesson
 from .incident import Incident
+from .schedule import TimeSlot, WeeklySchedule
