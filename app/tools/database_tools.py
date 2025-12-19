@@ -894,3 +894,83 @@ def list_all_courses() -> str:
         if not courses: return "Nenhuma disciplina no catálogo."
         return "\n".join([f"- {c['course_name']} ({c['course_code']})" for c in courses])
     except Exception as e: return f"Erro: {e}"
+
+@tool
+def register_attendance_tool(class_name: str, subject_name: str, lesson_title: str, student_names: str, status: str) -> str:
+    """
+    Registra a frequência de alunos em uma aula específica.
+
+    :param class_name: Nome da turma.
+    :param subject_name: Nome da disciplina.
+    :param lesson_title: Título da aula.
+    :param student_names: Lista de nomes de alunos separados por vírgula (ex: "João Silva, Maria Souza"). Use "TODOS" para aplicar a todos.
+    :param status: Status da presença: 'P' (Presente), 'F' (Falta), 'J' (Justificada), 'A' (Atraso).
+    """
+    valid_statuses = {'P', 'F', 'J', 'A'}
+    if status not in valid_statuses:
+        return f"Erro: Status inválido '{status}'. Use P, F, J ou A."
+
+    try:
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina '{subject_name}' não encontrada na turma."
+
+        lessons = data_service.get_lessons_for_subject(target_subject['id'])
+        target_lesson = next((l for l in lessons if l['title'].lower() == lesson_title.lower()), None)
+        if not target_lesson: return f"Aula '{lesson_title}' não encontrada."
+
+        # Identify students
+        target_student_ids = []
+
+        if student_names.upper() == "TODOS":
+            enrollments = data_service.get_enrollments_for_class(cls['id'])
+            target_student_ids = [e['student_id'] for e in enrollments if e['status'] == 'Active']
+        else:
+            names_list = [n.strip() for n in student_names.split(',')]
+            for name in names_list:
+                s = data_service.get_student_by_name(name)
+                if s:
+                    target_student_ids.append(s['id'])
+                else:
+                    return f"Erro: Aluno '{name}' não encontrado."
+
+        if not target_student_ids:
+            return "Nenhum aluno identificado para registro."
+
+        attendance_data = [{"student_id": sid, "status": status} for sid in target_student_ids]
+        data_service.register_attendance(target_lesson['id'], attendance_data)
+
+        return f"Frequência registrada: {len(attendance_data)} alunos marcados como '{status}' na aula '{lesson_title}'."
+
+    except Exception as e:
+        return f"Erro ao registrar frequência: {e}"
+
+@tool
+def get_attendance_stats_tool(student_name: str, class_name: str, subject_name: str) -> str:
+    """
+    Obtém estatísticas de frequência de um aluno em uma disciplina.
+    """
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student: return f"Aluno '{student_name}' não encontrado."
+
+        cls = data_service.get_class_by_name(class_name)
+        if not cls: return f"Turma '{class_name}' não encontrada."
+
+        subjects = data_service.get_subjects_for_class(cls['id'])
+        target_subject = next((s for s in subjects if s['course_name'].lower() == subject_name.lower()), None)
+        if not target_subject: return f"Disciplina '{subject_name}' não encontrada na turma."
+
+        stats = data_service.get_student_attendance_stats(student['id'], target_subject['id'])
+
+        return (f"Frequência de {student_name} em {subject_name}:\n"
+                f"- Aulas Totais: {stats['total_lessons']}\n"
+                f"- Presenças (P/A/J): {stats['present_count']}\n"
+                f"- Faltas: {stats['absent_count']}\n"
+                f"- Percentual: {stats['percentage']:.1f}%")
+
+    except Exception as e:
+        return f"Erro ao obter estatísticas: {e}"
