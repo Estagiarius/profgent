@@ -10,11 +10,8 @@ from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.enrollment_dialog import EnrollmentDialog
 from app.ui.views.attendance_dialog import AttendanceDialog
-<<<<<<< HEAD
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
-=======
 from app.ui.views.copy_lesson_dialog import CopyLessonDialog
->>>>>>> origin/app-beta-0.85v
 from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
@@ -288,6 +285,18 @@ class ClassDetailView(ctk.CTkFrame):
         ctk.CTkButton(self.student_reports_frame, text="Gerar Boletim (TXT)", command=self.generate_report_card).pack(side="left", padx=10)
         ctk.CTkButton(self.student_reports_frame, text="Gráfico de Desempenho", command=self.show_student_chart).pack(side="left", padx=10)
 
+        # --- Aba BNCC ---
+        self.bncc_tab = self.tab_view.tab("BNCC")
+        self.bncc_tab.grid_rowconfigure(0, weight=1)
+        self.bncc_tab.grid_columnconfigure(0, weight=1)
+
+        self.bncc_scroll_frame = ctk.CTkScrollableFrame(self.bncc_tab)
+        self.bncc_scroll_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        # Add refresh button for BNCC
+        self.refresh_bncc_button = ctk.CTkButton(self.bncc_tab, text="Atualizar BNCC", command=self.populate_bncc_tab)
+        self.refresh_bncc_button.grid(row=1, column=0, pady=10)
+
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
 
     def populate_subject_combo(self):
@@ -320,6 +329,7 @@ class ClassDetailView(ctk.CTkFrame):
             self.populate_lesson_list()
             self.populate_grade_grid()
             self.populate_student_list() # Atualiza lista de alunos para mostrar % de freq da matéria
+            self.populate_bncc_tab()
 
     def add_subject_popup(self):
         if not self.class_id: return

@@ -37,14 +37,29 @@ class AddDialog(ctk.CTkToplevel):
 
         # Cria os campos de entrada de texto.
         for key, label in fields.items():
-            # Cria um rótulo para o campo de texto.
             ctk.CTkLabel(self, text=label).grid(row=row_index, column=0, padx=10, pady=10, sticky="w")
-            # Cria o campo de entrada (entry).
-            entry = ctk.CTkEntry(self)
-            # Posiciona o campo na grade.
-            entry.grid(row=row_index, column=1, padx=10, pady=10, sticky="ew")
-            # Armazena o widget no dicionário de entradas.
-            self.entries[key] = entry
+
+            # Special handling for BNCC fields
+            if key in ['bncc', 'bncc_expected', 'bncc_codes']:
+                frame = ctk.CTkFrame(self, fg_color="transparent")
+                frame.grid(row=row_index, column=1, padx=10, pady=10, sticky="ew")
+                frame.grid_columnconfigure(0, weight=1)
+
+                entry = ctk.CTkEntry(frame)
+                entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+
+                btn = ctk.CTkButton(frame, text="Selecionar", width=80, command=lambda e=entry: self._open_bncc_selector(e))
+                btn.grid(row=0, column=1)
+
+                self.entries[key] = entry
+            else:
+                # Cria o campo de entrada (entry) normal.
+                entry = ctk.CTkEntry(self)
+                # Posiciona o campo na grade.
+                entry.grid(row=row_index, column=1, padx=10, pady=10, sticky="ew")
+                # Armazena o widget no dicionário de entradas.
+                self.entries[key] = entry
+
             # Incrementa o índice da linha.
             row_index += 1
 
@@ -52,6 +67,28 @@ class AddDialog(ctk.CTkToplevel):
         save_button = ctk.CTkButton(self, text="Salvar", command=self.save)
         # Posiciona o botão na grade, fazendo-o ocupar duas colunas ('columnspan=2').
         save_button.grid(row=row_index, column=0, columnspan=2, padx=10, pady=20)
+
+    def _open_bncc_selector(self, entry_widget):
+        def on_select(codes):
+            current_text = entry_widget.get()
+            # If there's already text, maybe append? or replace?
+            # Usually replace is safer to avoid duplicates if user selects again.
+            # Or merge.
+            # Let's replace for simplicity, assuming the dialog allows multi-selection of everything needed.
+            # But if user wants to keep old ones...
+            # BNCCSelectionDialog is multi-select.
+            # Let's append if not empty, but check for duplicates?
+            # Ideally the dialog should be pre-filled with current selection, but that's harder to pass.
+            # For now, append unique.
+
+            current_codes = [c.strip() for c in current_text.split(',') if c.strip()]
+            new_codes = [c for c in codes if c not in current_codes]
+
+            final_list = current_codes + new_codes
+            entry_widget.delete(0, "end")
+            entry_widget.insert(0, ", ".join(final_list))
+
+        BNCCSelectionDialog(self, on_select)
 
     # Método chamado quando o botão "Salvar" é clicado.
     def save(self):
