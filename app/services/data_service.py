@@ -1,4 +1,4 @@
-from datetime import date, datetime # Importa a classe 'date' e 'datetime' para manipulação de datas.
+from datetime import date, datetime, timedelta # Importa a classe 'date', 'datetime' e 'timedelta'.
 from sqlalchemy import func, or_, and_ # Importa a função 'func' do SQLAlchemy para usar funções SQL como COUNT, MAX, etc.
 from sqlalchemy.orm import joinedload, Session # Importa 'joinedload' para carregamento otimizado de relacionamentos (evita N+1 queries) e 'Session' para type hinting.
 from app.data.database import get_db_session # Importa o gerenciador de contexto para obter uma sessão de banco de dados.
@@ -13,6 +13,7 @@ from app.models.class_enrollment import ClassEnrollment
 from app.models.assessment import Assessment
 from app.models.lesson import Lesson
 from app.models.incident import Incident
+from app.models.schedule import TimeSlot, WeeklySchedule
 from app.models.attendance import Attendance
 from app.utils.student_csv_parser import parse_student_csv # Importa a função de parsing de CSV de alunos.
 from contextlib import contextmanager # Importa o gerenciador de contexto para criar blocos 'with'.
@@ -1570,3 +1571,132 @@ class DataService:
                 db.add(new_enrollment)
                 # Incrementa o número de chamada para o próximo aluno.
                 next_call_number += 1
+
+    # --- Schedule Methods ---
+
+    def create_time_slot(self, day_of_week: int, period_index: int, start_time: str, end_time: str) -> dict | None:
+        """Cria um novo slot de tempo na grade horária."""
+        try:
+             start = datetime.strptime(start_time, "%H:%M").time()
+             end = datetime.strptime(end_time, "%H:%M").time()
+        except ValueError:
+             raise ValueError("Horários devem estar no formato HH:MM.")
+
+        with self._get_db() as db:
+            existing = db.query(TimeSlot).filter(
+                TimeSlot.day_of_week == day_of_week,
+                TimeSlot.period_index == period_index
+            ).first()
+
+            if existing:
+                raise ValueError("Já existe um período configurado para este dia com este índice.")
+
+            new_slot = TimeSlot(
+                day_of_week=day_of_week,
+                period_index=period_index,
+                start_time=start,
+                end_time=end
+            )
+            db.add(new_slot)
+            db.flush()
+            db.refresh(new_slot)
+            return {
+                "id": new_slot.id,
+                "day_of_week": new_slot.day_of_week,
+                "period_index": new_slot.period_index,
+                "start_time": new_slot.start_time.strftime("%H:%M"),
+                "end_time": new_slot.end_time.strftime("%H:%M")
+            }
+
+    def get_time_slots(self, day_of_week: int = None) -> list[dict]:
+        """Retorna todos os slots de tempo, opcionalmente filtrados por dia."""
+        with self._get_db() as db:
+            query = db.query(TimeSlot)
+            if day_of_week is not None:
+                query = query.filter(TimeSlot.day_of_week == day_of_week)
+
+            # Ordena por dia e depois por índice
+            slots = query.order_by(TimeSlot.day_of_week, TimeSlot.period_index).all()
+
+            return [{
+                "id": s.id,
+                "day_of_week": s.day_of_week,
+                "period_index": s.period_index,
+                "start_time": s.start_time.strftime("%H:%M"),
+                "end_time": s.end_time.strftime("%H:%M")
+            } for s in slots]
+
+    def delete_time_slot(self, slot_id: int):
+        with self._get_db() as db:
+            # Note: Cascade delete handled by DB if properly set up, but let's be explicit
+            db.query(WeeklySchedule).filter(WeeklySchedule.time_slot_id == slot_id).delete()
+            db.query(TimeSlot).filter(TimeSlot.id == slot_id).delete()
+
+    def create_schedule_assignment(self, time_slot_id: int, class_subject_id: int) -> dict | None:
+        """Aloca uma disciplina de uma turma a um slot de tempo."""
+        with self._get_db() as db:
+            # Remove anterior se existir (sobrescreve)
+            existing = db.query(WeeklySchedule).filter(WeeklySchedule.time_slot_id == time_slot_id).first()
+            if existing:
+                db.delete(existing)
+                db.flush()
+
+            assignment = WeeklySchedule(time_slot_id=time_slot_id, class_subject_id=class_subject_id)
+            db.add(assignment)
+            db.flush()
+            db.refresh(assignment)
+            return {"id": assignment.id}
+
+    def get_full_schedule_grid(self) -> dict:
+        """
+        Retorna a grade completa combinando Slots e Assignments.
+        Estrutura otimizada para a UI renderizar o grid.
+        Retorno: { day_int: [ { slot_data, assignment_data }, ... ] }
+        """
+        with self._get_db() as db:
+            # Query Slots joined with WeeklySchedule, ClassSubject, Class, and Course
+            results = (db.query(TimeSlot, WeeklySchedule, ClassSubject, Class, Course)
+                       .outerjoin(WeeklySchedule, TimeSlot.id == WeeklySchedule.time_slot_id)
+                       .outerjoin(ClassSubject, WeeklySchedule.class_subject_id == ClassSubject.id)
+                       .outerjoin(Class, ClassSubject.class_id == Class.id)
+                       .outerjoin(Course, ClassSubject.course_id == Course.id)
+                       .order_by(TimeSlot.day_of_week, TimeSlot.period_index)
+                       .all())
+
+            grid = {}
+            for slot, schedule, subj, cls, course in results:
+                day = slot.day_of_week
+                if day not in grid:
+                    grid[day] = []
+
+                item = {
+                    "slot_id": slot.id,
+                    "period_index": slot.period_index,
+                    "start_time": slot.start_time.strftime("%H:%M"),
+                    "end_time": slot.end_time.strftime("%H:%M"),
+                    "assignment": None
+                }
+
+                if schedule and cls and course:
+                    item["assignment"] = {
+                        "class_id": cls.id,
+                        "class_name": cls.name,
+                        "course_name": course.course_name,
+                        "class_subject_id": subj.id
+                    }
+
+                grid[day].append(item)
+
+            return grid
+
+    def get_lesson_for_schedule(self, class_subject_id: int, date_val: date) -> dict | None:
+        """Verifica se existe uma aula registrada para a disciplina na data específica."""
+        with self._get_db() as db:
+            lesson = db.query(Lesson).filter(
+                Lesson.class_subject_id == class_subject_id,
+                Lesson.date == date_val
+            ).first()
+
+            if lesson:
+                return {"id": lesson.id, "title": lesson.title, "content": lesson.content, "date": lesson.date.isoformat()}
+            return None
