@@ -5,6 +5,7 @@ from typing import Dict, Callable
 
 # Importa tipos para anotações, melhorando a clareza do código.
 from typing import Dict, Callable, List, Union, Tuple
+from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
 
 # Define a classe EditDialog, que herda de CTkToplevel para criar uma janela secundária (pop-up).
 class EditDialog(ctk.CTkToplevel):

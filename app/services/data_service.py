@@ -313,20 +313,20 @@ class DataService:
             return results
 
     # Método para adicionar um novo curso.
-    def add_course(self, course_name: str, course_code: str) -> dict | None:
+    def add_course(self, course_name: str, course_code: str, bncc_expected: str = None) -> dict | None:
         if not course_name or not course_code: return None
-        new_course = Course(course_name=course_name, course_code=course_code)
+        new_course = Course(course_name=course_name, course_code=course_code, bncc_expected=bncc_expected)
         with self._get_db() as db:
             db.add(new_course)
             db.flush()
             db.refresh(new_course)
-            return {"id": new_course.id, "course_name": new_course.course_name, "course_code": new_course.course_code}
+            return {"id": new_course.id, "course_name": new_course.course_name, "course_code": new_course.course_code, "bncc_expected": new_course.bncc_expected}
 
     # Método para buscar todos os cursos.
     def get_all_courses(self) -> list[dict]:
         with self._get_db() as db:
             courses = db.query(Course).order_by(Course.course_name).all()
-            return [{"id": c.id, "course_name": c.course_name, "course_code": c.course_code} for c in courses]
+            return [{"id": c.id, "course_name": c.course_name, "course_code": c.course_code, "bncc_expected": c.bncc_expected} for c in courses]
 
     # Método para obter a contagem total de cursos.
     def get_course_count(self) -> int:
@@ -338,7 +338,7 @@ class DataService:
         with self._get_db() as db:
             course = db.query(Course).filter(func.lower(Course.course_name) == name.lower()).first()
             if course:
-                return {"id": course.id, "course_name": course.course_name, "course_code": course.course_code}
+                return {"id": course.id, "course_name": course.course_name, "course_code": course.course_code, "bncc_expected": course.bncc_expected}
             return None
 
     # Método para buscar um curso pelo ID.
@@ -364,17 +364,19 @@ class DataService:
                     "id": course.id,
                     "course_name": course.course_name,
                     "course_code": course.course_code,
+                    "bncc_expected": course.bncc_expected,
                     "classes": classes_list
                 }
             return None
 
     # Método para atualizar um curso.
-    def update_course(self, course_id: int, course_name: str, course_code: str):
+    def update_course(self, course_id: int, course_name: str, course_code: str, bncc_expected: str = None):
         with self._get_db() as db:
             course = db.query(Course).filter(Course.id == course_id).first()
             if course:
                 course.course_name = course_name
                 course.course_code = course_code
+                course.bncc_expected = bncc_expected
 
     # Método para deletar um curso.
     def delete_course(self, course_id: int):
@@ -657,7 +659,7 @@ class DataService:
             return self._get_next_call_number(db, class_id)
 
     # Método para adicionar uma nova avaliação a uma disciplina de uma turma.
-    def add_assessment(self, class_subject_id: int, name: str, weight: float, grading_period: int = 1) -> dict | None:
+    def add_assessment(self, class_subject_id: int, name: str, weight: float, grading_period: int = 1, bncc_codes: str = None) -> dict | None:
         if not all([class_subject_id, name, weight is not None]): return None
 
         if weight < 0:
@@ -666,7 +668,7 @@ class DataService:
         if not (1 <= grading_period <= 5):
              raise ValueError("Grading period must be between 1 and 5.")
 
-        assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight, grading_period=grading_period)
+        assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight, grading_period=grading_period, bncc_codes=bncc_codes)
         with self._get_db() as db:
             db.add(assessment)
             db.flush()
@@ -676,7 +678,8 @@ class DataService:
                 "name": assessment.name,
                 "weight": assessment.weight,
                 "class_subject_id": assessment.class_subject_id,
-                "grading_period": assessment.grading_period
+                "grading_period": assessment.grading_period,
+                "bncc_codes": assessment.bncc_codes
             }
 
     # Método auxiliar para garantir que a avaliação final (período 5) exista.
@@ -819,6 +822,68 @@ class DataService:
 
             return results
 
+    def get_class_period_averages(self, class_subject_id: int) -> dict:
+        """
+        Calcula médias de todos os bimestres e final para todos os alunos da disciplina.
+        Retorna: { student_id: { 1: float, ..., "final_calculated": float, "final_override": float } }
+        """
+        with self._get_db() as db:
+            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
+            if not assessments: return {}
+
+            assessment_ids = [a.id for a in assessments]
+            # Fetch simple columns
+            grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(assessment_ids)).all()
+
+            # Map: student -> assessment_id -> score
+            student_grades = {}
+            for g in grades:
+                if g.student_id not in student_grades: student_grades[g.student_id] = {}
+                student_grades[g.student_id][g.assessment_id] = g.score
+
+            results = {}
+            # Group assessments by period
+            period_assessments = {1: [], 2: [], 3: [], 4: [], 5: []}
+            for a in assessments:
+                period_assessments[a.grading_period].append({"id": a.id, "weight": a.weight})
+
+            final_assessment_id = next((a.id for a in assessments if a.grading_period == 5), None)
+
+            for student_id, s_grades_map in student_grades.items():
+                s_results = {}
+                final_sum = 0.0
+                periods_count = 0
+
+                for period in range(1, 5):
+                    assessments_data = period_assessments[period]
+                    if not assessments_data:
+                        s_results[period] = None
+                        final_sum += 0.0
+                        periods_count += 1
+                        continue
+
+                    total_weight = sum(a['weight'] for a in assessments_data)
+                    if total_weight == 0:
+                        avg = 0.0
+                    else:
+                        weighted_sum = sum(s_grades_map.get(a['id'], 0.0) * a['weight'] for a in assessments_data)
+                        avg = weighted_sum / total_weight
+
+                    s_results[period] = avg
+                    final_sum += avg
+                    periods_count += 1
+
+                s_results["final_calculated"] = final_sum / 4.0 if periods_count > 0 else 0.0
+
+                if final_assessment_id and final_assessment_id in s_grades_map:
+                    s_results["final_override"] = s_grades_map[final_assessment_id]
+                else:
+                    s_results["final_override"] = None
+
+                results[student_id] = s_results
+
+            return results
+
     # Método para buscar todas as notas com detalhes completos (aluno, avaliação, turma, curso).
     def get_all_grades_with_details(self) -> list[dict]:
         with self._get_db() as db:
@@ -958,14 +1023,14 @@ class DataService:
         return at_risk_students
 
     # Método para criar um novo registro de aula.
-    def create_lesson(self, class_subject_id: int, title: str, content: str, lesson_date: date) -> dict | None:
+    def create_lesson(self, class_subject_id: int, title: str, content: str, lesson_date: date, bncc_codes: str = None) -> dict | None:
         if not all([class_subject_id, title, lesson_date]): return None
-        new_lesson = Lesson(class_subject_id=class_subject_id, title=title, content=content, date=lesson_date)
+        new_lesson = Lesson(class_subject_id=class_subject_id, title=title, content=content, date=lesson_date, bncc_codes=bncc_codes)
         with self._get_db() as db:
             db.add(new_lesson)
             db.flush()
             db.refresh(new_lesson)
-            return {"id": new_lesson.id, "title": new_lesson.title, "content": new_lesson.content, "date": new_lesson.date.isoformat()}
+            return {"id": new_lesson.id, "title": new_lesson.title, "content": new_lesson.content, "date": new_lesson.date.isoformat(), "bncc_codes": new_lesson.bncc_codes}
 
     # Método para atualizar uma aula.
     def update_lesson(self, lesson_id: int, title: str, content: str, lesson_date: date):
@@ -988,6 +1053,29 @@ class DataService:
         with self._get_db() as db:
             lessons = db.query(Lesson).filter(Lesson.class_subject_id == class_subject_id).order_by(Lesson.date.desc()).all()
             return [{"id": l.id, "title": l.title, "content": l.content, "date": l.date.isoformat()} for l in lessons]
+
+    # Método para copiar aulas (conteúdo) para outra disciplina.
+    def copy_lessons(self, source_lesson_ids: list[int], target_class_subject_id: int) -> int:
+        if not source_lesson_ids or not target_class_subject_id:
+            return 0
+
+        with self._get_db() as db:
+            # Busca as aulas de origem
+            source_lessons = db.query(Lesson).filter(Lesson.id.in_(source_lesson_ids)).all()
+
+            count = 0
+            for src in source_lessons:
+                new_lesson = Lesson(
+                    class_subject_id=target_class_subject_id,
+                    title=src.title,
+                    content=src.content,
+                    date=src.date # Mantém a mesma data (pode ser editada depois)
+                )
+                db.add(new_lesson)
+                count += 1
+
+            db.flush()
+            return count
 
     # Método para criar um novo incidente.
     def create_incident(self, class_id: int, student_id: int, description: str, incident_date: date) -> dict | None:
@@ -1090,7 +1178,7 @@ class DataService:
         """
         with self._get_db() as db:
             # Busca todas as aulas da disciplina
-            lesson_ids = db.query(Lesson.id).filter(Lesson.class_subject_id == class_subject_id).subquery()
+            lesson_ids = db.query(Lesson.id).filter(Lesson.class_subject_id == class_subject_id)
 
             # Conta registros de presença do aluno nessas aulas
             # Assumption: Se não tiver registro, conta como ausência ou ignora?
@@ -1121,6 +1209,46 @@ class DataService:
                 "absent_count": absent_count,
                 "percentage": percentage
             }
+
+    def get_class_attendance_stats(self, class_subject_id: int) -> dict:
+        """
+        Calcula estatísticas de frequência para todos os alunos de uma disciplina em lote.
+        Retorna: { student_id: { "total_lessons": int, "percentage": float, ... } }
+        """
+        with self._get_db() as db:
+            # Busca IDs das aulas
+            lessons = db.query(Lesson.id).filter(Lesson.class_subject_id == class_subject_id).all()
+            lesson_ids = [l.id for l in lessons]
+
+            if not lesson_ids:
+                return {}
+
+            # Busca todos os registros de presença dessas aulas de uma só vez
+            records = db.query(Attendance).filter(Attendance.lesson_id.in_(lesson_ids)).all()
+
+            stats = {} # student_id -> {present, absent, total}
+
+            for r in records:
+                if r.student_id not in stats:
+                    stats[r.student_id] = {'present': 0, 'absent': 0, 'total': 0}
+
+                stats[r.student_id]['total'] += 1
+                if r.status in ('P', 'A', 'J'):
+                    stats[r.student_id]['present'] += 1
+                elif r.status == 'F':
+                    stats[r.student_id]['absent'] += 1
+
+            result = {}
+            for sid, data in stats.items():
+                total = data['total']
+                pct = (data['present'] / total * 100) if total > 0 else 100.0
+                result[sid] = {
+                    "total_lessons": total,
+                    "present_count": data['present'],
+                    "absent_count": data['absent'],
+                    "percentage": pct
+                }
+            return result
 
     # Método para adicionar uma nova nota.
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
@@ -1345,7 +1473,8 @@ class DataService:
             if not all_assessment_ids:
                 return []
 
-            all_grades = db.query(Grade).filter(Grade.assessment_id.in_(all_assessment_ids)).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de objetos ORM
+            all_grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(all_assessment_ids)).all()
 
             # Mapa: (student_id, assessment_id) -> score OU student_id -> {assessment_id: score}
             # Vamos usar o formato esperado por calculate_weighted_average: list[dict]
@@ -1438,7 +1567,8 @@ class DataService:
                  chunk_size = 500
                  for i in range(0, len(all_assessment_ids), chunk_size):
                      chunk = all_assessment_ids[i:i+chunk_size]
-                     grades_chunk = db.query(Grade).filter(Grade.assessment_id.in_(chunk)).all()
+                     # Otimização: Seleciona apenas colunas necessárias
+                     grades_chunk = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(chunk)).all()
                      all_grades.extend(grades_chunk)
 
             # Indexar grades por student_id
@@ -1698,5 +1828,54 @@ class DataService:
             ).first()
 
             if lesson:
-                return {"id": lesson.id, "title": lesson.title, "content": lesson.content, "date": lesson.date.isoformat()}
+                return {"id": lesson.id, "title": lesson.title, "content": lesson.content, "date": lesson.date.isoformat(), "bncc_codes": lesson.bncc_codes}
             return None
+
+    # --- BNCC Tracking ---
+
+    def get_bncc_coverage(self, class_subject_id: int) -> dict:
+        """Calcula a cobertura de habilidades BNCC para uma disciplina de turma."""
+        with self._get_db() as db:
+            # Carrega a disciplina e o curso
+            subject = db.query(ClassSubject).options(joinedload(ClassSubject.course)).filter(ClassSubject.id == class_subject_id).first()
+            if not subject:
+                return {}
+
+            # 1. Expected Skills
+            expected_raw = subject.course.bncc_expected or ""
+            # Normaliza: Split por vírgula, strip, upper, remove vazios
+            expected_set = {code.strip().upper() for code in expected_raw.split(',') if code.strip()}
+
+            # 2. Covered in Lessons
+            lessons = db.query(Lesson).filter(Lesson.class_subject_id == class_subject_id).all()
+            covered_lessons_set = set()
+            for l in lessons:
+                if l.bncc_codes:
+                    codes = {code.strip().upper() for code in l.bncc_codes.split(',') if code.strip()}
+                    covered_lessons_set.update(codes)
+
+            # 3. Covered in Assessments
+            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
+            covered_assessments_set = set()
+            for a in assessments:
+                if a.bncc_codes:
+                    codes = {code.strip().upper() for code in a.bncc_codes.split(',') if code.strip()}
+                    covered_assessments_set.update(codes)
+
+            # Total Covered (Union)
+            total_covered = covered_lessons_set.union(covered_assessments_set)
+
+            # Missing
+            missing = expected_set - total_covered
+
+            # Relevant Covered (Intersection with Expected)
+            relevant_covered = total_covered.intersection(expected_set)
+
+            return {
+                "expected": sorted(list(expected_set)),
+                "covered_lessons": sorted(list(covered_lessons_set)),
+                "covered_assessments": sorted(list(covered_assessments_set)),
+                "total_covered": sorted(list(total_covered)),
+                "missing": sorted(list(missing)),
+                "coverage_percentage": (len(relevant_covered) / len(expected_set) * 100) if expected_set else 0.0
+            }

@@ -122,20 +122,20 @@ class MainApp(ctk.CTk):
         self.dashboard_button = ctk.CTkButton(self.navigation_frame, text="Dashboard", command=lambda: self.show_view("dashboard"))
         self.dashboard_button.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
 
-        self.schedule_button = ctk.CTkButton(self.navigation_frame, text="Horário", command=lambda: self.show_view("schedule"))
-        self.schedule_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-
-        self.management_button = ctk.CTkButton(self.navigation_frame, text="Gestão de Dados", command=lambda: self.show_view("management"))
-        self.management_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
-
         self.class_selection_button = ctk.CTkButton(self.navigation_frame, text="Minhas Turmas", command=lambda: self.show_view("class_selection"))
-        self.class_selection_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
+        self.class_selection_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+
+        self.schedule_button = ctk.CTkButton(self.navigation_frame, text="Horário", command=lambda: self.show_view("schedule"))
+        self.schedule_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
         self.assistant_button = ctk.CTkButton(self.navigation_frame, text="Assistente IA", command=lambda: self.show_view("assistant"))
-        self.assistant_button.grid(row=5, column=0, padx=20, pady=10, sticky="ew")
+        self.assistant_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
+
+        self.management_button = ctk.CTkButton(self.navigation_frame, text="Gestão de Dados", command=lambda: self.show_view("management"))
+        self.management_button.grid(row=5, column=0, padx=20, pady=10, sticky="ew")
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Configurações", command=lambda: self.show_view("settings"))
-        self.settings_button.grid(row=7, column=0, padx=20, pady=10, sticky="ew")
+        self.settings_button.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
 
 
         # Cria o frame principal onde o conteúdo de cada tela será exibido.

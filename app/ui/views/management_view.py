@@ -282,8 +282,8 @@ class ManagementView(ctk.CTkFrame):
 
     # Abre o diálogo de edição para um curso.
     def edit_course(self, c):
-        def cb(id, data): self.data_service.update_course(id, data['course_name'], data['course_code']); self.populate_data()
-        EditDialog(self, "Editar Disciplina", {"course_name":"Nome", "course_code":"Código"}, c, cb)
+        def cb(id, data): self.data_service.update_course(id, data['course_name'], data['course_code'], data.get('bncc_expected')); self.populate_data()
+        EditDialog(self, "Editar Disciplina", {"course_name":"Nome", "course_code":"Código", "bncc_expected": "BNCC Esperada (CSV)"}, c, cb)
 
     # Abre o diálogo de adição para um novo aluno.
     def add_student_popup(self):

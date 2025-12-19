@@ -8,14 +8,16 @@ class Attendance(Base):
 
     :ivar id: Identificador único do registro de frequência.
     :ivar lesson_id: ID da aula (Lesson).
-    :ivar student_id: ID do aluno (Student).
+    :ivar student_id: ID do aluno (Student). Indexado.
     :ivar status: Status da presença. 'P' (Presente), 'F' (Falta), 'J' (Justificada), 'A' (Atraso).
     """
     __tablename__ = 'attendance'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     lesson_id = Column(Integer, ForeignKey('lessons.id'), nullable=False)
-    student_id = Column(Integer, ForeignKey('students.id'), nullable=False)
+    # index=True otimiza estatísticas de frequência por aluno (Student -> Attendance).
+    # O índice composto (lesson_id, student_id) não cobre buscas apenas por student_id.
+    student_id = Column(Integer, ForeignKey('students.id'), nullable=False, index=True)
     status = Column(String, nullable=False, default='P')
 
     lesson = relationship("Lesson", back_populates="attendance_records")

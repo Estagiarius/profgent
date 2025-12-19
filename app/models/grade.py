@@ -18,10 +18,10 @@ class Grade(Base):
     :ivar id: Identificador único da nota. Chave primária com autoincremento.
     :type id: int
     :ivar student_id: Identificador do aluno associado à nota. Chave estrangeira
-        para a tabela de alunos ('students').
+        para a tabela de alunos ('students'). Indexado para performance.
     :type student_id: int
     :ivar assessment_id: Identificador da avaliação associada à nota. Chave estrangeira
-        para a tabela de avaliações ('assessments').
+        para a tabela de avaliações ('assessments'). Indexado para performance.
     :type assessment_id: int
     :ivar score: Nota obtida pelo aluno na avaliação em questão. Deve ser um número
         maior ou igual a 0.
@@ -36,9 +36,11 @@ class Grade(Base):
     # Define a coluna 'id' como um inteiro, chave primária e com autoincremento.
     id = Column(Integer, primary_key=True, autoincrement=True)
     # Define a coluna 'student_id' como uma chave estrangeira para a tabela 'students'. Não pode ser nula.
-    student_id = Column(Integer, ForeignKey('students.id'), nullable=False)
+    # index=True adicionado para otimizar queries que filtram ou fazem join por aluno (ex: boletins).
+    student_id = Column(Integer, ForeignKey('students.id'), nullable=False, index=True)
     # Define a coluna 'assessment_id' como uma chave estrangeira para a tabela 'assessments'. Não pode ser nula.
-    assessment_id = Column(Integer, ForeignKey('assessments.id'), nullable=False)
+    # index=True adicionado para otimizar queries que filtram ou fazem join por avaliação (ex: estatísticas globais).
+    assessment_id = Column(Integer, ForeignKey('assessments.id'), nullable=False, index=True)
     # Define a coluna 'score' (nota) como um número de ponto flutuante. Não pode ser nula.
     score = Column(Float, nullable=False)
     # Define a coluna 'date_recorded' (data de registro) como uma string. Não pode ser nula.

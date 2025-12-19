@@ -20,7 +20,7 @@ class ClassEnrollment(Base):
     :ivar class_id: Identificador da turma associada à matrícula. Chave estrangeira
         para a tabela 'classes'.
     :ivar student_id: Identificador do estudante associado à matrícula. Chave
-        estrangeira para a tabela 'students'.
+        estrangeira para a tabela 'students'. Indexado.
     :ivar call_number: Número de chamada associado ao estudante nesta turma.
     :ivar status: Status da matrícula, como "Active" ou "Inactive". Valor padrão:
         "Active".
@@ -40,7 +40,8 @@ class ClassEnrollment(Base):
     # Define a coluna 'class_id' como uma chave estrangeira para a tabela 'classes'. Não pode ser nula.
     class_id = Column(Integer, ForeignKey('classes.id'), nullable=False)
     # Define a coluna 'student_id' como uma chave estrangeira para a tabela 'students'. Não pode ser nula.
-    student_id = Column(Integer, ForeignKey('students.id'), nullable=False)
+    # index=True otimiza buscas reversas (Student -> ClassEnrollment), que não são cobertas pelo índice composto (class_id, student_id).
+    student_id = Column(Integer, ForeignKey('students.id'), nullable=False, index=True)
     # Define a coluna 'call_number' (número de chamada) como um inteiro. Não pode ser nula.
     call_number = Column(Integer, nullable=False)
     # Define a coluna 'status' como uma string, com valor padrão 'Active'. Ex: "Active", "Inactive".

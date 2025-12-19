@@ -2,6 +2,7 @@
 import customtkinter as ctk
 # Importa tipos para anotações, melhorando a clareza e a robustez do código.
 from typing import Dict, Callable, List
+from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
 
 # Define a classe AddDialog, que herda de CTkToplevel para criar uma janela secundária (pop-up).
 class AddDialog(ctk.CTkToplevel):
