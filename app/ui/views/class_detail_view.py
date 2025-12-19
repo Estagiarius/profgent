@@ -549,6 +549,9 @@ class ClassDetailView(ctk.CTkFrame):
             # Dados
             grades = data_service.get_grades_for_subject(self.current_subject_id)
 
+            # --- OTIMIZAÇÃO: Indexar grades em um dicionário para acesso O(1) ---
+            grades_map = {(g['student_id'], g['assessment_id']): g for g in grades}
+
             for row, enrollment in enumerate(enrollments, start=1):
                 student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
                 ctk.CTkLabel(frame, text=student_name).grid(row=row, column=0, padx=5, pady=5, sticky="w")
@@ -559,7 +562,9 @@ class ClassDetailView(ctk.CTkFrame):
                     entry = ctk.CTkEntry(frame, width=80)
                     entry.grid(row=row, column=col, padx=5, pady=5)
 
-                    existing_grade = next((g for g in grades if g['student_id'] == enrollment['student_id'] and g['assessment_id'] == assessment['id']), None)
+                    # Acesso direto via hash map
+                    existing_grade = grades_map.get((enrollment['student_id'], assessment['id']))
+
                     if existing_grade:
                         entry.insert(0, format_float_output(existing_grade['score']))
                         student_grades_for_avg.append({"assessment_id": assessment['id'], "score": existing_grade['score']})
@@ -580,9 +585,14 @@ class ClassDetailView(ctk.CTkFrame):
                 label = ctk.CTkLabel(frame, text=header, font=ctk.CTkFont(weight="bold"))
                 label.grid(row=0, column=col, padx=10, pady=5, sticky="w")
 
+            # --- OTIMIZAÇÃO: Batch fetch de médias finais ---
+            batch_averages = data_service.get_class_period_averages(self.current_subject_id)
+
             for row, enrollment in enumerate(enrollments, start=1):
                 student_id = enrollment['student_id']
-                averages = data_service.get_student_period_averages(student_id, self.current_subject_id)
+
+                # Lookup no batch results (se não existir, retorna dict vazio, que resulta em 0.0)
+                averages = batch_averages.get(student_id, {})
 
                 calc_avg = averages.get("final_calculated", 0.0)
                 override_avg = averages.get("final_override")
