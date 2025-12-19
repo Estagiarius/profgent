@@ -14,6 +14,7 @@ from app.models.assessment import Assessment
 from app.models.lesson import Lesson
 from app.models.incident import Incident
 from app.models.schedule import TimeSlot, WeeklySchedule
+from app.models.attendance import Attendance
 from app.utils.student_csv_parser import parse_student_csv # Importa a função de parsing de CSV de alunos.
 from contextlib import contextmanager # Importa o gerenciador de contexto para criar blocos 'with'.
 
@@ -1021,6 +1022,105 @@ class DataService:
                 {"id": i.id, "description": i.description, "date": i.date.isoformat()}
                 for i in incidents
             ]
+
+    # --- Métodos de Controle de Frequência ---
+
+    def register_attendance(self, lesson_id: int, attendance_data: list[dict]):
+        """
+        Registra ou atualiza a frequência para uma aula.
+
+        :param lesson_id: ID da aula.
+        :param attendance_data: Lista de dicts com {'student_id': int, 'status': str}.
+                                Status aceitos: 'P', 'F', 'J', 'A'.
+        """
+        valid_statuses = {'P', 'F', 'J', 'A'}
+
+        with self._get_db() as db:
+            # Verifica se a aula existe
+            lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+            if not lesson:
+                raise ValueError(f"Lesson with id {lesson_id} not found.")
+
+            # Busca registros existentes para upsert
+            existing_records = db.query(Attendance).filter(Attendance.lesson_id == lesson_id).all()
+            existing_map = {att.student_id: att for att in existing_records}
+
+            to_insert = []
+
+            for entry in attendance_data:
+                student_id = entry.get('student_id')
+                status = entry.get('status', 'P')
+
+                if status not in valid_statuses:
+                    continue # Ou raise ValueError
+
+                existing = existing_map.get(student_id)
+                if existing:
+                    if existing.status != status:
+                        existing.status = status
+                else:
+                    to_insert.append({
+                        "lesson_id": lesson_id,
+                        "student_id": student_id,
+                        "status": status
+                    })
+
+            if to_insert:
+                db.bulk_insert_mappings(Attendance, to_insert)
+
+            db.flush()
+
+    def get_lesson_attendance(self, lesson_id: int) -> list[dict]:
+        """Retorna a lista de frequência para uma aula."""
+        with self._get_db() as db:
+            records = db.query(Attendance).filter(Attendance.lesson_id == lesson_id).all()
+            return [{"student_id": r.student_id, "status": r.status} for r in records]
+
+    def get_student_attendance_stats(self, student_id: int, class_subject_id: int) -> dict:
+        """
+        Calcula as estatísticas de frequência do aluno em uma disciplina.
+
+        Retorna:
+            {
+                "total_lessons": int,
+                "present_count": int, # P + A + J
+                "absent_count": int, # F
+                "percentage": float
+            }
+        """
+        with self._get_db() as db:
+            # Busca todas as aulas da disciplina
+            lesson_ids = db.query(Lesson.id).filter(Lesson.class_subject_id == class_subject_id).subquery()
+
+            # Conta registros de presença do aluno nessas aulas
+            # Assumption: Se não tiver registro, conta como ausência ou ignora?
+            # Pela lógica de "Chamada", só conta aulas onde houve chamada registrada para o aluno.
+            # Mas se o aluno faltou e não foi registrado (ex: bug), ou a chamada não foi feita?
+            # Vamos contar apenas registros existentes na tabela Attendance.
+
+            records = db.query(Attendance).filter(
+                Attendance.student_id == student_id,
+                Attendance.lesson_id.in_(lesson_ids)
+            ).all()
+
+            total_recorded = len(records)
+            if total_recorded == 0:
+                return {"total_lessons": 0, "present_count": 0, "absent_count": 0, "percentage": 100.0}
+
+            # P, A (Atraso), J (Justificada) -> Contam como Presença no cálculo simplificado acordado.
+            # F -> Falta.
+
+            present_count = sum(1 for r in records if r.status in ('P', 'A', 'J'))
+            absent_count = sum(1 for r in records if r.status == 'F')
+
+            percentage = (present_count / total_recorded) * 100
+
+            return {
+                "total_lessons": total_recorded,
+                "present_count": present_count,
+                "absent_count": absent_count,
+                "percentage": percentage
+            }
 
     # Método para adicionar uma nova nota.
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
