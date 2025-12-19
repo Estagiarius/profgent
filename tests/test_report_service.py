@@ -30,6 +30,13 @@ class TestReportService:
         }
         report_service.data_service.get_student_incidents.return_value = []
         report_service.data_service.calculate_weighted_average.return_value = 9.0
+        # Mock attendance stats
+        report_service.data_service.get_student_attendance_stats.return_value = {
+            "total_lessons": 10,
+            "present_count": 9,
+            "absent_count": 1,
+            "percentage": 90.0
+        }
 
         # Call method
         filepath = report_service.generate_student_report_card(1, 1)
