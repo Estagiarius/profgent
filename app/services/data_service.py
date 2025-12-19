@@ -1113,7 +1113,7 @@ class DataService:
         """
         with self._get_db() as db:
             # Busca todas as aulas da disciplina
-            lesson_ids = db.query(Lesson.id).filter(Lesson.class_subject_id == class_subject_id).subquery()
+            lesson_ids = db.query(Lesson.id).filter(Lesson.class_subject_id == class_subject_id)
 
             # Conta registros de presença do aluno nessas aulas
             # Assumption: Se não tiver registro, conta como ausência ou ignora?
