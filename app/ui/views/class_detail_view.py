@@ -12,6 +12,7 @@ from app.ui.views.enrollment_dialog import EnrollmentDialog
 from app.ui.views.attendance_dialog import AttendanceDialog
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
 from app.ui.views.copy_lesson_dialog import CopyLessonDialog
+from app.ui.views.copy_lesson_dialog import CopyLessonDialog
 from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
