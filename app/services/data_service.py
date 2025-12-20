@@ -587,14 +587,23 @@ class DataService:
     def get_enrollments_for_class(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
             # Carrega os dados do aluno junto com a matrícula e ordena pelo número de chamada.
-            enrollments = db.query(ClassEnrollment).options(joinedload(ClassEnrollment.student)).filter(ClassEnrollment.class_id == class_id).order_by(ClassEnrollment.call_number).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM e joinedload
+            enrollments = (db.query(
+                ClassEnrollment.id, ClassEnrollment.call_number, ClassEnrollment.status, ClassEnrollment.student_id,
+                Student.first_name, Student.last_name, Student.birth_date
+            )
+            .join(Student, ClassEnrollment.student_id == Student.id)
+            .filter(ClassEnrollment.class_id == class_id)
+            .order_by(ClassEnrollment.call_number)
+            .all())
+
             # Retorna uma lista de dicionários com dados combinados da matrícula e do aluno.
             return [
                 {
                     "id": e.id, "call_number": e.call_number, "status": e.status,
-                    "student_id": e.student.id,
-                    "student_first_name": e.student.first_name, "student_last_name": e.student.last_name,
-                    "student_birth_date": e.student.birth_date.isoformat() if e.student.birth_date else None
+                    "student_id": e.student_id,
+                    "student_first_name": e.first_name, "student_last_name": e.last_name,
+                    "student_birth_date": e.birth_date.isoformat() if e.birth_date else None
                 } for e in enrollments
             ]
 
