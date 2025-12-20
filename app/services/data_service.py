@@ -1228,7 +1228,8 @@ class DataService:
                 return {}
 
             # Busca todos os registros de presença dessas aulas de uma só vez
-            records = db.query(Attendance).filter(Attendance.lesson_id.in_(lesson_ids)).all()
+            # Otimização: Select specific columns to avoid ORM overhead
+            records = db.query(Attendance.student_id, Attendance.status).filter(Attendance.lesson_id.in_(lesson_ids)).all()
 
             stats = {} # student_id -> {present, absent, total}
 
@@ -1423,7 +1424,8 @@ class DataService:
             # 3. Buscar Notas
             grades_map = {} # (student_id, assessment_id) -> score
             if all_assessment_ids and student_ids:
-                 grades = db.query(Grade).filter(
+                 # Otimização: Seleciona apenas colunas necessárias para evitar overhead de objetos ORM
+                 grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(
                      Grade.assessment_id.in_(all_assessment_ids),
                      Grade.student_id.in_(student_ids)
                  ).all()
