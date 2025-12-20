@@ -1817,7 +1817,14 @@ class DataService:
         """
         with self._get_db() as db:
             # Query Slots joined with WeeklySchedule, ClassSubject, Class, and Course
-            results = (db.query(TimeSlot, WeeklySchedule, ClassSubject, Class, Course)
+            # Otimização: Select specific columns to avoid full ORM object hydration (5 objects per row)
+            results = (db.query(
+                            TimeSlot.id, TimeSlot.day_of_week, TimeSlot.period_index, TimeSlot.start_time, TimeSlot.end_time,
+                            WeeklySchedule.id.label('schedule_id'),
+                            ClassSubject.id.label('subject_id'),
+                            Class.id.label('class_id'), Class.name.label('class_name'),
+                            Course.course_name
+                       )
                        .outerjoin(WeeklySchedule, TimeSlot.id == WeeklySchedule.time_slot_id)
                        .outerjoin(ClassSubject, WeeklySchedule.class_subject_id == ClassSubject.id)
                        .outerjoin(Class, ClassSubject.class_id == Class.id)
@@ -1826,25 +1833,25 @@ class DataService:
                        .all())
 
             grid = {}
-            for slot, schedule, subj, cls, course in results:
-                day = slot.day_of_week
+            for row in results:
+                day = row.day_of_week
                 if day not in grid:
                     grid[day] = []
 
                 item = {
-                    "slot_id": slot.id,
-                    "period_index": slot.period_index,
-                    "start_time": slot.start_time.strftime("%H:%M"),
-                    "end_time": slot.end_time.strftime("%H:%M"),
+                    "slot_id": row.id,
+                    "period_index": row.period_index,
+                    "start_time": row.start_time.strftime("%H:%M"),
+                    "end_time": row.end_time.strftime("%H:%M"),
                     "assignment": None
                 }
 
-                if schedule and cls and course:
+                if row.schedule_id and row.class_id and row.course_name:
                     item["assignment"] = {
-                        "class_id": cls.id,
-                        "class_name": cls.name,
-                        "course_name": course.course_name,
-                        "class_subject_id": subj.id
+                        "class_id": row.class_id,
+                        "class_name": row.class_name,
+                        "course_name": row.course_name,
+                        "class_subject_id": row.subject_id
                     }
 
                 grid[day].append(item)
