@@ -29,16 +29,24 @@ def test_bncc_coverage_logic(db_session, mocker):
     subjects = data_service.get_subjects_for_class(class_id)
     subject_id = subjects[0]['id']
 
-    # 3. Create Lesson covering one skill
-    data_service.create_lesson(subject_id, "Lesson 1", "Content", date.today())
+    # 3. Create Lesson covering one skill (using new create_lesson bncc support)
+    data_service.create_lesson(subject_id, "Lesson 1", "Content", date.today(), bncc_codes="EF01MA01")
 
     lessons = data_service.get_lessons_for_subject(subject_id)
     lesson_id = lessons[0]['id']
 
-    # Manually update bncc_codes in DB to simulate feature usage
+    # 3b. Test update_lesson BNCC support
+    # We update to add another code to see if it persists, then revert or check.
+    # Let's change it to EF01MA02 via update
+    data_service.update_lesson(lesson_id, "Lesson 1 Updated", "Content Updated", date.today(), bncc_codes="EF01MA01,EF01MA02")
+
+    # Check DB
     lesson = db_session.get(Lesson, lesson_id)
-    lesson.bncc_codes = "EF01MA01"
-    db_session.commit()
+    assert "EF01MA01" in lesson.bncc_codes
+    assert "EF01MA02" in lesson.bncc_codes
+
+    # Revert to just 01 for coverage calc consistency with original plan
+    data_service.update_lesson(lesson_id, "Lesson 1", "Content", date.today(), bncc_codes="EF01MA01")
 
     # 4. Create Assessment covering another skill (or same)
     data_service.add_assessment(subject_id, "Test 1", 1.0)
@@ -49,10 +57,17 @@ def test_bncc_coverage_logic(db_session, mocker):
     assessment.bncc_codes = "EF01MA03" # Extra skill not in expected
     db_session.commit()
 
+    # 4b. Test update_assessment BNCC support
+    data_service.update_assessment(assessment_id, "Test 1 Updated", 1.0, grading_period=1, bncc_codes="EF01MA03,EF01MA04")
+    assessment = db_session.get(Assessment, assessment_id)
+    assert "EF01MA04" in assessment.bncc_codes
+
+    # Revert to keep coverage logic consistent
+    data_service.update_assessment(assessment_id, "Test 1", 1.0, grading_period=1, bncc_codes="EF01MA03")
+
     # 5. Get Coverage
     report = data_service.get_bncc_coverage(subject_id)
 
-    # assert report['subject_name'] == "Math Test" # Removed as not returned
     assert "EF01MA01" in report['covered_lessons']
     assert "EF01MA03" in report['covered_assessments']
 

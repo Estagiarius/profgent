@@ -185,8 +185,21 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_editor_content_textbox = ctk.CTkTextbox(self.lesson_editor_view)
         self.lesson_editor_content_textbox.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
 
+        # --- Campo BNCC ---
+        ctk.CTkLabel(self.lesson_editor_view, text="BNCC:").grid(row=3, column=0, padx=(10,0), pady=10, sticky="w")
+
+        bncc_frame = ctk.CTkFrame(self.lesson_editor_view, fg_color="transparent")
+        bncc_frame.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
+        bncc_frame.grid_columnconfigure(0, weight=1)
+
+        self.lesson_editor_bncc_entry = ctk.CTkEntry(bncc_frame)
+        self.lesson_editor_bncc_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+
+        bncc_btn = ctk.CTkButton(bncc_frame, text="Selecionar", width=80, command=self.open_lesson_bncc_selector)
+        bncc_btn.grid(row=0, column=1)
+
         editor_buttons_frame = ctk.CTkFrame(self.lesson_editor_view)
-        editor_buttons_frame.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
+        editor_buttons_frame.grid(row=4, column=1, padx=10, pady=10, sticky="ew")
 
         self.save_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Salvar", command=self.save_lesson)
         self.save_lesson_button.pack(side="left", padx=5)
@@ -764,12 +777,14 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_editor_title_entry.delete(0, "end")
         self.lesson_editor_date_entry.delete(0, "end")
         self.lesson_editor_content_textbox.delete("1.0", "end")
+        self.lesson_editor_bncc_entry.delete(0, "end")
 
         # Se estiver editando, preenche os campos com os dados da aula.
         if lesson:
             self.lesson_editor_title_entry.insert(0, lesson['title'])
             self.lesson_editor_date_entry.insert(0, lesson['date'])
             self.lesson_editor_content_textbox.insert("1.0", lesson['content'] or "")
+            self.lesson_editor_bncc_entry.insert(0, lesson.get('bncc_codes') or "")
         # Se estiver criando, preenche a data com o dia de hoje.
         else:
             self.lesson_editor_date_entry.insert(0, date.today().isoformat())
@@ -779,6 +794,17 @@ class ClassDetailView(ctk.CTkFrame):
         self.editing_lesson_id = None
         self.lesson_editor_view.grid_forget()
         self.lesson_list_view.grid(row=0, column=0, sticky="nsew")
+
+    def open_lesson_bncc_selector(self):
+        def on_select(codes):
+             current_text = self.lesson_editor_bncc_entry.get()
+             current_codes = [c.strip() for c in current_text.split(',') if c.strip()]
+             new_codes = [c for c in codes if c not in current_codes]
+             final_list = current_codes + new_codes
+             self.lesson_editor_bncc_entry.delete(0, "end")
+             self.lesson_editor_bncc_entry.insert(0, ", ".join(final_list))
+
+        BNCCSelectionDialog(self, on_select)
 
     def generate_ai_content(self):
         """Dispara a geração de conteúdo de aula usando IA."""
@@ -833,6 +859,7 @@ class ClassDetailView(ctk.CTkFrame):
         title = self.lesson_editor_title_entry.get()
         content = self.lesson_editor_content_textbox.get("1.0", "end-1c")
         date_str = self.lesson_editor_date_entry.get()
+        bncc_codes = self.lesson_editor_bncc_entry.get()
 
         if not title or not date_str:
             messagebox.showerror("Erro", "Título e Data são obrigatórios.")
@@ -846,10 +873,10 @@ class ClassDetailView(ctk.CTkFrame):
 
         # Se estiver editando, chama o método de atualização.
         if self.editing_lesson_id:
-            data_service.update_lesson(self.editing_lesson_id, title, content, lesson_date)
+            data_service.update_lesson(self.editing_lesson_id, title, content, lesson_date, bncc_codes)
         # Caso contrário, chama o método de criação (usando a disciplina atual).
         else:
-            data_service.create_lesson(self.current_subject_id, title, content, lesson_date)
+            data_service.create_lesson(self.current_subject_id, title, content, lesson_date, bncc_codes)
 
         # Atualiza a lista de aulas e esconde o editor.
         self.populate_lesson_list()

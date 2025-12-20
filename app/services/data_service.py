@@ -707,7 +707,7 @@ class DataService:
             return {"id": new_assessment.id, "name": new_assessment.name}
 
     # Método para atualizar uma avaliação.
-    def update_assessment(self, assessment_id: int, name: str, weight: float, grading_period: int = None):
+    def update_assessment(self, assessment_id: int, name: str, weight: float, grading_period: int = None, bncc_codes: str = None):
         if weight < 0:
             raise ValueError("Assessment weight must be non-negative.")
 
@@ -721,6 +721,7 @@ class DataService:
                 assessment.weight = weight
                 if grading_period is not None:
                     assessment.grading_period = grading_period
+                assessment.bncc_codes = bncc_codes
 
     # Método para deletar uma avaliação.
     def delete_assessment(self, assessment_id: int):
@@ -1033,13 +1034,14 @@ class DataService:
             return {"id": new_lesson.id, "title": new_lesson.title, "content": new_lesson.content, "date": new_lesson.date.isoformat(), "bncc_codes": new_lesson.bncc_codes}
 
     # Método para atualizar uma aula.
-    def update_lesson(self, lesson_id: int, title: str, content: str, lesson_date: date):
+    def update_lesson(self, lesson_id: int, title: str, content: str, lesson_date: date, bncc_codes: str = None):
         with self._get_db() as db:
             lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
             if lesson:
                 lesson.title = title
                 lesson.content = content
                 lesson.date = lesson_date
+                lesson.bncc_codes = bncc_codes
 
     # Método para deletar uma aula.
     def delete_lesson(self, lesson_id: int):
