@@ -10,6 +10,8 @@ from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.enrollment_dialog import EnrollmentDialog
 from app.ui.views.attendance_dialog import AttendanceDialog
+from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
+from app.ui.views.copy_lesson_dialog import CopyLessonDialog
 from app.ui.views.copy_lesson_dialog import CopyLessonDialog
 from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
@@ -74,6 +76,7 @@ class ClassDetailView(ctk.CTkFrame):
         self.tab_view.add("Aulas")
         self.tab_view.add("Incidentes")
         self.tab_view.add("Quadro de Notas")
+        self.tab_view.add("BNCC")
         self.tab_view.add("Relatórios")
 
         # --- Aba de Alunos ---
@@ -183,8 +186,21 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_editor_content_textbox = ctk.CTkTextbox(self.lesson_editor_view)
         self.lesson_editor_content_textbox.grid(row=2, column=1, padx=10, pady=10, sticky="nsew")
 
+        # --- Campo BNCC ---
+        ctk.CTkLabel(self.lesson_editor_view, text="BNCC:").grid(row=3, column=0, padx=(10,0), pady=10, sticky="w")
+
+        bncc_frame = ctk.CTkFrame(self.lesson_editor_view, fg_color="transparent")
+        bncc_frame.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
+        bncc_frame.grid_columnconfigure(0, weight=1)
+
+        self.lesson_editor_bncc_entry = ctk.CTkEntry(bncc_frame)
+        self.lesson_editor_bncc_entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
+
+        bncc_btn = ctk.CTkButton(bncc_frame, text="Selecionar", width=80, command=self.open_lesson_bncc_selector)
+        bncc_btn.grid(row=0, column=1)
+
         editor_buttons_frame = ctk.CTkFrame(self.lesson_editor_view)
-        editor_buttons_frame.grid(row=3, column=1, padx=10, pady=10, sticky="ew")
+        editor_buttons_frame.grid(row=4, column=1, padx=10, pady=10, sticky="ew")
 
         self.save_lesson_button = ctk.CTkButton(editor_buttons_frame, text="Salvar", command=self.save_lesson)
         self.save_lesson_button.pack(side="left", padx=5)
@@ -283,6 +299,24 @@ class ClassDetailView(ctk.CTkFrame):
         ctk.CTkButton(self.student_reports_frame, text="Gerar Boletim (TXT)", command=self.generate_report_card).pack(side="left", padx=10)
         ctk.CTkButton(self.student_reports_frame, text="Gráfico de Desempenho", command=self.show_student_chart).pack(side="left", padx=10)
 
+        # --- Aba BNCC ---
+        self.bncc_tab = self.tab_view.tab("BNCC")
+        self.bncc_tab.grid_rowconfigure(0, weight=1)
+        self.bncc_tab.grid_columnconfigure(0, weight=1)
+
+        self.bncc_scroll_frame = ctk.CTkScrollableFrame(self.bncc_tab)
+        self.bncc_scroll_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+
+        # Actions Frame
+        self.bncc_actions_frame = ctk.CTkFrame(self.bncc_tab, fg_color="transparent")
+        self.bncc_actions_frame.grid(row=1, column=0, pady=10)
+
+        self.refresh_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Atualizar Relatório", command=self.populate_bncc_tab)
+        self.refresh_bncc_button.pack(side="left", padx=5)
+
+        self.consult_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Consultar BNCC", command=self.open_bncc_consultation)
+        self.consult_bncc_button.pack(side="left", padx=5)
+
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
 
     def populate_subject_combo(self):
@@ -315,6 +349,7 @@ class ClassDetailView(ctk.CTkFrame):
             self.populate_lesson_list()
             self.populate_grade_grid()
             self.populate_student_list() # Atualiza lista de alunos para mostrar % de freq da matéria
+            self.populate_bncc_tab()
 
     def add_subject_popup(self):
         if not self.class_id: return
@@ -352,6 +387,66 @@ class ClassDetailView(ctk.CTkFrame):
         AddDialog(self, "Adicionar Disciplina à Turma", fields={}, dropdowns=dropdowns, save_callback=save_callback)
 
     # --- Fim Métodos de Gestão de Disciplinas ---
+
+    def open_bncc_consultation(self):
+        """Abre o diálogo da BNCC apenas para consulta."""
+        BNCCSelectionDialog(self, title="Consulta à Base Nacional Comum Curricular", callback=None)
+
+    def populate_bncc_tab(self):
+        """Preenche a aba de relatório BNCC."""
+        # Limpa conteúdo
+        for widget in self.bncc_scroll_frame.winfo_children():
+            widget.destroy()
+
+        if not self.class_id or not self.current_subject_id:
+            ctk.CTkLabel(self.bncc_scroll_frame, text="Selecione uma disciplina.").pack(pady=20)
+            return
+
+        report = data_service.get_bncc_coverage(self.current_subject_id)
+        if not report:
+             ctk.CTkLabel(self.bncc_scroll_frame, text="Dados não disponíveis.").pack(pady=20)
+             return
+
+        # Summary
+        summary_frame = ctk.CTkFrame(self.bncc_scroll_frame)
+        summary_frame.pack(fill="x", padx=10, pady=10)
+
+        coverage_pct = report.get('coverage_percentage', 0.0)
+
+        ctk.CTkLabel(summary_frame, text=f"Cobertura: {coverage_pct:.1f}%", font=ctk.CTkFont(size=18, weight="bold")).pack(pady=5)
+
+        progress = ctk.CTkProgressBar(summary_frame)
+        progress.pack(fill="x", padx=20, pady=5)
+        progress.set(coverage_pct / 100.0)
+
+        # Lists Frame
+        lists_frame = ctk.CTkFrame(self.bncc_scroll_frame, fg_color="transparent")
+        lists_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        lists_frame.grid_columnconfigure(0, weight=1)
+        lists_frame.grid_columnconfigure(1, weight=1)
+
+        # Covered
+        covered_frame = ctk.CTkFrame(lists_frame)
+        covered_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
+        ctk.CTkLabel(covered_frame, text="Trabalhadas", font=ctk.CTkFont(weight="bold")).pack(pady=5)
+
+        covered_text = "\n".join(report['total_covered']) if report['total_covered'] else "Nenhuma habilidade registrada."
+        ctk.CTkLabel(covered_frame, text=covered_text, justify="left", anchor="n").pack(padx=10, pady=5, fill="both", expand=True)
+
+        # Missing
+        missing_frame = ctk.CTkFrame(lists_frame)
+        missing_frame.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
+        ctk.CTkLabel(missing_frame, text="Pendentes (do currículo)", font=ctk.CTkFont(weight="bold")).pack(pady=5)
+
+        missing_text = "\n".join(report['missing']) if report['missing'] else "Nenhuma pendência."
+        ctk.CTkLabel(missing_frame, text=missing_text, justify="left", anchor="n", text_color=("red" if report['missing'] else "green")).pack(padx=10, pady=5, fill="both", expand=True)
+
+        # Details
+        details_frame = ctk.CTkFrame(self.bncc_scroll_frame)
+        details_frame.pack(fill="x", padx=10, pady=10)
+        ctk.CTkLabel(details_frame, text="Detalhes:", font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=5)
+        ctk.CTkLabel(details_frame, text=f"Em Aulas: {', '.join(report['covered_lessons'])}").pack(anchor="w", padx=10)
+        ctk.CTkLabel(details_frame, text=f"Em Avaliações: {', '.join(report['covered_assessments'])}").pack(anchor="w", padx=10)
 
     def export_csv(self):
         if not self.class_id: return
@@ -693,12 +788,14 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_editor_title_entry.delete(0, "end")
         self.lesson_editor_date_entry.delete(0, "end")
         self.lesson_editor_content_textbox.delete("1.0", "end")
+        self.lesson_editor_bncc_entry.delete(0, "end")
 
         # Se estiver editando, preenche os campos com os dados da aula.
         if lesson:
             self.lesson_editor_title_entry.insert(0, lesson['title'])
             self.lesson_editor_date_entry.insert(0, lesson['date'])
             self.lesson_editor_content_textbox.insert("1.0", lesson['content'] or "")
+            self.lesson_editor_bncc_entry.insert(0, lesson.get('bncc_codes') or "")
         # Se estiver criando, preenche a data com o dia de hoje.
         else:
             self.lesson_editor_date_entry.insert(0, date.today().isoformat())
@@ -708,6 +805,13 @@ class ClassDetailView(ctk.CTkFrame):
         self.editing_lesson_id = None
         self.lesson_editor_view.grid_forget()
         self.lesson_list_view.grid(row=0, column=0, sticky="nsew")
+
+    def open_lesson_bncc_selector(self):
+        def on_select(result_string):
+             self.lesson_editor_bncc_entry.delete(0, "end")
+             self.lesson_editor_bncc_entry.insert(0, result_string)
+
+        BNCCSelectionDialog(self, initial_selection=self.lesson_editor_bncc_entry.get(), callback=on_select)
 
     def generate_ai_content(self):
         """Dispara a geração de conteúdo de aula usando IA."""
@@ -762,6 +866,7 @@ class ClassDetailView(ctk.CTkFrame):
         title = self.lesson_editor_title_entry.get()
         content = self.lesson_editor_content_textbox.get("1.0", "end-1c")
         date_str = self.lesson_editor_date_entry.get()
+        bncc_codes = self.lesson_editor_bncc_entry.get()
 
         if not title or not date_str:
             messagebox.showerror("Erro", "Título e Data são obrigatórios.")
@@ -775,10 +880,10 @@ class ClassDetailView(ctk.CTkFrame):
 
         # Se estiver editando, chama o método de atualização.
         if self.editing_lesson_id:
-            data_service.update_lesson(self.editing_lesson_id, title, content, lesson_date)
+            data_service.update_lesson(self.editing_lesson_id, title, content, lesson_date, bncc_codes)
         # Caso contrário, chama o método de criação (usando a disciplina atual).
         else:
-            data_service.create_lesson(self.current_subject_id, title, content, lesson_date)
+            data_service.create_lesson(self.current_subject_id, title, content, lesson_date, bncc_codes)
 
         # Atualiza a lista de aulas e esconde o editor.
         self.populate_lesson_list()
@@ -795,6 +900,7 @@ class ClassDetailView(ctk.CTkFrame):
             name = data.get("name")
             weight_str = data.get("weight")
             period_str = data.get("period") # Ex: "1º Bimestre"
+            bncc_codes = data.get("bncc")
 
             period_map = {"1º Bimestre": 1, "2º Bimestre": 2, "3º Bimestre": 3, "4º Bimestre": 4}
             grading_period = period_map.get(period_str, 1)
@@ -802,13 +908,13 @@ class ClassDetailView(ctk.CTkFrame):
             if name and weight_str:
                 try:
                     weight = parse_float_input(weight_str)
-                    data_service.add_assessment(self.current_subject_id, name, weight, grading_period)
+                    data_service.add_assessment(self.current_subject_id, name, weight, grading_period, bncc_codes)
                     self.populate_assessment_list()
                     self.populate_grade_grid() # Atualiza também o quadro de notas para aparecer a nova coluna
                 except ValueError as e:
                     messagebox.showerror("Erro", f"Erro ao adicionar avaliação: {e}")
 
-        fields = {"name": "Nome da Avaliação", "weight": "Peso"}
+        fields = {"name": "Nome da Avaliação", "weight": "Peso", "bncc": "Códigos BNCC"}
         dropdowns = {"period": ("Bimestre", ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"])}
 
         AddDialog(self, "Adicionar Nova Avaliação", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
@@ -872,6 +978,7 @@ class ClassDetailView(ctk.CTkFrame):
             name = data.get("name")
             weight_str = data.get("weight")
             period_str = data.get("period")
+            bncc_codes = data.get("bncc")
 
             period_map = {"1º Bimestre": 1, "2º Bimestre": 2, "3º Bimestre": 3, "4º Bimestre": 4}
             grading_period = period_map.get(period_str, assessment.get('grading_period', 1))
@@ -879,16 +986,13 @@ class ClassDetailView(ctk.CTkFrame):
             if name and weight_str:
                 try:
                     weight = parse_float_input(weight_str)
-                    # Note: update_assessment needs to support grading_period update now.
-                    # Currently data_service.update_assessment does NOT support it.
-                    # We need to update DataService too!
-                    data_service.update_assessment(assessment_id, name, weight, grading_period)
+                    data_service.update_assessment(assessment_id, name, weight, grading_period, bncc_codes)
                     self.populate_assessment_list()
                     self.populate_grade_grid()
                 except ValueError as e:
                     messagebox.showerror("Erro", f"Erro ao editar avaliação: {e}")
 
-        fields = {"name": "Nome da Avaliação", "weight": "Peso"}
+        fields = {"name": "Nome da Avaliação", "weight": "Peso", "bncc": "Códigos BNCC"}
 
         # Determine initial period string
         current_period_id = assessment.get('grading_period', 1)
@@ -899,7 +1003,8 @@ class ClassDetailView(ctk.CTkFrame):
             "id": assessment['id'],
             "name": assessment['name'],
             "weight": format_float_output(assessment['weight']),
-            "period": current_period_str
+            "period": current_period_str,
+            "bncc": assessment.get('bncc_codes') or ""
         }
 
         dropdowns = {"period": ("Bimestre", ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"])}

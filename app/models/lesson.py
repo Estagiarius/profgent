@@ -38,6 +38,8 @@ class Lesson(Base):
     title = Column(String, nullable=False)
     # Define a coluna 'content' (conteúdo) como do tipo Text (texto longo), podendo ser nula.
     content = Column(Text, nullable=True)
+    # Define a coluna 'bncc_codes' para armazenar os códigos da BNCC trabalhados nesta aula.
+    bncc_codes = Column(Text, nullable=True)
 
     # Define a coluna 'class_subject_id' como uma chave estrangeira para a tabela 'class_subjects'. Não pode ser nula.
     # index=True otimiza busca de aulas por disciplina.

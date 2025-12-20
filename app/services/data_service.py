@@ -313,20 +313,20 @@ class DataService:
             return results
 
     # Método para adicionar um novo curso.
-    def add_course(self, course_name: str, course_code: str) -> dict | None:
+    def add_course(self, course_name: str, course_code: str, bncc_expected: str = None) -> dict | None:
         if not course_name or not course_code: return None
-        new_course = Course(course_name=course_name, course_code=course_code)
+        new_course = Course(course_name=course_name, course_code=course_code, bncc_expected=bncc_expected)
         with self._get_db() as db:
             db.add(new_course)
             db.flush()
             db.refresh(new_course)
-            return {"id": new_course.id, "course_name": new_course.course_name, "course_code": new_course.course_code}
+            return {"id": new_course.id, "course_name": new_course.course_name, "course_code": new_course.course_code, "bncc_expected": new_course.bncc_expected}
 
     # Método para buscar todos os cursos.
     def get_all_courses(self) -> list[dict]:
         with self._get_db() as db:
             courses = db.query(Course).order_by(Course.course_name).all()
-            return [{"id": c.id, "course_name": c.course_name, "course_code": c.course_code} for c in courses]
+            return [{"id": c.id, "course_name": c.course_name, "course_code": c.course_code, "bncc_expected": c.bncc_expected} for c in courses]
 
     # Método para obter a contagem total de cursos.
     def get_course_count(self) -> int:
@@ -338,7 +338,7 @@ class DataService:
         with self._get_db() as db:
             course = db.query(Course).filter(func.lower(Course.course_name) == name.lower()).first()
             if course:
-                return {"id": course.id, "course_name": course.course_name, "course_code": course.course_code}
+                return {"id": course.id, "course_name": course.course_name, "course_code": course.course_code, "bncc_expected": course.bncc_expected}
             return None
 
     # Método para buscar um curso pelo ID.
@@ -364,17 +364,19 @@ class DataService:
                     "id": course.id,
                     "course_name": course.course_name,
                     "course_code": course.course_code,
+                    "bncc_expected": course.bncc_expected,
                     "classes": classes_list
                 }
             return None
 
     # Método para atualizar um curso.
-    def update_course(self, course_id: int, course_name: str, course_code: str):
+    def update_course(self, course_id: int, course_name: str, course_code: str, bncc_expected: str = None):
         with self._get_db() as db:
             course = db.query(Course).filter(Course.id == course_id).first()
             if course:
                 course.course_name = course_name
                 course.course_code = course_code
+                course.bncc_expected = bncc_expected
 
     # Método para deletar um curso.
     def delete_course(self, course_id: int):
@@ -657,7 +659,7 @@ class DataService:
             return self._get_next_call_number(db, class_id)
 
     # Método para adicionar uma nova avaliação a uma disciplina de uma turma.
-    def add_assessment(self, class_subject_id: int, name: str, weight: float, grading_period: int = 1) -> dict | None:
+    def add_assessment(self, class_subject_id: int, name: str, weight: float, grading_period: int = 1, bncc_codes: str = None) -> dict | None:
         if not all([class_subject_id, name, weight is not None]): return None
 
         if weight < 0:
@@ -666,7 +668,7 @@ class DataService:
         if not (1 <= grading_period <= 5):
              raise ValueError("Grading period must be between 1 and 5.")
 
-        assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight, grading_period=grading_period)
+        assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight, grading_period=grading_period, bncc_codes=bncc_codes)
         with self._get_db() as db:
             db.add(assessment)
             db.flush()
@@ -676,7 +678,8 @@ class DataService:
                 "name": assessment.name,
                 "weight": assessment.weight,
                 "class_subject_id": assessment.class_subject_id,
-                "grading_period": assessment.grading_period
+                "grading_period": assessment.grading_period,
+                "bncc_codes": assessment.bncc_codes
             }
 
     # Método auxiliar para garantir que a avaliação final (período 5) exista.
@@ -704,7 +707,7 @@ class DataService:
             return {"id": new_assessment.id, "name": new_assessment.name}
 
     # Método para atualizar uma avaliação.
-    def update_assessment(self, assessment_id: int, name: str, weight: float, grading_period: int = None):
+    def update_assessment(self, assessment_id: int, name: str, weight: float, grading_period: int = None, bncc_codes: str = None):
         if weight < 0:
             raise ValueError("Assessment weight must be non-negative.")
 
@@ -718,6 +721,7 @@ class DataService:
                 assessment.weight = weight
                 if grading_period is not None:
                     assessment.grading_period = grading_period
+                assessment.bncc_codes = bncc_codes
 
     # Método para deletar uma avaliação.
     def delete_assessment(self, assessment_id: int):
@@ -1020,23 +1024,24 @@ class DataService:
         return at_risk_students
 
     # Método para criar um novo registro de aula.
-    def create_lesson(self, class_subject_id: int, title: str, content: str, lesson_date: date) -> dict | None:
+    def create_lesson(self, class_subject_id: int, title: str, content: str, lesson_date: date, bncc_codes: str = None) -> dict | None:
         if not all([class_subject_id, title, lesson_date]): return None
-        new_lesson = Lesson(class_subject_id=class_subject_id, title=title, content=content, date=lesson_date)
+        new_lesson = Lesson(class_subject_id=class_subject_id, title=title, content=content, date=lesson_date, bncc_codes=bncc_codes)
         with self._get_db() as db:
             db.add(new_lesson)
             db.flush()
             db.refresh(new_lesson)
-            return {"id": new_lesson.id, "title": new_lesson.title, "content": new_lesson.content, "date": new_lesson.date.isoformat()}
+            return {"id": new_lesson.id, "title": new_lesson.title, "content": new_lesson.content, "date": new_lesson.date.isoformat(), "bncc_codes": new_lesson.bncc_codes}
 
     # Método para atualizar uma aula.
-    def update_lesson(self, lesson_id: int, title: str, content: str, lesson_date: date):
+    def update_lesson(self, lesson_id: int, title: str, content: str, lesson_date: date, bncc_codes: str = None):
         with self._get_db() as db:
             lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
             if lesson:
                 lesson.title = title
                 lesson.content = content
                 lesson.date = lesson_date
+                lesson.bncc_codes = bncc_codes
 
     # Método para deletar uma aula.
     def delete_lesson(self, lesson_id: int):
@@ -1825,5 +1830,54 @@ class DataService:
             ).first()
 
             if lesson:
-                return {"id": lesson.id, "title": lesson.title, "content": lesson.content, "date": lesson.date.isoformat()}
+                return {"id": lesson.id, "title": lesson.title, "content": lesson.content, "date": lesson.date.isoformat(), "bncc_codes": lesson.bncc_codes}
             return None
+
+    # --- BNCC Tracking ---
+
+    def get_bncc_coverage(self, class_subject_id: int) -> dict:
+        """Calcula a cobertura de habilidades BNCC para uma disciplina de turma."""
+        with self._get_db() as db:
+            # Carrega a disciplina e o curso
+            subject = db.query(ClassSubject).options(joinedload(ClassSubject.course)).filter(ClassSubject.id == class_subject_id).first()
+            if not subject:
+                return {}
+
+            # 1. Expected Skills
+            expected_raw = subject.course.bncc_expected or ""
+            # Normaliza: Split por vírgula, strip, upper, remove vazios
+            expected_set = {code.strip().upper() for code in expected_raw.split(',') if code.strip()}
+
+            # 2. Covered in Lessons
+            lessons = db.query(Lesson).filter(Lesson.class_subject_id == class_subject_id).all()
+            covered_lessons_set = set()
+            for l in lessons:
+                if l.bncc_codes:
+                    codes = {code.strip().upper() for code in l.bncc_codes.split(',') if code.strip()}
+                    covered_lessons_set.update(codes)
+
+            # 3. Covered in Assessments
+            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
+            covered_assessments_set = set()
+            for a in assessments:
+                if a.bncc_codes:
+                    codes = {code.strip().upper() for code in a.bncc_codes.split(',') if code.strip()}
+                    covered_assessments_set.update(codes)
+
+            # Total Covered (Union)
+            total_covered = covered_lessons_set.union(covered_assessments_set)
+
+            # Missing
+            missing = expected_set - total_covered
+
+            # Relevant Covered (Intersection with Expected)
+            relevant_covered = total_covered.intersection(expected_set)
+
+            return {
+                "expected": sorted(list(expected_set)),
+                "covered_lessons": sorted(list(covered_lessons_set)),
+                "covered_assessments": sorted(list(covered_assessments_set)),
+                "total_covered": sorted(list(total_covered)),
+                "missing": sorted(list(missing)),
+                "coverage_percentage": (len(relevant_covered) / len(expected_set) * 100) if expected_set else 0.0
+            }
