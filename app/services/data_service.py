@@ -485,8 +485,12 @@ class DataService:
     # Busca todas as disciplinas de uma turma.
     def get_subjects_for_class(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
-            subjects = db.query(ClassSubject).options(joinedload(ClassSubject.course)).filter(ClassSubject.class_id == class_id).all()
-            return [{"id": s.id, "course_id": s.course.id, "course_name": s.course.course_name, "course_code": s.course.course_code} for s in subjects]
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM e joinedload
+            subjects = (db.query(ClassSubject.id, Course.id.label('course_id'), Course.course_name, Course.course_code)
+                        .join(Course, ClassSubject.course_id == Course.id)
+                        .filter(ClassSubject.class_id == class_id)
+                        .all())
+            return [{"id": s.id, "course_id": s.course_id, "course_name": s.course_name, "course_code": s.course_code} for s in subjects]
 
     # Método para buscar uma turma pelo nome.
     def get_class_by_name(self, name: str) -> dict | None:
@@ -500,13 +504,14 @@ class DataService:
     def get_all_classes(self) -> list[dict]:
         with self._get_db() as db:
             # Otimização 1: Calcular contagem via SQL aggregation ao invés de carregar objetos em memória.
-            results = (db.query(Class, func.count(ClassEnrollment.id).label('count'))
+            # Otimização 2: Selecionar apenas colunas necessárias para evitar overhead de ORM
+            results = (db.query(Class.id, Class.name, func.count(ClassEnrollment.id).label('count'))
                        .outerjoin(ClassEnrollment, Class.id == ClassEnrollment.class_id)
                        .group_by(Class.id)
                        .order_by(Class.name)
                        .all())
 
-            return [{"id": c.id, "name": c.name, "student_count": count} for c, count in results]
+            return [{"id": c.id, "name": c.name, "student_count": c.count} for c in results]
 
     # Método para buscar uma turma pelo ID.
     def get_class_by_id(self, class_id: int) -> dict | None:
@@ -587,14 +592,23 @@ class DataService:
     def get_enrollments_for_class(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
             # Carrega os dados do aluno junto com a matrícula e ordena pelo número de chamada.
-            enrollments = db.query(ClassEnrollment).options(joinedload(ClassEnrollment.student)).filter(ClassEnrollment.class_id == class_id).order_by(ClassEnrollment.call_number).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM e joinedload
+            enrollments = (db.query(
+                ClassEnrollment.id, ClassEnrollment.call_number, ClassEnrollment.status, ClassEnrollment.student_id,
+                Student.first_name, Student.last_name, Student.birth_date
+            )
+            .join(Student, ClassEnrollment.student_id == Student.id)
+            .filter(ClassEnrollment.class_id == class_id)
+            .order_by(ClassEnrollment.call_number)
+            .all())
+
             # Retorna uma lista de dicionários com dados combinados da matrícula e do aluno.
             return [
                 {
                     "id": e.id, "call_number": e.call_number, "status": e.status,
-                    "student_id": e.student.id,
-                    "student_first_name": e.student.first_name, "student_last_name": e.student.last_name,
-                    "student_birth_date": e.student.birth_date.isoformat() if e.student.birth_date else None
+                    "student_id": e.student_id,
+                    "student_first_name": e.first_name, "student_last_name": e.last_name,
+                    "student_birth_date": e.birth_date.isoformat() if e.birth_date else None
                 } for e in enrollments
             ]
 
@@ -735,7 +749,8 @@ class DataService:
     # Método para buscar avaliações de uma disciplina da turma.
     def get_assessments_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).order_by(Assessment.grading_period, Assessment.name).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM
+            assessments = db.query(Assessment.id, Assessment.name, Assessment.weight, Assessment.grading_period).filter(Assessment.class_subject_id == class_subject_id).order_by(Assessment.grading_period, Assessment.name).all()
             return [{"id": a.id, "name": a.name, "weight": a.weight, "grading_period": a.grading_period} for a in assessments]
 
     # Método para buscar todas as notas (geralmente para fins administrativos).
@@ -749,14 +764,15 @@ class DataService:
         with self._get_db() as db:
             # Consulta complexa que busca notas apenas de alunos com status 'Active' na turma associada à disciplina.
             # Grade -> Assessment -> ClassSubject -> Class -> Enrollment
-            grades = (db.query(Grade).options(joinedload(Grade.assessment))
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de objetos ORM e joinedload desnecessário
+            grades = (db.query(Grade.id, Grade.student_id, Grade.assessment_id, Grade.score, Assessment.name.label('assessment_name'))
                       .join(Assessment, Grade.assessment_id == Assessment.id)
                       .join(ClassSubject, Assessment.class_subject_id == ClassSubject.id)
                       .join(ClassEnrollment, (Grade.student_id == ClassEnrollment.student_id) & (ClassSubject.class_id == ClassEnrollment.class_id))
                       .filter(Assessment.class_subject_id == class_subject_id)
                       .filter(ClassEnrollment.status == 'Active').all())
             return [
-                {"id": g.id, "student_id": g.student_id, "assessment_id": g.assessment_id, "score": g.score, "assessment_name": g.assessment.name}
+                {"id": g.id, "student_id": g.student_id, "assessment_id": g.assessment_id, "score": g.score, "assessment_name": g.assessment_name}
                 for g in grades
             ]
 
@@ -984,7 +1000,8 @@ class DataService:
              assessment_ids = [a['id'] for a in assessments_data]
 
              # 4. Busca todas as notas de todos os alunos nessas avaliações
-             grades = db.query(Grade).filter(
+             # Otimização: Select specific columns
+             grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(
                  Grade.student_id.in_(student_ids),
                  Grade.assessment_id.in_(assessment_ids)
              ).all()
@@ -1055,7 +1072,8 @@ class DataService:
     # Método para buscar todas as aulas de uma disciplina da turma.
     def get_lessons_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            lessons = db.query(Lesson).filter(Lesson.class_subject_id == class_subject_id).order_by(Lesson.date.desc()).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM
+            lessons = db.query(Lesson.id, Lesson.title, Lesson.content, Lesson.date).filter(Lesson.class_subject_id == class_subject_id).order_by(Lesson.date.desc()).all()
             return [{"id": l.id, "title": l.title, "content": l.content, "date": l.date.isoformat()} for l in lessons]
 
     # Método para copiar aulas (conteúdo) para outra disciplina.
@@ -1094,11 +1112,20 @@ class DataService:
     # Método para buscar todos os incidentes de uma turma.
     def get_incidents_for_class(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
-            incidents = db.query(Incident).options(joinedload(Incident.student)).filter(Incident.class_id == class_id).order_by(Incident.date.desc()).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM e joinedload
+            incidents = (db.query(
+                Incident.id, Incident.description, Incident.date,
+                Student.id.label('student_id'), Student.first_name, Student.last_name
+            )
+            .join(Student, Incident.student_id == Student.id)
+            .filter(Incident.class_id == class_id)
+            .order_by(Incident.date.desc())
+            .all())
+
             return [
                 {
                     "id": i.id, "description": i.description, "date": i.date.isoformat(),
-                    "student_id": i.student.id, "student_first_name": i.student.first_name, "student_last_name": i.student.last_name
+                    "student_id": i.student_id, "student_first_name": i.first_name, "student_last_name": i.last_name
                 } for i in incidents
             ]
 
@@ -1228,7 +1255,8 @@ class DataService:
                 return {}
 
             # Busca todos os registros de presença dessas aulas de uma só vez
-            records = db.query(Attendance).filter(Attendance.lesson_id.in_(lesson_ids)).all()
+            # Otimização: Select specific columns to avoid ORM overhead
+            records = db.query(Attendance.student_id, Attendance.status).filter(Attendance.lesson_id.in_(lesson_ids)).all()
 
             stats = {} # student_id -> {present, absent, total}
 
@@ -1282,7 +1310,8 @@ class DataService:
             # Otimização 4: Batch Update/Insert para alta performance
 
             # 1. Identificar existentes
-            existing_grades_query = db.query(Grade).join(Assessment).filter(Assessment.class_subject_id == class_subject_id)
+            # Otimização: Select specific columns to avoid ORM overhead
+            existing_grades_query = db.query(Grade.id, Grade.student_id, Grade.assessment_id, Grade.score).join(Assessment).filter(Assessment.class_subject_id == class_subject_id)
             existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
 
             to_insert = []
@@ -1423,7 +1452,8 @@ class DataService:
             # 3. Buscar Notas
             grades_map = {} # (student_id, assessment_id) -> score
             if all_assessment_ids and student_ids:
-                 grades = db.query(Grade).filter(
+                 # Otimização: Seleciona apenas colunas necessárias para evitar overhead de objetos ORM
+                 grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(
                      Grade.assessment_id.in_(all_assessment_ids),
                      Grade.student_id.in_(student_ids)
                  ).all()
@@ -1787,7 +1817,14 @@ class DataService:
         """
         with self._get_db() as db:
             # Query Slots joined with WeeklySchedule, ClassSubject, Class, and Course
-            results = (db.query(TimeSlot, WeeklySchedule, ClassSubject, Class, Course)
+            # Otimização: Select specific columns to avoid full ORM object hydration (5 objects per row)
+            results = (db.query(
+                            TimeSlot.id, TimeSlot.day_of_week, TimeSlot.period_index, TimeSlot.start_time, TimeSlot.end_time,
+                            WeeklySchedule.id.label('schedule_id'),
+                            ClassSubject.id.label('subject_id'),
+                            Class.id.label('class_id'), Class.name.label('class_name'),
+                            Course.course_name
+                       )
                        .outerjoin(WeeklySchedule, TimeSlot.id == WeeklySchedule.time_slot_id)
                        .outerjoin(ClassSubject, WeeklySchedule.class_subject_id == ClassSubject.id)
                        .outerjoin(Class, ClassSubject.class_id == Class.id)
@@ -1796,25 +1833,25 @@ class DataService:
                        .all())
 
             grid = {}
-            for slot, schedule, subj, cls, course in results:
-                day = slot.day_of_week
+            for row in results:
+                day = row.day_of_week
                 if day not in grid:
                     grid[day] = []
 
                 item = {
-                    "slot_id": slot.id,
-                    "period_index": slot.period_index,
-                    "start_time": slot.start_time.strftime("%H:%M"),
-                    "end_time": slot.end_time.strftime("%H:%M"),
+                    "slot_id": row.id,
+                    "period_index": row.period_index,
+                    "start_time": row.start_time.strftime("%H:%M"),
+                    "end_time": row.end_time.strftime("%H:%M"),
                     "assignment": None
                 }
 
-                if schedule and cls and course:
+                if row.schedule_id and row.class_id and row.course_name:
                     item["assignment"] = {
-                        "class_id": cls.id,
-                        "class_name": cls.name,
-                        "course_name": course.course_name,
-                        "class_subject_id": subj.id
+                        "class_id": row.class_id,
+                        "class_name": row.class_name,
+                        "course_name": row.course_name,
+                        "class_subject_id": row.subject_id
                     }
 
                 grid[day].append(item)

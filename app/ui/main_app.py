@@ -144,16 +144,20 @@ class MainApp(ctk.CTk):
         self.main_frame.grid_rowconfigure(0, weight=1) # Permite que o conteúdo se expanda.
         self.main_frame.grid_columnconfigure(0, weight=1)
 
-        # Cria as instâncias de cada tela (view) e as armazena em um dicionário para fácil acesso.
-        self.views = {
-            "dashboard": DashboardView(self.main_frame, self),
-            "schedule": ScheduleView(self.main_frame, self),
-            "management": ManagementView(self.main_frame, self),
-            "class_selection": ClassSelectionView(self.main_frame, self),
-            "class_detail": ClassDetailView(self.main_frame, self),
-            "assistant": AssistantView(self.main_frame, self, assistant_service=self.assistant_service),
-            "settings": SettingsView(self.main_frame, self)
+        # Factories para criar as views sob demanda (Lazy Loading).
+        # Isso otimiza o tempo de inicialização, criando os widgets pesados apenas quando necessário.
+        self.view_factories = {
+            "dashboard": lambda: DashboardView(self.main_frame, self),
+            "schedule": lambda: ScheduleView(self.main_frame, self),
+            "management": lambda: ManagementView(self.main_frame, self),
+            "class_selection": lambda: ClassSelectionView(self.main_frame, self),
+            "class_detail": lambda: ClassDetailView(self.main_frame, self),
+            "assistant": lambda: AssistantView(self.main_frame, self, assistant_service=self.assistant_service),
+            "settings": lambda: SettingsView(self.main_frame, self)
         }
+
+        # Dicionário para armazenar as instâncias das views já criadas.
+        self.views = {}
 
         # Exibe a tela de dashboard por padrão ao iniciar a aplicação.
         self.show_view("dashboard")
@@ -175,12 +179,21 @@ class MainApp(ctk.CTk):
 
     # Método para alternar entre as diferentes telas da aplicação.
     def show_view(self, view_name, **kwargs):
+        # Instancia a view se ela ainda não existir (Lazy Loading)
+        if view_name not in self.views and view_name in self.view_factories:
+            # Cria a instância usando a factory e armazena no cache
+            self.views[view_name] = self.view_factories[view_name]()
+
         # Esconde todas as telas para garantir que apenas uma esteja visível.
         for view in self.views.values():
             view.grid_forget()
 
         # Obtém a tela solicitada do dicionário.
-        selected_view = self.views[view_name]
+        selected_view = self.views.get(view_name)
+
+        if not selected_view:
+            return
+
         # Exibe a tela selecionada na grade do frame principal.
         selected_view.grid(row=0, column=0, sticky="nsew")
 
