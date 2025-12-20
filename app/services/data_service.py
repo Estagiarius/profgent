@@ -749,14 +749,15 @@ class DataService:
         with self._get_db() as db:
             # Consulta complexa que busca notas apenas de alunos com status 'Active' na turma associada à disciplina.
             # Grade -> Assessment -> ClassSubject -> Class -> Enrollment
-            grades = (db.query(Grade).options(joinedload(Grade.assessment))
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de objetos ORM e joinedload desnecessário
+            grades = (db.query(Grade.id, Grade.student_id, Grade.assessment_id, Grade.score, Assessment.name.label('assessment_name'))
                       .join(Assessment, Grade.assessment_id == Assessment.id)
                       .join(ClassSubject, Assessment.class_subject_id == ClassSubject.id)
                       .join(ClassEnrollment, (Grade.student_id == ClassEnrollment.student_id) & (ClassSubject.class_id == ClassEnrollment.class_id))
                       .filter(Assessment.class_subject_id == class_subject_id)
                       .filter(ClassEnrollment.status == 'Active').all())
             return [
-                {"id": g.id, "student_id": g.student_id, "assessment_id": g.assessment_id, "score": g.score, "assessment_name": g.assessment.name}
+                {"id": g.id, "student_id": g.student_id, "assessment_id": g.assessment_id, "score": g.score, "assessment_name": g.assessment_name}
                 for g in grades
             ]
 
