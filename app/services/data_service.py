@@ -984,7 +984,8 @@ class DataService:
              assessment_ids = [a['id'] for a in assessments_data]
 
              # 4. Busca todas as notas de todos os alunos nessas avaliações
-             grades = db.query(Grade).filter(
+             # Otimização: Select specific columns
+             grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(
                  Grade.student_id.in_(student_ids),
                  Grade.assessment_id.in_(assessment_ids)
              ).all()
