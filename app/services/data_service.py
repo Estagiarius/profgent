@@ -1284,7 +1284,8 @@ class DataService:
             # Otimização 4: Batch Update/Insert para alta performance
 
             # 1. Identificar existentes
-            existing_grades_query = db.query(Grade).join(Assessment).filter(Assessment.class_subject_id == class_subject_id)
+            # Otimização: Select specific columns to avoid ORM overhead
+            existing_grades_query = db.query(Grade.id, Grade.student_id, Grade.assessment_id, Grade.score).join(Assessment).filter(Assessment.class_subject_id == class_subject_id)
             existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
 
             to_insert = []
