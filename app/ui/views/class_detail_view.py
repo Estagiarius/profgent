@@ -306,9 +306,15 @@ class ClassDetailView(ctk.CTkFrame):
         self.bncc_scroll_frame = ctk.CTkScrollableFrame(self.bncc_tab)
         self.bncc_scroll_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
-        # Add refresh button for BNCC
-        self.refresh_bncc_button = ctk.CTkButton(self.bncc_tab, text="Atualizar BNCC", command=self.populate_bncc_tab)
-        self.refresh_bncc_button.grid(row=1, column=0, pady=10)
+        # Actions Frame
+        self.bncc_actions_frame = ctk.CTkFrame(self.bncc_tab, fg_color="transparent")
+        self.bncc_actions_frame.grid(row=1, column=0, pady=10)
+
+        self.refresh_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Atualizar Relatório", command=self.populate_bncc_tab)
+        self.refresh_bncc_button.pack(side="left", padx=5)
+
+        self.consult_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Consultar BNCC", command=self.open_bncc_consultation)
+        self.consult_bncc_button.pack(side="left", padx=5)
 
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
 
@@ -380,6 +386,10 @@ class ClassDetailView(ctk.CTkFrame):
         AddDialog(self, "Adicionar Disciplina à Turma", fields={}, dropdowns=dropdowns, save_callback=save_callback)
 
     # --- Fim Métodos de Gestão de Disciplinas ---
+
+    def open_bncc_consultation(self):
+        """Abre o diálogo da BNCC apenas para consulta."""
+        BNCCSelectionDialog(self, title="Consulta à Base Nacional Comum Curricular", callback=None)
 
     def populate_bncc_tab(self):
         """Preenche a aba de relatório BNCC."""
