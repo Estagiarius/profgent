@@ -485,8 +485,12 @@ class DataService:
     # Busca todas as disciplinas de uma turma.
     def get_subjects_for_class(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
-            subjects = db.query(ClassSubject).options(joinedload(ClassSubject.course)).filter(ClassSubject.class_id == class_id).all()
-            return [{"id": s.id, "course_id": s.course.id, "course_name": s.course.course_name, "course_code": s.course.course_code} for s in subjects]
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM e joinedload
+            subjects = (db.query(ClassSubject.id, Course.id.label('course_id'), Course.course_name, Course.course_code)
+                        .join(Course, ClassSubject.course_id == Course.id)
+                        .filter(ClassSubject.class_id == class_id)
+                        .all())
+            return [{"id": s.id, "course_id": s.course_id, "course_name": s.course_name, "course_code": s.course_code} for s in subjects]
 
     # Método para buscar uma turma pelo nome.
     def get_class_by_name(self, name: str) -> dict | None:
@@ -500,13 +504,14 @@ class DataService:
     def get_all_classes(self) -> list[dict]:
         with self._get_db() as db:
             # Otimização 1: Calcular contagem via SQL aggregation ao invés de carregar objetos em memória.
-            results = (db.query(Class, func.count(ClassEnrollment.id).label('count'))
+            # Otimização 2: Selecionar apenas colunas necessárias para evitar overhead de ORM
+            results = (db.query(Class.id, Class.name, func.count(ClassEnrollment.id).label('count'))
                        .outerjoin(ClassEnrollment, Class.id == ClassEnrollment.class_id)
                        .group_by(Class.id)
                        .order_by(Class.name)
                        .all())
 
-            return [{"id": c.id, "name": c.name, "student_count": count} for c, count in results]
+            return [{"id": c.id, "name": c.name, "student_count": c.count} for c in results]
 
     # Método para buscar uma turma pelo ID.
     def get_class_by_id(self, class_id: int) -> dict | None:
@@ -744,7 +749,8 @@ class DataService:
     # Método para buscar avaliações de uma disciplina da turma.
     def get_assessments_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).order_by(Assessment.grading_period, Assessment.name).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM
+            assessments = db.query(Assessment.id, Assessment.name, Assessment.weight, Assessment.grading_period).filter(Assessment.class_subject_id == class_subject_id).order_by(Assessment.grading_period, Assessment.name).all()
             return [{"id": a.id, "name": a.name, "weight": a.weight, "grading_period": a.grading_period} for a in assessments]
 
     # Método para buscar todas as notas (geralmente para fins administrativos).
@@ -1066,7 +1072,8 @@ class DataService:
     # Método para buscar todas as aulas de uma disciplina da turma.
     def get_lessons_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            lessons = db.query(Lesson).filter(Lesson.class_subject_id == class_subject_id).order_by(Lesson.date.desc()).all()
+            # Otimização: Seleciona apenas colunas necessárias para evitar overhead de ORM
+            lessons = db.query(Lesson.id, Lesson.title, Lesson.content, Lesson.date).filter(Lesson.class_subject_id == class_subject_id).order_by(Lesson.date.desc()).all()
             return [{"id": l.id, "title": l.title, "content": l.content, "date": l.date.isoformat()} for l in lessons]
 
     # Método para copiar aulas (conteúdo) para outra disciplina.
