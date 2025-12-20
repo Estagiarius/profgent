@@ -1,6 +1,8 @@
 import customtkinter as ctk # Importa a biblioteca 'customtkinter' para os componentes da interface.
+import asyncio
 # Importa utilitário de rolagem
 from app.ui.ui_utils import bind_global_mouse_scroll
+from app.utils.async_utils import run_async_task
 from app.utils.charts import create_grade_distribution_chart, create_approval_pie_chart # Importa a função utilitária que gera o gráfico de distribuição de notas.
 from PIL import Image # Importa a biblioteca Pillow (PIL) para manipulação de imagens.
 import os # Importa o módulo 'os' para interagir com o sistema de arquivos (verificar se o arquivo do gráfico existe).
@@ -261,24 +263,62 @@ class DashboardView(ctk.CTkFrame):
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs):
         _ = kwargs
-        # Carrega dados globais
+        # Carrega dados globais de forma assíncrona
         self.update_global_stats()
         # Carrega (ou recarrega) a lista de cursos.
         self.load_courses()
-        # Atualiza o gráfico com base na seleção atual.
+        # Atualiza o gráfico com base na seleção atual (assíncrono).
         self.update_chart()
-        # Atualiza a lista de aniversariantes.
+        # Atualiza a lista de aniversariantes (assíncrono).
         self.update_birthdays()
 
     def update_global_stats(self):
-        """Atualiza os cards e estatísticas da aba Visão Geral."""
-        stats = self.data_service.get_global_dashboard_stats()
+        """Dispara a atualização assíncrona dos cards e estatísticas."""
+        # Feedback visual de carregamento
+        self.approval_label.configure(text="...", text_color="gray")
+        self.honor_count_label.configure(text="Carregando...")
+        self.pie_chart_label.configure(image=None, text="Carregando...")
+
+        async def fetch_task():
+            # Executa as operações pesadas em threads separadas para não travar a UI
+            stats = await asyncio.to_thread(self.data_service.get_global_dashboard_stats)
+            perf = await asyncio.to_thread(self.data_service.get_global_performance_stats)
+
+            approved = perf.get('approved', 0)
+            failed = perf.get('failed', 0)
+            # Geração do gráfico de pizza é pesada (matplotlib)
+            pie_path = await asyncio.to_thread(create_approval_pie_chart, approved, failed)
+
+            ranking = await asyncio.to_thread(self.data_service.get_class_incident_ranking)
+
+            return {
+                "stats": stats,
+                "perf": perf,
+                "pie_path": pie_path,
+                "ranking": ranking
+            }
+
+        run_async_task(fetch_task(), self.main_app.loop, self.main_app.async_queue, self._on_global_stats_loaded)
+
+    def _on_global_stats_loaded(self, result):
+        """Callback executado na thread principal com os dados globais."""
+        if isinstance(result, Exception):
+            print(f"Erro ao carregar stats: {result}")
+            self.approval_label.configure(text="Erro")
+            return
+
+        stats = result['stats']
+        perf = result['perf']
+        pie_path = result['pie_path']
+        ranking = result['ranking']
+
+        # Atualiza Cards
         self.card_students.configure(text=str(stats.get('active_students', 0)))
         self.card_classes.configure(text=str(stats.get('total_classes', 0)))
         self.card_courses.configure(text=str(stats.get('total_courses', 0)))
         self.card_incidents.configure(text=str(stats.get('total_incidents', 0)))
 
-        perf = self.data_service.get_global_performance_stats()
+        # Atualiza Aprovação
         approval_rate = perf.get('approval_rate', 0.0)
         approved = perf.get('approved', 0)
         failed = perf.get('failed', 0)
@@ -307,26 +347,23 @@ class DashboardView(ctk.CTkFrame):
                 ctk.CTkLabel(row, text=text, anchor="w").pack(side="left", padx=5)
                 ctk.CTkLabel(row, text=score_text, text_color="#FFD700", font=ctk.CTkFont(weight="bold")).pack(side="right", padx=5)
 
-        # Atualiza o gráfico de Pizza (Aba Visão Geral)
-        pie_chart_path = create_approval_pie_chart(approved, failed)
-        if os.path.exists(pie_chart_path):
-            img = Image.open(pie_chart_path)
+        # Atualiza o gráfico de Pizza
+        if os.path.exists(pie_path):
+            img = Image.open(pie_path)
             self.pie_chart_image = ctk.CTkImage(light_image=img, size=img.size)
             self.pie_chart_label.configure(image=self.pie_chart_image, text="")
         else:
              self.pie_chart_label.configure(image=None, text="Erro no Gráfico")
 
-        # Atualiza Ranking de Incidentes (Aba Destaques)
-        incident_ranking = self.data_service.get_class_incident_ranking()
-
+        # Atualiza Ranking de Incidentes
         # Clear previous widgets
         for widget in self.incidents_list_frame.winfo_children():
             widget.destroy()
 
-        if not incident_ranking:
+        if not ranking:
              ctk.CTkLabel(self.incidents_list_frame, text="Nenhum incidente registrado.", text_color="gray").pack(pady=5)
         else:
-            for i, item in enumerate(incident_ranking):
+            for i, item in enumerate(ranking):
                 row = ctk.CTkFrame(self.incidents_list_frame)
                 row.pack(fill="x", pady=2)
                 ctk.CTkLabel(row, text=f"{i+1}. {item['class_name']}", anchor="w").pack(side="left", padx=5)
@@ -363,46 +400,66 @@ class DashboardView(ctk.CTkFrame):
         # Atualiza o gráfico com base na nova seleção.
         self.update_chart()
 
-    # Gera e exibe o gráfico para o curso selecionado.
+    # Gera e exibe o gráfico para o curso selecionado (Assíncrono).
     def update_chart(self):
         """Gera e exibe o gráfico com as médias finais dos alunos para o curso selecionado."""
-        # Se nenhum curso estiver selecionado, exibe uma mensagem.
         if self.selected_course_id is None:
             self.chart_label.configure(text="Nenhum curso selecionado ou disponível.", image=None)
             return
 
-        # Busca os detalhes do curso selecionado
-        selected_course = self.data_service.get_course_by_id(self.selected_course_id)
-        if not selected_course:
-            self.chart_label.configure(text=f"Não foi possível encontrar o curso com ID: {self.selected_course_id}", image=None)
+        self.chart_label.configure(image=None, text="Gerando gráfico...")
+
+        async def chart_task():
+            # Busca os detalhes do curso selecionado (DB Call)
+            selected_course = await asyncio.to_thread(self.data_service.get_course_by_id, self.selected_course_id)
+            if not selected_course: return None
+
+            # Busca as médias calculadas (DB Call)
+            averages = await asyncio.to_thread(self.data_service.get_course_averages, self.selected_course_id)
+
+            # Chama a função utilitária para gerar o gráfico de médias (Matplotlib - Slow)
+            chart_path = await asyncio.to_thread(create_grade_distribution_chart, averages, selected_course['course_name'])
+            return chart_path
+
+        run_async_task(chart_task(), self.main_app.loop, self.main_app.async_queue, self._on_chart_loaded)
+
+    def _on_chart_loaded(self, chart_path):
+        if not chart_path:
+            self.chart_label.configure(text="Erro ao carregar curso.", image=None)
             return
 
-        # Busca as médias calculadas (ao invés de notas brutas)
-        averages = self.data_service.get_course_averages(self.selected_course_id)
+        if isinstance(chart_path, Exception):
+             self.chart_label.configure(text=f"Erro: {chart_path}", image=None)
+             return
 
-        # Chama a função utilitária para gerar o gráfico de médias.
-        chart_path = create_grade_distribution_chart(averages, selected_course['course_name'])
-
-        # Se o arquivo de imagem do gráfico foi criado com sucesso...
         if os.path.exists(chart_path):
-            # Abre a imagem usando a biblioteca Pillow.
             img = Image.open(chart_path)
-            # Cria um objeto de imagem compatível com o customtkinter.
             self.chart_image = ctk.CTkImage(light_image=img, size=img.size)
-            # Configura o rótulo para exibir a imagem do gráfico.
             self.chart_label.configure(image=self.chart_image, text="")
-        # Se o arquivo não foi criado...
         else:
             self.chart_label.configure(image=None, text="Não foi possível gerar o gráfico.")
 
-    # Atualiza a lista de aniversariantes do dia.
+    # Atualiza a lista de aniversariantes do dia (Assíncrono).
     def update_birthdays(self):
         # Limpa os widgets anteriores no frame de scroll.
         for widget in self.birthdays_scrollable_frame.winfo_children():
             widget.destroy()
 
-        # Busca os aniversariantes do dia.
-        birthdays = self.data_service.get_students_with_birthday_today()
+        ctk.CTkLabel(self.birthdays_scrollable_frame, text="Carregando...").pack(pady=10)
+
+        async def birthday_task():
+            return await asyncio.to_thread(self.data_service.get_students_with_birthday_today)
+
+        run_async_task(birthday_task(), self.main_app.loop, self.main_app.async_queue, self._on_birthdays_loaded)
+
+    def _on_birthdays_loaded(self, birthdays):
+        # Limpa o loading
+        for widget in self.birthdays_scrollable_frame.winfo_children():
+            widget.destroy()
+
+        if isinstance(birthdays, Exception):
+             ctk.CTkLabel(self.birthdays_scrollable_frame, text="Erro ao carregar.", text_color="red").pack(pady=20)
+             return
 
         if not birthdays:
             ctk.CTkLabel(self.birthdays_scrollable_frame, text="Nenhum aniversariante hoje.", text_color="gray").pack(pady=20)

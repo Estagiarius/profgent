@@ -5,3 +5,7 @@ Action: When fetching data solely for read-only aggregation or mapping (e.g., `g
 ## 2025-02-21 - [Lazy Loading UI Views]
 Learning: Initializing all CustomTkinter views (and their heavy widget trees) at startup causes significant lag.
 Action: Implemented Lazy Loading (Factory Pattern) in `MainApp`. Views are now instantiated only when requested via `show_view`. This reduced startup complexity from O(N) to O(1) (only Dashboard loads initially).
+
+## 2025-02-21 - [Async UI Loading]
+Learning: Running heavy data aggregation (O(N)) and Matplotlib generation on the main thread freezes the UI.
+Action: Refactored `DashboardView` to use `run_async_task` with `asyncio.to_thread`. This offloads blocking calls to a worker thread while keeping the UI responsive with loading indicators.
