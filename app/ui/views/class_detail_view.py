@@ -796,15 +796,11 @@ class ClassDetailView(ctk.CTkFrame):
         self.lesson_list_view.grid(row=0, column=0, sticky="nsew")
 
     def open_lesson_bncc_selector(self):
-        def on_select(codes):
-             current_text = self.lesson_editor_bncc_entry.get()
-             current_codes = [c.strip() for c in current_text.split(',') if c.strip()]
-             new_codes = [c for c in codes if c not in current_codes]
-             final_list = current_codes + new_codes
+        def on_select(result_string):
              self.lesson_editor_bncc_entry.delete(0, "end")
-             self.lesson_editor_bncc_entry.insert(0, ", ".join(final_list))
+             self.lesson_editor_bncc_entry.insert(0, result_string)
 
-        BNCCSelectionDialog(self, on_select)
+        BNCCSelectionDialog(self, initial_selection=self.lesson_editor_bncc_entry.get(), callback=on_select)
 
     def generate_ai_content(self):
         """Dispara a geração de conteúdo de aula usando IA."""

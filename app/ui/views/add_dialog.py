@@ -69,26 +69,11 @@ class AddDialog(ctk.CTkToplevel):
         save_button.grid(row=row_index, column=0, columnspan=2, padx=10, pady=20)
 
     def _open_bncc_selector(self, entry_widget):
-        def on_select(codes):
-            current_text = entry_widget.get()
-            # If there's already text, maybe append? or replace?
-            # Usually replace is safer to avoid duplicates if user selects again.
-            # Or merge.
-            # Let's replace for simplicity, assuming the dialog allows multi-selection of everything needed.
-            # But if user wants to keep old ones...
-            # BNCCSelectionDialog is multi-select.
-            # Let's append if not empty, but check for duplicates?
-            # Ideally the dialog should be pre-filled with current selection, but that's harder to pass.
-            # For now, append unique.
-
-            current_codes = [c.strip() for c in current_text.split(',') if c.strip()]
-            new_codes = [c for c in codes if c not in current_codes]
-
-            final_list = current_codes + new_codes
+        def on_select(result_string):
             entry_widget.delete(0, "end")
-            entry_widget.insert(0, ", ".join(final_list))
+            entry_widget.insert(0, result_string)
 
-        BNCCSelectionDialog(self, on_select)
+        BNCCSelectionDialog(self, initial_selection=entry_widget.get(), callback=on_select)
 
     # Método chamado quando o botão "Salvar" é clicado.
     def save(self):
