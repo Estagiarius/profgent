@@ -60,19 +60,16 @@ class ReportService:
 
         for subject in subjects_data:
             assessments = subject['assessments']
+            total_weight = sum(a['weight'] for a in assessments)
 
-            # Reconstrói lista de grades do aluno para esta matéria a partir do map global
-            student_grades = []
+            # Reconstrói lista de grades do aluno para esta matéria a partir do map global (Dict otimizado)
+            student_grades = {}
             for assessment in assessments:
                 score = grades_map.get((student_id, assessment['id']))
                 if score is not None:
-                    student_grades.append({
-                        "assessment_id": assessment['id'],
-                        "score": score,
-                        "student_id": student_id
-                    })
+                    student_grades[assessment['id']] = score
 
-            avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
+            avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments, total_weight=total_weight)
             subject_names.append(subject['course_name'])
             averages.append(avg)
 
@@ -120,19 +117,16 @@ class ReportService:
 
             for subject in subjects:
                 assessments = subject['assessments']
+                total_weight = sum(a['weight'] for a in assessments)
 
-                # Monta notas do aluno para essa matéria usando o mapa
-                student_grades = []
+                # Monta notas do aluno para essa matéria usando o mapa (Dict otimizado)
+                student_grades = {}
                 for assessment in assessments:
                     score = grades_map.get((student_id, assessment['id']))
                     if score is not None:
-                        student_grades.append({
-                            "assessment_id": assessment['id'],
-                            "score": score,
-                            "student_id": student_id
-                        })
+                        student_grades[assessment['id']] = score
 
-                avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
+                avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments, total_weight=total_weight)
                 student_subject_averages.append(avg)
 
             if student_subject_averages:
@@ -191,19 +185,16 @@ class ReportService:
             subject_averages = []
             for subject in subjects:
                 assessments = subject['assessments']
+                total_weight = sum(a['weight'] for a in assessments)
 
-                # Monta notas do aluno para essa matéria usando o mapa
-                student_grades = []
+                # Monta notas do aluno para essa matéria usando o mapa (Dict otimizado)
+                student_grades = {}
                 for assessment in assessments:
                     score = grades_map.get((student_id, assessment['id']))
                     if score is not None:
-                        student_grades.append({
-                            "assessment_id": assessment['id'],
-                            "score": score,
-                            "student_id": student_id
-                        })
+                        student_grades[assessment['id']] = score
 
-                avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
+                avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments, total_weight=total_weight)
                 row.append(f"{avg:.2f}")
                 subject_averages.append(avg)
 
@@ -278,17 +269,14 @@ class ReportService:
             lines.append(f"DISCIPLINA: {subject['course_name'].upper()}")
 
             assessments = subject['assessments']
+            total_weight = sum(a['weight'] for a in assessments)
 
             # Monta notas do aluno para essa matéria usando o mapa
-            student_grades = []
+            student_grades = {}
             for assessment in assessments:
                 score = grades_map.get((student_id, assessment['id']))
                 if score is not None:
-                    student_grades.append({
-                        "assessment_id": assessment['id'],
-                        "score": score,
-                        "student_id": student_id
-                    })
+                    student_grades[assessment['id']] = score
 
             if not assessments:
                 lines.append("  - Nenhuma avaliação registrada.")
@@ -298,7 +286,7 @@ class ReportService:
                     score_str = f"{score:.2f}" if score is not None else "N/A"
                     lines.append(f"  - {assessment['name']} (Peso {assessment['weight']}): {score_str}")
 
-            avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments)
+            avg = self.data_service.calculate_weighted_average(student_id, student_grades, assessments, total_weight=total_weight)
             lines.append(f"  >> MÉDIA FINAL: {avg:.2f}")
 
             # Adiciona Frequência

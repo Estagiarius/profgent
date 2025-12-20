@@ -651,7 +651,7 @@ class ClassDetailView(ctk.CTkFrame):
                 student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
                 ctk.CTkLabel(frame, text=student_name).grid(row=row, column=0, padx=5, pady=5, sticky="w")
 
-                student_grades_for_avg = [] # Para cálculo da média local da linha
+                student_grades_for_avg = {} # Para cálculo da média local da linha (Dict {assessment_id: score})
 
                 for col, assessment in enumerate(period_assessments, start=1):
                     entry = ctk.CTkEntry(frame, width=80)
@@ -662,14 +662,21 @@ class ClassDetailView(ctk.CTkFrame):
 
                     if existing_grade:
                         entry.insert(0, format_float_output(existing_grade['score']))
-                        student_grades_for_avg.append({"assessment_id": assessment['id'], "score": existing_grade['score']})
+                        student_grades_for_avg[assessment['id']] = existing_grade['score']
 
                     self.grade_entries[(enrollment['student_id'], assessment['id'])] = entry
 
                 # Calcula Média do Bimestre
                 # Precisamos passar apenas os assessments deste bimestre para o cálculo ficar correto como média deste bimestre
                 period_assessments_data = [{"id": a['id'], "weight": a['weight']} for a in period_assessments]
-                avg = data_service.calculate_weighted_average(enrollment['student_id'], [{"student_id": enrollment['student_id'], "assessment_id": x['assessment_id'], "score": x['score']} for x in student_grades_for_avg], period_assessments_data)
+                period_total_weight = sum(a['weight'] for a in period_assessments_data)
+
+                avg = data_service.calculate_weighted_average(
+                    enrollment['student_id'],
+                    student_grades_for_avg,
+                    period_assessments_data,
+                    total_weight=period_total_weight
+                )
 
                 ctk.CTkLabel(frame, text=format_float_output(avg, precision=2)).grid(row=row, column=len(period_assessments)+1, padx=5, pady=5)
 
@@ -1058,7 +1065,7 @@ class ClassDetailView(ctk.CTkFrame):
         if self.current_subject_id:
              batch_attendance_stats = data_service.get_class_attendance_stats(self.current_subject_id)
 
-        headers = ["Nº de Chamada", "Nome do Aluno", "Freq. %", "Data de Nascimento", "Status", "Ações"]
+        headers = ["Nº de Chamada", "Nome do Aluno", "Freq. %", "Data de Nascimento", "Status"]
         for i, header in enumerate(headers):
             label = ctk.CTkLabel(self.student_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
             label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
@@ -1085,18 +1092,26 @@ class ClassDetailView(ctk.CTkFrame):
                     birth_date_str = "Data Inválida"
             ctk.CTkLabel(self.student_list_frame, text=birth_date_str).grid(row=i, column=3, padx=10, pady=5, sticky="w")
 
-            display_status = self.status_map_rev.get(enrollment['status'], enrollment['status'])
-            ctk.CTkLabel(self.student_list_frame, text=display_status).grid(row=i, column=4, padx=10, pady=5, sticky="w")
+            # Botão Toggle para Status (Mais leve que Dropdown)
+            is_active = enrollment['status'] == 'Active'
+            btn_text = "Ativo" if is_active else "Inativo"
+            btn_color = "#2CC985" if is_active else "#D32F2F" # Verde / Vermelho
+            btn_hover = "#229A66" if is_active else "#B71C1C"
 
-            status_menu = ctk.CTkOptionMenu(self.student_list_frame, values=["Ativo", "Inativo"],
-                                            command=lambda status, eid=enrollment['id']: self.update_status(eid, status))
-            status_menu.set(display_status)
-            status_menu.grid(row=i, column=5, padx=10, pady=5, sticky="w")
+            status_btn = ctk.CTkButton(
+                self.student_list_frame,
+                text=btn_text,
+                fg_color=btn_color,
+                hover_color=btn_hover,
+                width=80,
+                command=lambda eid=enrollment['id'], curr=enrollment['status']: self.toggle_student_status(eid, curr)
+            )
+            status_btn.grid(row=i, column=4, padx=10, pady=5, sticky="w")
 
-    # Atualiza o status de uma matrícula.
-    def update_status(self, enrollment_id, status):
-        db_status = self.status_map.get(status, status)
-        data_service.update_enrollment_status(enrollment_id, db_status)
+    # Atualiza o status de uma matrícula (Toggle).
+    def toggle_student_status(self, enrollment_id, current_status):
+        new_status = "Inactive" if current_status == "Active" else "Active"
+        data_service.update_enrollment_status(enrollment_id, new_status)
         self.populate_student_list()
 
     def populate_report_student_combo(self):
