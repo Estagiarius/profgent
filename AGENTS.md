@@ -21,6 +21,20 @@ O projeto utiliza o **Poetry** para gerenciamento de dependências.
 Para manter a consistência e estabilidade do código, siga estas regras estritamente:
 
 *   **Idioma:** Todo o código visível ao usuário (interface, logs, saídas de ferramentas) e comentários devem ser em **Português do Brasil**. Identificadores de código (variáveis, funções, classes) devem permanecer em **Inglês**.
+*   **Cabeçalho de Propriedade Intelectual:** Todo arquivo de código-fonte (especialmente `.py`) deve iniciar com o seguinte cabeçalho (respeitando shebangs/encodings):
+    ```python
+    # Author: Victor Hugo Garcia de Oliveira
+    # Date: [Data de Criação do Arquivo no Formato YYYY-MM-DD]
+    #
+    # This Source Code Form is subject to the terms of the Mozilla Public
+    # License, v. 2.0. If a copy of the MPL was not distributed with this
+    # file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    #
+    # Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+    # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+    # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
+    ```
+    *Para arquivos novos, use a data atual. Para arquivos existentes, preserve a data da primeira inserção.*
 *   **Interface Gráfica e Assincronismo:** A aplicação usa `CustomTkinter` (CTK) em um loop de eventos principal.
     *   **NUNCA** execute código bloqueante (ex: `time.sleep`, requisições HTTP síncronas, queries pesadas) diretamente na thread da UI. Isso congelará a aplicação.
     *   Utilize o utilitário `run_async_task` (`app/utils/async_utils.py`) para despachar corrotinas para background.
