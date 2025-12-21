@@ -22,7 +22,7 @@ from app.ui.views.enrollment_dialog import EnrollmentDialog
 from app.ui.views.attendance_dialog import AttendanceDialog
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
 from app.ui.views.copy_lesson_dialog import CopyLessonDialog
-from app.ui.views.copy_lesson_dialog import CopyLessonDialog
+from app.ui.views.seating_chart_view import SeatingChartView
 from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
@@ -86,6 +86,7 @@ class ClassDetailView(ctk.CTkFrame):
         self.tab_view.add("Aulas")
         self.tab_view.add("Incidentes")
         self.tab_view.add("Quadro de Notas")
+        self.tab_view.add("Mapa de Sala")
         self.tab_view.add("BNCC")
         self.tab_view.add("Relatórios")
 
@@ -326,6 +327,15 @@ class ClassDetailView(ctk.CTkFrame):
 
         self.edit_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Editar Currículo Global", command=self.open_bncc_editor)
         self.edit_bncc_button.pack(side="left", padx=5)
+
+        # --- Aba Mapa de Sala ---
+        seating_tab = self.tab_view.tab("Mapa de Sala")
+        seating_tab.grid_rowconfigure(0, weight=1)
+        seating_tab.grid_columnconfigure(0, weight=1)
+
+        # O self.class_id é None no init, então precisamos configurar a view e atualizá-la depois
+        self.seating_chart_view = SeatingChartView(seating_tab, self.class_id)
+        self.seating_chart_view.grid(row=0, column=0, sticky="nsew")
 
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
 
@@ -1299,6 +1309,12 @@ class ClassDetailView(ctk.CTkFrame):
     # Método chamado quando esta view é exibida.
     def on_show(self, class_id=None):
         self.class_id = class_id
+
+        # Atualiza a view do mapa de sala com o ID novo
+        self.seating_chart_view.class_id = class_id
+        # Reseta o estado do mapa
+        self.seating_chart_view.populate_layout_combo()
+
         if class_id:
             # Atualiza o título e preenche todas as listas/quadros com os dados da turma selecionada.
             class_data = data_service.get_class_by_id(self.class_id)
