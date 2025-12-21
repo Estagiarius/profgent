@@ -1,8 +1,11 @@
 # Importa a biblioteca 'customtkinter' para os componentes da interface.
 import customtkinter as ctk
+from datetime import datetime
 # Importa as janelas de diálogo personalizadas para edição e adição.
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.views.add_dialog import AddDialog
+# Importa utilitário de rolagem
+from app.ui.ui_utils import bind_global_mouse_scroll
 # Importa o diálogo de entrada de texto padrão para confirmação de exclusão.
 from customtkinter import CTkInputDialog
 from tkinter import messagebox
@@ -70,6 +73,7 @@ class ManagementView(ctk.CTkFrame):
         # Frame com rolagem para a lista de alunos.
         self.students_frame = ctk.CTkScrollableFrame(students_tab)
         self.students_frame.grid(row=2, column=0, padx=10, pady=5, sticky="nsew")
+        bind_global_mouse_scroll(self.students_frame)
 
         # Frame de Paginação
         pagination_frame = ctk.CTkFrame(students_tab)
@@ -92,6 +96,7 @@ class ManagementView(ctk.CTkFrame):
         self.add_course_button.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
         self.courses_frame = ctk.CTkScrollableFrame(courses_tab)
         self.courses_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
+        bind_global_mouse_scroll(self.courses_frame)
 
         # --- Aba de Notas (Código Legado - Comentado) ---
         # grades_tab = self.tab_view.tab("Notas")
@@ -237,22 +242,72 @@ class ManagementView(ctk.CTkFrame):
     def edit_student(self, s):
         # Define o callback que será executado ao salvar no diálogo.
         def cb(id, data):
-            self.data_service.update_student(id, data['first_name'], data['last_name'])
-            self._load_student_page(self.current_page)
-        initial_data = { "id": s['id'], "first_name": s['first_name'], "last_name": s['last_name'] }
-        EditDialog(self, "Editar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, initial_data, cb)
+            birth_date_obj = None
+            if data['birth_date']:
+                try:
+                    birth_date_obj = datetime.strptime(data['birth_date'], "%d/%m/%Y").date()
+                except ValueError:
+                    messagebox.showerror("Erro", "Formato de data inválido. Use DD/MM/AAAA.")
+                    return
+
+            try:
+                self.data_service.update_student(id, data['first_name'], data['last_name'], birth_date=birth_date_obj)
+                self._load_student_page(self.current_page)
+            except ValueError as e:
+                messagebox.showerror("Erro", str(e))
+
+        # Formata a data de nascimento para exibição (DD/MM/AAAA)
+        birth_date_str = ""
+        if s.get('birth_date'):
+            try:
+                # s['birth_date'] vem do DataService como string ISO (YYYY-MM-DD)
+                dt = datetime.strptime(s['birth_date'], "%Y-%m-%d")
+                birth_date_str = dt.strftime("%d/%m/%Y")
+            except ValueError:
+                pass
+
+        initial_data = {
+            "id": s['id'],
+            "first_name": s['first_name'],
+            "last_name": s['last_name'],
+            "birth_date": birth_date_str
+        }
+
+        fields = {
+            "first_name": "Nome",
+            "last_name": "Sobrenome",
+            "birth_date": "Data de Nascimento (DD/MM/AAAA)"
+        }
+        EditDialog(self, "Editar Aluno", fields, initial_data, cb)
 
     # Abre o diálogo de edição para um curso.
     def edit_course(self, c):
-        def cb(id, data): self.data_service.update_course(id, data['course_name'], data['course_code']); self.populate_data()
-        EditDialog(self, "Editar Disciplina", {"course_name":"Nome", "course_code":"Código"}, c, cb)
+        def cb(id, data): self.data_service.update_course(id, data['course_name'], data['course_code'], data.get('bncc_expected')); self.populate_data()
+        EditDialog(self, "Editar Disciplina", {"course_name":"Nome", "course_code":"Código", "bncc_expected": "BNCC Esperada (CSV)"}, c, cb)
 
     # Abre o diálogo de adição para um novo aluno.
     def add_student_popup(self):
         def cb(data):
-            self.data_service.add_student(data['first_name'], data['last_name'])
-            self._load_student_page(self.current_page)
-        AddDialog(self, "Adicionar Aluno", {"first_name":"Nome", "last_name":"Sobrenome"}, save_callback=cb)
+            birth_date_obj = None
+            if data['birth_date']:
+                try:
+                    birth_date_obj = datetime.strptime(data['birth_date'], "%d/%m/%Y").date()
+                except ValueError:
+                    messagebox.showerror("Erro", "Formato de data inválido. Use DD/MM/AAAA.")
+                    return
+
+            try:
+                self.data_service.add_student(data['first_name'], data['last_name'], birth_date=birth_date_obj)
+                self._load_student_page(self.current_page)
+            except ValueError as e:
+                messagebox.showerror("Erro", str(e))
+
+        fields = {
+            "first_name": "Nome",
+            "last_name": "Sobrenome",
+            "birth_date": "Data de Nascimento (DD/MM/AAAA)"
+        }
+        AddDialog(self, "Adicionar Aluno", fields, save_callback=cb)
 
     # Abre o diálogo de adição para um novo curso.
     def add_course_popup(self):

@@ -1,5 +1,5 @@
 # Importa os tipos de coluna necessários do SQLAlchemy para definir o modelo.
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Text
 # Importa a função 'relationship' para definir relacionamentos entre modelos.
 from sqlalchemy.orm import relationship
 # Importa a classe 'Base' declarativa da qual todos os modelos devem herdar.
@@ -34,6 +34,8 @@ class Course(Base):
     course_name = Column(String, nullable=False, unique=True)
     # Define a coluna 'course_code' como uma string que deve ser única.
     course_code = Column(String, unique=True)
+    # Define a coluna 'bncc_expected' para armazenar os códigos da BNCC esperados (csv).
+    bncc_expected = Column(Text, nullable=True)
 
     # Relacionamento com ClassSubject (Associações com Turmas)
     class_subjects = relationship("ClassSubject", back_populates="course", cascade="all, delete-orphan")

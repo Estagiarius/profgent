@@ -8,7 +8,7 @@ description = "An academic management application with an AI assistant."
 authors = [
     {name = "Jules"}
 ]
-license = {text = "MIT"}
+license = {text = "MPL-2.0"}
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
 dependencies = [

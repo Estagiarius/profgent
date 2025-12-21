@@ -11,6 +11,7 @@ from app.ui.views.settings_view import SettingsView
 from app.ui.views.management_view import ManagementView
 from app.ui.views.class_selection_view import ClassSelectionView
 from app.ui.views.class_detail_view import ClassDetailView
+from app.ui.views.schedule_view import ScheduleView
 from app.core.config import load_setting
 
 # Importa as classes de serviço que contêm a lógica de negócios e da IA.
@@ -47,6 +48,8 @@ class MainApp(ctk.CTk):
     :type navigation_frame_label: ctk.CTkLabel
     :ivar dashboard_button: Botão de navegação para o dashboard.
     :type dashboard_button: ctk.CTkButton
+    :ivar schedule_button: Botão de navegação para o horário escolar.
+    :type schedule_button: ctk.CTkButton
     :ivar management_button: Botão de navegação para a gestão de dados.
     :type management_button: ctk.CTkButton
     :ivar class_selection_button: Botão de navegação para a seleção de turmas.
@@ -108,6 +111,7 @@ class MainApp(ctk.CTk):
         self.navigation_frame = ctk.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew") # Posiciona o frame na grade.
         self.navigation_frame.grid_rowconfigure(8, weight=1) # Linha 8 do frame se expande para empurrar os botões para cima.
+        self.navigation_frame.grid_columnconfigure(0, weight=1)
 
         # Adiciona um rótulo de título ao painel de navegação.
         self.navigation_frame_label = ctk.CTkLabel(self.navigation_frame, text="Navegação",
@@ -116,19 +120,22 @@ class MainApp(ctk.CTk):
 
         # Adiciona os botões de navegação. Cada botão chama o método `show_view` com o nome da tela correspondente.
         self.dashboard_button = ctk.CTkButton(self.navigation_frame, text="Dashboard", command=lambda: self.show_view("dashboard"))
-        self.dashboard_button.grid(row=1, column=0, padx=20, pady=10)
-
-        self.management_button = ctk.CTkButton(self.navigation_frame, text="Gestão de Dados", command=lambda: self.show_view("management"))
-        self.management_button.grid(row=2, column=0, padx=20, pady=10)
+        self.dashboard_button.grid(row=1, column=0, padx=20, pady=10, sticky="ew")
 
         self.class_selection_button = ctk.CTkButton(self.navigation_frame, text="Minhas Turmas", command=lambda: self.show_view("class_selection"))
-        self.class_selection_button.grid(row=3, column=0, padx=20, pady=10)
+        self.class_selection_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
+
+        self.schedule_button = ctk.CTkButton(self.navigation_frame, text="Horário", command=lambda: self.show_view("schedule"))
+        self.schedule_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
         self.assistant_button = ctk.CTkButton(self.navigation_frame, text="Assistente IA", command=lambda: self.show_view("assistant"))
-        self.assistant_button.grid(row=4, column=0, padx=20, pady=10)
+        self.assistant_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
+
+        self.management_button = ctk.CTkButton(self.navigation_frame, text="Gestão de Dados", command=lambda: self.show_view("management"))
+        self.management_button.grid(row=5, column=0, padx=20, pady=10, sticky="ew")
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Configurações", command=lambda: self.show_view("settings"))
-        self.settings_button.grid(row=7, column=0, padx=20, pady=10)
+        self.settings_button.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
 
 
         # Cria o frame principal onde o conteúdo de cada tela será exibido.
@@ -137,15 +144,20 @@ class MainApp(ctk.CTk):
         self.main_frame.grid_rowconfigure(0, weight=1) # Permite que o conteúdo se expanda.
         self.main_frame.grid_columnconfigure(0, weight=1)
 
-        # Cria as instâncias de cada tela (view) e as armazena em um dicionário para fácil acesso.
-        self.views = {
-            "dashboard": DashboardView(self.main_frame, self),
-            "management": ManagementView(self.main_frame, self),
-            "class_selection": ClassSelectionView(self.main_frame, self),
-            "class_detail": ClassDetailView(self.main_frame, self),
-            "assistant": AssistantView(self.main_frame, self, assistant_service=self.assistant_service),
-            "settings": SettingsView(self.main_frame, self)
+        # Factories para criar as views sob demanda (Lazy Loading).
+        # Isso otimiza o tempo de inicialização, criando os widgets pesados apenas quando necessário.
+        self.view_factories = {
+            "dashboard": lambda: DashboardView(self.main_frame, self),
+            "schedule": lambda: ScheduleView(self.main_frame, self),
+            "management": lambda: ManagementView(self.main_frame, self),
+            "class_selection": lambda: ClassSelectionView(self.main_frame, self),
+            "class_detail": lambda: ClassDetailView(self.main_frame, self),
+            "assistant": lambda: AssistantView(self.main_frame, self, assistant_service=self.assistant_service),
+            "settings": lambda: SettingsView(self.main_frame, self)
         }
+
+        # Dicionário para armazenar as instâncias das views já criadas.
+        self.views = {}
 
         # Exibe a tela de dashboard por padrão ao iniciar a aplicação.
         self.show_view("dashboard")
@@ -167,12 +179,21 @@ class MainApp(ctk.CTk):
 
     # Método para alternar entre as diferentes telas da aplicação.
     def show_view(self, view_name, **kwargs):
+        # Instancia a view se ela ainda não existir (Lazy Loading)
+        if view_name not in self.views and view_name in self.view_factories:
+            # Cria a instância usando a factory e armazena no cache
+            self.views[view_name] = self.view_factories[view_name]()
+
         # Esconde todas as telas para garantir que apenas uma esteja visível.
         for view in self.views.values():
             view.grid_forget()
 
         # Obtém a tela solicitada do dicionário.
-        selected_view = self.views[view_name]
+        selected_view = self.views.get(view_name)
+
+        if not selected_view:
+            return
+
         # Exibe a tela selecionada na grade do frame principal.
         selected_view.grid(row=0, column=0, sticky="nsew")
 

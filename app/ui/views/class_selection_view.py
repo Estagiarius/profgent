@@ -1,14 +1,12 @@
-# Importa a biblioteca 'customtkinter' para os componentes da interface.
-import customtkinter as ctk
-# Importa o serviço de dados para acessar as informações do banco.
-from app.services import data_service
+import customtkinter as ctk # Importa a biblioteca 'customtkinter' para os componentes da interface.
+from app.services import data_service # Importa o serviço de dados para acessar as informações do banco.
 # Importa as janelas de diálogo personalizadas para adicionar e editar.
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
-# Importa a janela de diálogo de entrada de texto padrão do customtkinter.
-from customtkinter import CTkInputDialog
-# Importa a biblioteca tkinter para exibir caixas de mensagem.
-from tkinter import messagebox
+from app.ui.ui_utils import bind_global_mouse_scroll # Importa utilitário de rolagem
+from app.ui.views.copy_class_dialog import CopyClassDialog
+from customtkinter import CTkInputDialog # Importa a janela de diálogo de entrada de texto padrão do customtkinter.
+from tkinter import messagebox # Importa a biblioteca tkinter para exibir caixas de mensagem.
 
 # Define a classe para a tela de seleção de turmas.
 class ClassSelectionView(ctk.CTkFrame):
@@ -32,6 +30,7 @@ class ClassSelectionView(ctk.CTkFrame):
         self.scrollable_frame = ctk.CTkScrollableFrame(self, label_text="Selecione uma turma para ver os detalhes")
         self.scrollable_frame.grid(row=1, column=0, columnspan=2, padx=20, pady=10, sticky="nsew")
         self.scrollable_frame.grid_columnconfigure(0, weight=1) # Permite que os cards se expandam horizontalmente.
+        bind_global_mouse_scroll(self.scrollable_frame)
 
         # Chama o método para preencher a lista de turmas ao iniciar.
         self.populate_class_cards()
@@ -77,6 +76,10 @@ class ClassSelectionView(ctk.CTkFrame):
         edit_button = ctk.CTkButton(actions_frame, text="Editar", command=lambda c=class_data: self.edit_class_popup(c))
         edit_button.pack(side="top", fill="x", padx=5, pady=5)
 
+        # Botão "Copiar Turma".
+        copy_button = ctk.CTkButton(actions_frame, text="Copiar Turma", fg_color="green", command=lambda c=class_data: self.copy_class_popup(c))
+        copy_button.pack(side="top", fill="x", padx=5, pady=5)
+
         # Botão "Excluir".
         delete_button = ctk.CTkButton(actions_frame, text="Excluir", fg_color="red", command=lambda c_id=class_data["id"]: self.delete_class_action(c_id))
         delete_button.pack(side="top", fill="x", padx=5, pady=5)
@@ -113,6 +116,26 @@ class ClassSelectionView(ctk.CTkFrame):
         fields = {"name": "Nome da Turma"}
         initial_data = {"id": class_data["id"], "name": class_data["name"]}
         EditDialog(self, "Editar Turma", fields, initial_data, save_callback)
+
+    # Abre o pop-up para copiar uma turma.
+    def copy_class_popup(self, class_data):
+        def save_callback(data):
+            try:
+                data_service.copy_class(
+                    source_class_id=class_data["id"],
+                    new_name=data["name"],
+                    copy_subjects=data["copy_subjects"],
+                    copy_assessments=data["copy_assessments"],
+                    copy_students=data["copy_students"]
+                )
+                messagebox.showinfo("Sucesso", f"Turma '{class_data['name']}' copiada para '{data['name']}' com sucesso!")
+                self.populate_class_cards()
+            except ValueError as e:
+                messagebox.showerror("Erro", str(e))
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro inesperado ao copiar turma: {e}")
+
+        CopyClassDialog(self, title=f"Copiar Turma: {class_data['name']}", callback=save_callback)
 
     # Abre o pop-up para adicionar uma nova turma.
     def add_class_popup(self):

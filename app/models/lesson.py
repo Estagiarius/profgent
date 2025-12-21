@@ -22,7 +22,7 @@ class Lesson(Base):
     :type title: str
     :ivar content: Conteúdo descritivo da aula. Pode ser nulo.
     :type content: str | None
-    :ivar class_subject_id: Chave estrangeira que associa a aula a uma disciplina de uma turma.
+    :ivar class_subject_id: Chave estrangeira que associa a aula a uma disciplina de uma turma. Indexado.
     :type class_subject_id: int
     :ivar class_subject: Relacionamento que conecta a aula com a respectiva instância de ClassSubject.
     :type class_subject: ClassSubject
@@ -38,11 +38,17 @@ class Lesson(Base):
     title = Column(String, nullable=False)
     # Define a coluna 'content' (conteúdo) como do tipo Text (texto longo), podendo ser nula.
     content = Column(Text, nullable=True)
+    # Define a coluna 'bncc_codes' para armazenar os códigos da BNCC trabalhados nesta aula.
+    bncc_codes = Column(Text, nullable=True)
 
     # Define a coluna 'class_subject_id' como uma chave estrangeira para a tabela 'class_subjects'. Não pode ser nula.
-    class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False)
+    # index=True otimiza busca de aulas por disciplina.
+    class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False, index=True)
     # Define o relacionamento com o modelo ClassSubject.
     class_subject = relationship("ClassSubject", back_populates="lessons")
+
+    # Define o relacionamento com o modelo Attendance.
+    attendance_records = relationship("Attendance", back_populates="lesson", cascade="all, delete-orphan")
 
     # Define uma representação em string para o objeto Lesson, útil para depuração.
     def __repr__(self):
