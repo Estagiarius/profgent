@@ -12,7 +12,7 @@ class BNCCSelectionDialog(ctk.CTkToplevel):
         self.selected_codes = {c.strip() for c in self.selected_codes if c.strip()}
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         # Search
         self.search_frame = ctk.CTkFrame(self)
@@ -25,18 +25,19 @@ class BNCCSelectionDialog(ctk.CTkToplevel):
         self.search_btn = ctk.CTkButton(self.search_frame, text="Buscar", command=self.perform_search)
         self.search_btn.pack(side="right")
 
-        # Selection Status
-        self.status_label = ctk.CTkLabel(self, text=f"Selecionados: {len(self.selected_codes)}")
-        self.status_label.grid(row=1, column=0, padx=10, pady=5, sticky="w")
-
         # List Area
         self.scrollable_frame = ctk.CTkScrollableFrame(self)
-        self.scrollable_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+        self.scrollable_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
-        # Buttons
+        # Buttons & Status Frame
         self.btn_frame = ctk.CTkFrame(self)
-        self.btn_frame.grid(row=3, column=0, padx=10, pady=10, sticky="ew")
+        self.btn_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
+        # Status Label (Left)
+        self.status_label = ctk.CTkLabel(self.btn_frame, text=f"Selecionados: {len(self.selected_codes)}")
+        self.status_label.pack(side="left", padx=10)
+
+        # Buttons (Right)
         ctk.CTkButton(self.btn_frame, text="Confirmar", command=self.confirm).pack(side="right", padx=10)
         ctk.CTkButton(self.btn_frame, text="Cancelar", fg_color="transparent", border_width=1, command=self.destroy).pack(side="right")
 
