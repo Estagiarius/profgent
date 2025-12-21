@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 from datetime import date, datetime, timedelta # Importa a classe 'date', 'datetime' e 'timedelta'.
 from sqlalchemy import func, or_, and_ # Importa a função 'func' do SQLAlchemy para usar funções SQL como COUNT, MAX, etc.
 from sqlalchemy.orm import joinedload, Session # Importa 'joinedload' para carregamento otimizado de relacionamentos (evita N+1 queries) e 'Session' para type hinting.
