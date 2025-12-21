@@ -119,7 +119,7 @@ erDiagram
 A lógica de negócios é encapsulada em serviços:
 
 ### `DataService` (`app/services/data_service.py`)
-Atua como um **DAO** centralizado para operações CRUD e gestão de transações. Injeta a sessão do banco de dados para facilitar testes.
+Atua como uma **Fachada (Facade)** centralizada para operações CRUD e gestão de transações. Internamente, delega a lógica para serviços especializados localizados em `app/services/data/` (ex: `StudentService`, `GradeService`, `EnrollmentService`), garantindo modularidade e coesão.
 
 ### `AssistantService` (`app/services/assistant_service.py`)
 Orquestra a inteligência artificial, mantendo histórico de conversas e gerenciando a chamada de ferramentas.

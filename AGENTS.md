@@ -55,7 +55,10 @@ Para manter a consistência e estabilidade do código, siga estas regras estrita
     *   `core/`: Núcleo estrutural (Configuração, Segurança, Framework de IA).
     *   `data/`: Configuração do banco (`database.py`) e arquivos estáticos da BNCC.
     *   `models/`: Definições de modelos SQLAlchemy (`student.py`, `schedule.py`, etc.).
-    *   `services/`: Lógica de negócios (`DataService`, `AssistantService`, `ReportService`, `BNCCService`).
+    *   `services/`: Lógica de negócios.
+        *   `DataService` (`data_service.py`): **Fachada** que centraliza o acesso aos dados.
+        *   `data/`: Submódulo contendo os serviços especializados (`StudentService`, `GradeService`, etc.) que compõem o `DataService`.
+        *   Outros serviços: `AssistantService`, `ReportService`, `BNCCService`.
     *   `tools/`: Implementações concretas das ferramentas do Assistente.
     *   `ui/`: Camada de apresentação (`views/`, `widgets/` e `main_app.py`).
     *   `utils/`: Utilitários compartilhados (`async_utils.py`, `student_csv_parser.py`, `charts.py`).
