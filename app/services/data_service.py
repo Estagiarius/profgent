@@ -378,6 +378,13 @@ class DataService:
                 course.course_code = course_code
                 course.bncc_expected = bncc_expected
 
+    def update_course_bncc(self, course_id: int, bncc_expected: str):
+        """Atualiza apenas os códigos BNCC esperados de um curso."""
+        with self._get_db() as db:
+            course = db.query(Course).filter(Course.id == course_id).first()
+            if course:
+                course.bncc_expected = bncc_expected
+
     # Método para deletar um curso.
     def delete_course(self, course_id: int):
         with self._get_db() as db:
