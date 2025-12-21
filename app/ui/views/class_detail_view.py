@@ -314,8 +314,8 @@ class ClassDetailView(ctk.CTkFrame):
         self.refresh_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Atualizar Relatório", command=self.populate_bncc_tab)
         self.refresh_bncc_button.pack(side="left", padx=5)
 
-        self.consult_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Consultar BNCC", command=self.open_bncc_consultation)
-        self.consult_bncc_button.pack(side="left", padx=5)
+        self.edit_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Editar Currículo Global", command=self.open_bncc_editor)
+        self.edit_bncc_button.pack(side="left", padx=5)
 
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
 
@@ -332,6 +332,7 @@ class ClassDetailView(ctk.CTkFrame):
             self.subject_combo.configure(state="normal")
             subject_names = [s['course_name'] for s in subjects]
             self.subject_mapping = {s['course_name']: s['id'] for s in subjects}
+            self.subject_data_mapping = {s['course_name']: s for s in subjects}
             self.subject_combo.configure(values=subject_names)
 
             # Seleciona o primeiro se nada estiver selecionado
@@ -388,9 +389,31 @@ class ClassDetailView(ctk.CTkFrame):
 
     # --- Fim Métodos de Gestão de Disciplinas ---
 
-    def open_bncc_consultation(self):
-        """Abre o diálogo da BNCC apenas para consulta."""
-        BNCCSelectionDialog(self, title="Consulta à Base Nacional Comum Curricular", callback=None)
+    def open_bncc_editor(self):
+        """Abre o diálogo da BNCC para editar o currículo global da disciplina."""
+        if not self.current_subject_id:
+            return
+
+        # Recupera o course_id usando o mapeamento
+        selected_subject_name = self.subject_combo.get()
+        subject_data = self.subject_data_mapping.get(selected_subject_name)
+        if not subject_data:
+            messagebox.showerror("Erro", "Erro ao identificar a disciplina.")
+            return
+
+        course_id = subject_data['course_id']
+        course_data = data_service.get_course_by_id(course_id)
+        current_bncc = course_data.get('bncc_expected', '')
+
+        def save_callback(new_codes):
+            try:
+                data_service.update_course_bncc(course_id, new_codes)
+                messagebox.showinfo("Sucesso", "Currículo global atualizado com sucesso.")
+                self.populate_bncc_tab()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Falha ao atualizar currículo: {e}")
+
+        BNCCSelectionDialog(self, title="Editar Currículo Global", initial_selection=current_bncc, callback=save_callback)
 
     def populate_bncc_tab(self):
         """Preenche a aba de relatório BNCC."""
@@ -406,6 +429,20 @@ class ClassDetailView(ctk.CTkFrame):
         if not report:
              ctk.CTkLabel(self.bncc_scroll_frame, text="Dados não disponíveis.").pack(pady=20)
              return
+
+        # Warning se não houver habilidades esperadas
+        if not report.get('expected'):
+            warning_frame = ctk.CTkFrame(self.bncc_scroll_frame, fg_color=("#FFEEBB", "#554400"), border_color="orange", border_width=1)
+            warning_frame.pack(fill="x", padx=10, pady=(10, 0))
+
+            warning_label = ctk.CTkLabel(
+                warning_frame,
+                text="⚠️ O professor ainda não cadastrou as habilidades no menu da disciplina, indicando para com que o professor cadastre as habilidades do currículo a serem trabalhadas.",
+                text_color=("black", "orange"),
+                wraplength=600,
+                font=ctk.CTkFont(weight="bold")
+            )
+            warning_label.pack(padx=10, pady=10)
 
         # Summary
         summary_frame = ctk.CTkFrame(self.bncc_scroll_frame)
