@@ -34,6 +34,7 @@ from app.ui.ui_utils import bind_global_mouse_scroll
 # Importa o serviço de relatórios.
 from app.services.report_service import ReportService
 import os
+import asyncio
 from PIL import Image
 
 # Define a classe para a tela de detalhes da turma.
@@ -329,11 +330,13 @@ class ClassDetailView(ctk.CTkFrame):
 
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
 
-    def populate_subject_combo(self):
+    def populate_subject_combo(self, subjects=None):
         """Busca as disciplinas da turma e preenche o combobox."""
         if not self.class_id: return
 
-        subjects = data_service.get_subjects_for_class(self.class_id)
+        if subjects is None:
+            subjects = data_service.get_subjects_for_class(self.class_id)
+
         if not subjects:
             self.subject_combo.configure(values=["Nenhuma Disciplina"], state="disabled")
             self.current_subject_id = None
@@ -657,117 +660,121 @@ class ClassDetailView(ctk.CTkFrame):
         for widget in frame.winfo_children():
             widget.destroy()
 
-        # Limpa entradas antigas para não salvar dados de abas invisíveis
+        # Limpa entradas antigas
         self.grade_entries = {}
 
         if not self.class_id or not self.current_subject_id:
             ctk.CTkLabel(frame, text="Selecione uma disciplina.").pack(pady=20)
             return
 
-        # Busca alunos
-        enrollments = data_service.get_enrollments_for_class(self.class_id)
-        if self.show_active_only_grades_checkbox.get():
-            enrollments = [e for e in enrollments if e['status'] == 'Active']
+        # Feedback de Carregamento
+        loading_label = ctk.CTkLabel(frame, text="Carregando notas...", font=ctk.CTkFont(size=16))
+        loading_label.pack(pady=20)
 
-        # Lógica para Abas de Bimestre (1-4)
-        if current_tab_name != "Resultados Finais":
-            period_map = {"1º Bimestre": 1, "2º Bimestre": 2, "3º Bimestre": 3, "4º Bimestre": 4}
-            target_period = period_map.get(current_tab_name, 1)
+        # Inicia carregamento assíncrono
+        run_async_task(
+            self._load_grade_grid_async(current_tab_name, self.current_subject_id, self.class_id, self.show_active_only_grades_checkbox.get()),
+            self.main_app.loop,
+            self.main_app.async_queue,
+            lambda res: self._on_grade_grid_loaded(res, frame, loading_label, current_tab_name)
+        )
 
-            # Busca avaliações DO PERÍODO
-            all_assessments = data_service.get_assessments_for_subject(self.current_subject_id)
-            period_assessments = [a for a in all_assessments if a.get('grading_period', 1) == target_period]
+    async def _load_grade_grid_async(self, tab_name, subject_id, class_id, active_only):
+        loop = asyncio.get_running_loop()
+        def fetch():
+            if tab_name != "Resultados Finais":
+                period_map = {"1º Bimestre": 1, "2º Bimestre": 2, "3º Bimestre": 3, "4º Bimestre": 4}
+                target_period = period_map.get(tab_name, 1)
+                # Busca otimizada de tudo que precisamos
+                return {
+                    "type": "period",
+                    "data": data_service.get_grade_grid_data(subject_id, target_period, active_only=active_only)
+                }
+            else:
+                # Lógica para Resultados Finais
+                enrollments = data_service.get_enrollments_for_class(class_id)
+                if active_only:
+                    enrollments = [e for e in enrollments if e['status'] == 'Active']
 
-            if not period_assessments:
+                averages = data_service.get_class_period_averages(subject_id)
+                return {
+                    "type": "final",
+                    "enrollments": enrollments,
+                    "averages": averages
+                }
+
+        return await loop.run_in_executor(None, fetch)
+
+    def _on_grade_grid_loaded(self, result, frame, loading_label, tab_name):
+        loading_label.destroy()
+
+        if isinstance(result, Exception):
+            ctk.CTkLabel(frame, text=f"Erro ao carregar notas: {result}").pack(pady=20)
+            return
+
+        result_type = result["type"]
+
+        # Renderização Bimestre (1-4)
+        if result_type == "period":
+            data = result["data"]
+            assessments = data["assessments"]
+            students = data["students"]
+            grades_map = data["grades_map"]
+            averages = data["averages"]
+
+            if not assessments:
                 ctk.CTkLabel(frame, text="Nenhuma avaliação cadastrada neste bimestre.").pack(pady=20)
                 return
 
             # Headers
-            headers = ["Nome do Aluno"] + [a['name'] for a in period_assessments] + ["Média Bimestre"]
+            headers = ["Nome do Aluno"] + [a['name'] for a in assessments] + ["Média Bimestre"]
             for col, header in enumerate(headers):
-                label = ctk.CTkLabel(frame, text=header, font=ctk.CTkFont(weight="bold"))
-                label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
+                ctk.CTkLabel(frame, text=header, font=ctk.CTkFont(weight="bold")).grid(row=0, column=col, padx=5, pady=5, sticky="w")
 
-            # Dados
-            grades = data_service.get_grades_for_subject(self.current_subject_id)
+            # Rows
+            for row, student in enumerate(students, start=1):
+                ctk.CTkLabel(frame, text=student['name']).grid(row=row, column=0, padx=5, pady=5, sticky="w")
 
-            # --- OTIMIZAÇÃO: Indexar grades em um dicionário para acesso O(1) ---
-            grades_map = {(g['student_id'], g['assessment_id']): g for g in grades}
-
-            for row, enrollment in enumerate(enrollments, start=1):
-                student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
-                ctk.CTkLabel(frame, text=student_name).grid(row=row, column=0, padx=5, pady=5, sticky="w")
-
-                student_grades_for_avg = {} # Para cálculo da média local da linha (Dict {assessment_id: score})
-
-                for col, assessment in enumerate(period_assessments, start=1):
+                for col, assessment in enumerate(assessments, start=1):
                     entry = ctk.CTkEntry(frame, width=80)
                     entry.grid(row=row, column=col, padx=5, pady=5)
 
-                    # Acesso direto via hash map
-                    existing_grade = grades_map.get((enrollment['student_id'], assessment['id']))
+                    score = grades_map.get((student['id'], assessment['id']))
+                    if score is not None:
+                        entry.insert(0, format_float_output(score))
 
-                    if existing_grade:
-                        entry.insert(0, format_float_output(existing_grade['score']))
-                        student_grades_for_avg[assessment['id']] = existing_grade['score']
+                    self.grade_entries[(student['id'], assessment['id'])] = entry
 
-                    self.grade_entries[(enrollment['student_id'], assessment['id'])] = entry
+                # Média (Pré-calculada no backend!)
+                avg = averages.get(student['id'], 0.0)
+                ctk.CTkLabel(frame, text=format_float_output(avg, precision=2)).grid(row=row, column=len(assessments)+1, padx=5, pady=5)
 
-                # Calcula Média do Bimestre
-                # Precisamos passar apenas os assessments deste bimestre para o cálculo ficar correto como média deste bimestre
-                period_assessments_data = [{"id": a['id'], "weight": a['weight']} for a in period_assessments]
-                period_total_weight = sum(a['weight'] for a in period_assessments_data)
+        # Renderização Resultados Finais
+        elif result_type == "final":
+            enrollments = result["enrollments"]
+            batch_averages = result["averages"]
 
-                avg = data_service.calculate_weighted_average(
-                    enrollment['student_id'],
-                    student_grades_for_avg,
-                    period_assessments_data,
-                    total_weight=period_total_weight
-                )
-
-                ctk.CTkLabel(frame, text=format_float_output(avg, precision=2)).grid(row=row, column=len(period_assessments)+1, padx=5, pady=5)
-
-        # Lógica para Aba "Resultados Finais"
-        else:
             headers = ["Nome do Aluno", "Média Calculada (4 Bim.)", "Nota Final (Editável)", "Ações"]
             for col, header in enumerate(headers):
-                label = ctk.CTkLabel(frame, text=header, font=ctk.CTkFont(weight="bold"))
-                label.grid(row=0, column=col, padx=10, pady=5, sticky="w")
-
-            # --- OTIMIZAÇÃO: Batch fetch de médias finais ---
-            batch_averages = data_service.get_class_period_averages(self.current_subject_id)
+                ctk.CTkLabel(frame, text=header, font=ctk.CTkFont(weight="bold")).grid(row=0, column=col, padx=10, pady=5, sticky="w")
 
             for row, enrollment in enumerate(enrollments, start=1):
                 student_id = enrollment['student_id']
-
-                # Lookup no batch results (se não existir, retorna dict vazio, que resulta em 0.0)
                 averages = batch_averages.get(student_id, {})
-
                 calc_avg = averages.get("final_calculated", 0.0)
                 override_avg = averages.get("final_override")
 
-                student_name = f"{enrollment['student_first_name']} {enrollment['student_last_name']}"
-
-                # Col 0: Nome
-                ctk.CTkLabel(frame, text=student_name).grid(row=row, column=0, padx=10, pady=5, sticky="w")
-
-                # Col 1: Média Calculada
+                ctk.CTkLabel(frame, text=f"{enrollment['student_first_name']} {enrollment['student_last_name']}").grid(row=row, column=0, padx=10, pady=5, sticky="w")
                 ctk.CTkLabel(frame, text=format_float_output(calc_avg, precision=2)).grid(row=row, column=1, padx=10, pady=5)
 
-                # Col 2: Nota Final (Editável)
                 entry = ctk.CTkEntry(frame, width=80)
                 entry.grid(row=row, column=2, padx=10, pady=5)
 
-                # Valor inicial: Se tiver override, mostra ele. Se não, mostra a calculada.
                 current_val = override_avg if override_avg is not None else calc_avg
                 entry.insert(0, format_float_output(current_val, precision=2))
 
-                # Armazena entry com chave 'None' para assessment_id, pois tratamos especial no save_final_grades
                 self.grade_entries[(student_id, None)] = entry
 
-                # Col 3: Botão Recalcular (Reset)
-                # Só faz sentido se tiver um override. Se não tiver, o valor já é o calculado.
-                # Mas para simplificar, o botão sempre copia o valor calculado para o entry.
                 recalc_btn = ctk.CTkButton(frame, text="Recalcular", width=80,
                                            command=lambda e=entry, val=calc_avg: self._reset_final_grade(e, val))
                 recalc_btn.grid(row=row, column=3, padx=10, pady=5)
@@ -807,11 +814,12 @@ class ClassDetailView(ctk.CTkFrame):
         AddDialog(self, "Adicionar Novo Incidente", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
 
     # Preenche a lista de incidentes na respectiva aba.
-    def populate_incident_list(self):
+    def populate_incident_list(self, incidents=None):
         for widget in self.incident_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
-        incidents = data_service.get_incidents_for_class(self.class_id)
+        if incidents is None:
+            incidents = data_service.get_incidents_for_class(self.class_id)
 
         # Cria cabeçalhos.
         headers = ["Nome do Aluno", "Data", "Descrição"]
@@ -1097,11 +1105,12 @@ class ClassDetailView(ctk.CTkFrame):
         )
 
     # Preenche a lista de alunos matriculados.
-    def populate_student_list(self):
+    def populate_student_list(self, enrollments=None):
         for widget in self.student_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
-        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        if enrollments is None:
+            enrollments = data_service.get_enrollments_for_class(self.class_id)
 
         # Filtra por alunos ativos se o checkbox estiver marcado.
         if self.show_active_only_checkbox.get():
@@ -1161,11 +1170,13 @@ class ClassDetailView(ctk.CTkFrame):
         data_service.update_enrollment_status(enrollment_id, new_status)
         self.populate_student_list()
 
-    def populate_report_student_combo(self):
+    def populate_report_student_combo(self, enrollments=None):
         """Atualiza o combobox de alunos na aba de relatórios."""
         if not self.class_id: return
 
-        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        if enrollments is None:
+            enrollments = data_service.get_enrollments_for_class(self.class_id)
+
         student_names = [f"{e['student_first_name']} {e['student_last_name']}" for e in enrollments]
 
         self.report_student_combo.configure(values=student_names)
@@ -1299,15 +1310,46 @@ class ClassDetailView(ctk.CTkFrame):
     # Método chamado quando esta view é exibida.
     def on_show(self, class_id=None):
         self.class_id = class_id
-        if class_id:
-            # Atualiza o título e preenche todas as listas/quadros com os dados da turma selecionada.
-            class_data = data_service.get_class_by_id(self.class_id)
-            self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
-            self.populate_student_list()
-            self.populate_incident_list()
+        if not self.class_id: return
 
-            # Popula o dropdown de disciplinas e dispara a atualização das outras abas
-            self.populate_subject_combo()
+        # Indicador visual de carregamento
+        self.title_label.configure(text="Carregando Detalhes da Turma...")
 
-            # Atualiza o combobox de alunos na aba de relatórios
-            self.populate_report_student_combo()
+        # Limpa as listas enquanto carrega
+        for widget in self.student_list_frame.winfo_children(): widget.destroy()
+
+        # Carregamento Assíncrono
+        run_async_task(
+            self._load_class_data_async(self.class_id),
+            self.main_app.loop,
+            self.main_app.async_queue,
+            self._on_class_data_loaded
+        )
+
+    async def _load_class_data_async(self, class_id):
+        loop = asyncio.get_running_loop()
+        def fetch_task():
+            # Executa queries pesadas em thread separada
+            c_data = data_service.get_class_by_id(class_id)
+            enrollments = data_service.get_enrollments_for_class(class_id)
+            incidents = data_service.get_incidents_for_class(class_id)
+            subjects = data_service.get_subjects_for_class(class_id)
+            return c_data, enrollments, incidents, subjects
+
+        return await loop.run_in_executor(None, fetch_task)
+
+    def _on_class_data_loaded(self, result):
+        if isinstance(result, Exception):
+            messagebox.showerror("Erro", f"Falha ao carregar turma: {result}")
+            self.title_label.configure(text="Erro ao carregar turma")
+            return
+
+        class_data, enrollments, incidents, subjects = result
+
+        self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
+
+        # Popula a UI com os dados JÁ carregados (evitando novas queries)
+        self.populate_student_list(enrollments)
+        self.populate_incident_list(incidents)
+        self.populate_subject_combo(subjects)
+        self.populate_report_student_combo(enrollments)

@@ -199,6 +199,9 @@ class DataService:
     def calculate_weighted_average(*args, **kwargs):
         return GradeService.calculate_weighted_average(*args, **kwargs)
 
+    def get_grade_grid_data(self, *args, **kwargs):
+        return self.grade_service.get_grade_grid_data(*args, **kwargs)
+
     # --- Lesson Service Delegations ---
     def create_lesson(self, *args, **kwargs):
         return self.lesson_service.create_lesson(*args, **kwargs)

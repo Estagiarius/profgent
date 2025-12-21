@@ -282,3 +282,82 @@ class GradeService(BaseDataService):
 
         weighted_sum = sum(student_grades.get(a['id'], 0.0) * a['weight'] for a in assessments)
         return weighted_sum / total_weight
+
+    def get_grade_grid_data(self, class_subject_id: int, grading_period: int, active_only: bool = True) -> dict:
+        """
+        Fetches all necessary data for the grade grid in a single optimized bundle.
+        Returns: {
+            "assessments": list[dict],
+            "students": list[dict], # Sorted by call number
+            "grades_map": dict[(student_id, assessment_id), float],
+            "averages": dict[student_id, float]
+        }
+        """
+        with self._get_db() as db:
+            # 1. Fetch Assessments for the period
+            assessments = db.query(Assessment).filter(
+                Assessment.class_subject_id == class_subject_id,
+                Assessment.grading_period == grading_period
+            ).order_by(Assessment.name).all()
+
+            assessments_data = [{"id": a.id, "name": a.name, "weight": a.weight} for a in assessments]
+            assessment_ids = [a.id for a in assessments]
+            total_weight = sum(a.weight for a in assessments)
+
+            # 2. Fetch Students in the Class (via ClassSubject)
+            class_subject = db.query(ClassSubject).filter(ClassSubject.id == class_subject_id).first()
+            if not class_subject:
+                return {"assessments": [], "students": [], "grades_map": {}, "averages": {}}
+
+            class_id = class_subject.class_id
+
+            query = (
+                db.query(Student.id, Student.first_name, Student.last_name, ClassEnrollment.call_number)
+                .join(ClassEnrollment, Student.id == ClassEnrollment.student_id)
+                .filter(ClassEnrollment.class_id == class_id)
+            )
+
+            if active_only:
+                query = query.filter(ClassEnrollment.status == 'Active')
+
+            students_query = query.order_by(ClassEnrollment.call_number).all()
+
+            students_data = [
+                {
+                    "id": s.id,
+                    "name": f"{s.first_name} {s.last_name}",
+                    "call_number": s.call_number
+                }
+                for s in students_query
+            ]
+
+            if not assessments_data or not students_data:
+                return {
+                    "assessments": assessments_data,
+                    "students": students_data,
+                    "grades_map": {},
+                    "averages": {}
+                }
+
+            # 3. Fetch Grades for these assessments
+            grades = db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).all()
+            grades_map = {(g.student_id, g.assessment_id): g.score for g in grades}
+
+            # 4. Calculate Averages
+            averages = {}
+            for student in students_data:
+                sid = student['id']
+                weighted_sum = 0.0
+                for a in assessments_data:
+                    score = grades_map.get((sid, a['id']), 0.0) # Default to 0 for missing grades in avg
+                    weighted_sum += score * a['weight']
+
+                avg = weighted_sum / total_weight if total_weight > 0 else 0.0
+                averages[sid] = avg
+
+            return {
+                "assessments": assessments_data,
+                "students": students_data,
+                "grades_map": grades_map,
+                "averages": averages
+            }
