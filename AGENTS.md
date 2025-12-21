@@ -14,7 +14,7 @@ O projeto utiliza o **Poetry** para gerenciamento de dependências.
     ```bash
     poetry install --no-root --with dev
     ```
-    *A flag `--with dev` é obrigatória para incluir dependências de teste como `pytest` e `pytest-mock`.*
+    *A flag `--with dev` é necessária para incluir dependências de teste como `pytest`.*
 
 ## Padrões de Desenvolvimento
 
@@ -25,7 +25,7 @@ Para manter a consistência e estabilidade do código, siga estas regras estrita
     *   **NUNCA** execute código bloqueante (ex: `time.sleep`, requisições HTTP síncronas, queries pesadas) diretamente na thread da UI. Isso congelará a aplicação.
     *   Utilize o utilitário `run_async_task` (`app/utils/async_utils.py`) para despachar corrotinas para background.
     *   A classe `MainApp` integra o loop `asyncio` através de um mecanismo de polling (`update_asyncio`).
-*   **Injeção de Dependência:** As Views da UI não devem instanciar serviços diretamente. Elas devem receber instâncias de `DataService` e `AssistantService` via construtor (`__init__`).
+*   **Injeção de Dependência:** As Views da UI não devem instanciar serviços diretamente. Elas devem receber instâncias de `DataService`, `AssistantService`, etc., via construtor (`__init__`).
 
 ## Execução e Testes
 
@@ -38,30 +38,27 @@ Para manter a consistência e estabilidade do código, siga estas regras estrita
     ```bash
     poetry run pytest
     ```
-    *   **Ambiente de Teste:** Os testes utilizam o `tests/conftest.py` para criar um banco de dados SQLite **em memória** (`db_session` fixture) para cada função de teste. Isso garante isolamento total e evita efeitos colaterais.
-    *   **Fixtures Úteis:**
-        *   `db_session`: Sessão SQLAlchemy isolada em memória.
-        *   `data_service`: Instância de `DataService` configurada para usar a `db_session`.
-        *   `assistant_service`: Instância com o provedor de IA "mockado" para evitar chamadas de rede.
+    *   **Ambiente de Teste:** Os testes utilizam o `tests/conftest.py` para criar um banco de dados SQLite **em memória** (`db_session` fixture) para cada função de teste. Isso garante isolamento total.
+    *   **Fixtures Úteis:** `db_session`, `data_service`, `assistant_service`.
 
 ## Arquitetura do Banco de Dados
 
 **AVISO IMPORTANTE:** O sistema de migração de banco de dados **Alembic foi removido** deste projeto.
 
 *   **Banco de Dados:** O arquivo é nomeado `academic_management.db`.
-*   **Inicialização:** Todas as tabelas são criadas automaticamente na primeira vez que a aplicação é executada. A lógica reside em `main.py` -> `initialize_database`, utilizando `Base.metadata.create_all(engine)`.
-*   **Não tente usar comandos do Alembic.** Eles não funcionarão.
+*   **Inicialização:** Todas as tabelas são criadas automaticamente na primeira vez que a aplicação é executada (`main.py` -> `initialize_database`), utilizando `Base.metadata.create_all(engine)`.
+*   **Migrações:** Alterações de schema devem ser gerenciadas manualmente ou através de scripts de migração personalizados em `app/data/migrations.py` (se existirem), nunca via Alembic.
 
 ## Estrutura do Código
 
 *   `app/`: Código-fonte da aplicação.
-    *   `core/`: Núcleo estrutural (Configuração `config.py`, Segurança, Framework de IA).
-    *   `data/`: Configuração da conexão com o banco de dados (`database.py`).
-    *   `models/`: Definições de modelos SQLAlchemy (Schema).
-    *   `services/`: Lógica de negócios (`DataService`, `AssistantService`, `ReportService`).
+    *   `core/`: Núcleo estrutural (Configuração, Segurança, Framework de IA).
+    *   `data/`: Configuração do banco (`database.py`) e arquivos estáticos da BNCC.
+    *   `models/`: Definições de modelos SQLAlchemy (`student.py`, `schedule.py`, etc.).
+    *   `services/`: Lógica de negócios (`DataService`, `AssistantService`, `ReportService`, `BNCCService`).
     *   `tools/`: Implementações concretas das ferramentas do Assistente.
-    *   `ui/`: Camada de apresentação (`views/` e `main_app.py`).
-    *   `utils/`: Utilitários compartilhados (Async, Gráficos, Parsers).
+    *   `ui/`: Camada de apresentação (`views/`, `widgets/` e `main_app.py`).
+    *   `utils/`: Utilitários compartilhados (`async_utils.py`, `student_csv_parser.py`, `charts.py`).
 *   `tests/`: Testes automatizados.
 *   `main.py`: Ponto de entrada (Bootstrap).
 
@@ -69,7 +66,7 @@ Para manter a consistência e estabilidade do código, siga estas regras estrita
 
 O Assistente de IA interage com o sistema exclusivamente através de ferramentas registradas.
 
-*   **Infraestrutura:** A lógica de registro e execução reside em `app/core/tools/` (`ToolRegistry`, `ToolExecutor`).
+*   **Infraestrutura:** A lógica de registro e execução reside em `app/core/tools/`.
 *   **Definição:** As ferramentas concretas estão em `app/tools/` e devem ser decoradas com `@tool`.
-*   **Registro:** Novas ferramentas devem ser registradas manualmente no método `_register_tools` da classe `AssistantService` (`app/services/assistant_service.py`).
-*   **Segurança:** O agente deve usar apenas as ferramentas fornecidas. A execução de código arbitrário é proibida.
+*   **Registro:** Novas ferramentas devem ser registradas manualmente no `AssistantService`.
+*   **Segurança:** O agente deve usar apenas as ferramentas fornecidas e não pode executar código arbitrário.

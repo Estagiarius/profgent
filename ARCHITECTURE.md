@@ -13,7 +13,8 @@ Um componente central da arquitetura é o **Assistente de IA**, que opera de for
 -   **GUI:** CustomTkinter (Wrapper moderno sobre Tkinter)
 -   **ORM:** SQLAlchemy
 -   **Banco de Dados:** SQLite
--   **IA:** Integração agnóstica de provedor (OpenAI, Ollama, Maritaca, etc.)
+-   **IA:** Integração agnóstica de provedor (OpenAI, etc.)
+-   **Visualização:** Matplotlib
 -   **Gerenciamento de Dependências:** Poetry
 -   **Testes:** Pytest
 
@@ -25,22 +26,31 @@ A organização do código reflete a separação de responsabilidades:
 .
 ├── app/
 │   ├── core/               # Núcleo da aplicação (Configuração, Segurança, Framework de IA)
-│   │   ├── llm/            # Abstração dos provedores de LLM (OpenAI, Ollama, etc.)
-│   │   ├── security/       # Gerenciamento de credenciais
+│   │   ├── llm/            # Abstração dos provedores de LLM
 │   │   ├── tools/          # Framework de execução de ferramentas da IA (Registry, Executor)
-│   │   └── config.py       # Gerenciamento de configurações persistentes
-│   ├── data/               # Configuração da conexão com o banco de dados
+│   │   └── config.py       # Gerenciamento de configurações
+│   ├── data/               # Configuração do banco e arquivos estáticos (JSONs da BNCC)
 │   ├── models/             # Modelos ORM (SQLAlchemy) - Definição do Schema
-│   ├── services/           # Lógica de Negócios (DataService, AssistantService, ReportService)
+│   │   ├── ...             # student.py, class_.py, course.py, etc.
+│   │   └── schedule.py     # Modelos de Horário Escolar
+│   ├── services/           # Lógica de Negócios
+│   │   ├── data_service.py      # CRUD Central
+│   │   ├── assistant_service.py # Lógica do Agente IA
+│   │   ├── report_service.py    # Geração de Relatórios e Gráficos
+│   │   └── bncc_service.py      # Gestão da Base Nacional Comum Curricular
 │   ├── tools/              # Implementação concreta das ferramentas do Agente
-│   ├── ui/                 # Camada de Apresentação (Views e MainApp)
-│   │   ├── views/          # Telas individuais da aplicação
-│   │   └── main_app.py     # Ponto de entrada da UI e Loop de Eventos
-│   └── utils/              # Utilitários (Async, Gráficos, Parsers)
+│   ├── ui/                 # Camada de Apresentação
+│   │   ├── views/          # Telas (Dashboard, Schedule, ClassDetail, etc.)
+│   │   ├── widgets/        # Componentes reutilizáveis
+│   │   └── main_app.py     # Ponto de entrada da UI
+│   └── utils/              # Utilitários
+│       ├── async_utils.py       # Gerenciamento de Threads/Async
+│       ├── student_csv_parser.py # Importação determinística de CSV
+│       └── ...
 ├── tests/                  # Testes Automatizados
-├── AGENTS.md               # Diretrizes para Agentes de IA (Meta-documentação)
-├── main.py                 # Ponto de entrada da aplicação (Bootstrap)
-└── pyproject.toml          # Definição de dependências (Poetry)
+├── AGENTS.md               # Diretrizes para Agentes de IA
+├── main.py                 # Ponto de entrada (Bootstrap)
+└── pyproject.toml          # Definição de dependências
 ```
 
 ## 3. Camada de Dados (Data Layer)
@@ -48,7 +58,7 @@ A organização do código reflete a separação de responsabilidades:
 A camada de dados utiliza o **SQLAlchemy** para mapear classes Python para tabelas do banco de dados SQLite (`academic_management.db`).
 
 ### Inicialização
-A inicialização do banco de dados ocorre em `main.py`. O sistema verifica a existência das tabelas e as cria automaticamente usando `Base.metadata.create_all(engine)` caso não existam. O uso do **Alembic foi removido** em favor dessa abordagem simplificada para este projeto.
+A inicialização do banco de dados ocorre em `main.py`. O sistema verifica a existência das tabelas e as cria automaticamente usando `Base.metadata.create_all(engine)`.
 
 ### Diagrama ERD (Entidade-Relacionamento)
 
@@ -63,7 +73,9 @@ erDiagram
     COURSE ||--o{ CLASS_SUBJECT : "definido_em"
     CLASS_SUBJECT ||--o{ ASSESSMENT : "inclui"
     CLASS_SUBJECT ||--o{ LESSON : "rastreia"
+    CLASS_SUBJECT ||--o{ WEEKLY_SCHEDULE : "ocupa"
     ASSESSMENT ||--o{ GRADE : "avaliado_por"
+    TIME_SLOT ||--o{ WEEKLY_SCHEDULE : "define"
 
     STUDENT {
         int id
@@ -77,6 +89,7 @@ erDiagram
     COURSE {
         int id
         string name
+        string bncc_expected
     }
     CLASS_ENROLLMENT {
         int id
@@ -88,73 +101,61 @@ erDiagram
         int id
         float score
     }
+    TIME_SLOT {
+        int id
+        int day_of_week
+        int period_index
+        time start_time
+    }
+    WEEKLY_SCHEDULE {
+        int id
+        int time_slot_id
+        int class_subject_id
+    }
 ```
 
 ## 4. Camada de Serviços (Service Layer)
 
-A lógica de negócios é encapsulada em serviços, promovendo a reutilização e testabilidade.
+A lógica de negócios é encapsulada em serviços:
 
 ### `DataService` (`app/services/data_service.py`)
-Atua como um **Data Access Object (DAO)** centralizado.
--   Responsável por todas as operações CRUD.
--   Gerencia transações de banco de dados (`Commit`/`Rollback`).
--   Injeta a sessão do banco de dados, permitindo fácil "mocking" em testes.
--   **Padrão Importante:** Retorna dicionários (DTOs) ou tipos primitivos para a UI, evitando problemas com objetos SQLAlchemy "detached" na interface.
+Atua como um **DAO** centralizado para operações CRUD e gestão de transações. Injeta a sessão do banco de dados para facilitar testes.
 
 ### `AssistantService` (`app/services/assistant_service.py`)
-Orquestra a inteligência artificial.
--   Mantém o histórico de conversas.
--   Gerencia o ciclo de vida do provedor de LLM.
--   Coordena a execução de ferramentas solicitadas pela IA.
+Orquestra a inteligência artificial, mantendo histórico de conversas e gerenciando a chamada de ferramentas.
 
 ### `ReportService` (`app/services/report_service.py`)
--   Centraliza a lógica de geração de relatórios, gráficos e exportações CSV.
--   Compartilhado entre a UI e o Agente de IA.
+Centraliza a lógica de geração de relatórios, gráficos (via Matplotlib) e exportações. Utilizado tanto pela UI quanto pelo Agente.
+
+### `BNCCService` (`app/services/bncc_service.py`)
+Gerencia o acesso aos dados estáticos da Base Nacional Comum Curricular (BNCC), permitindo a pesquisa e seleção de competências.
 
 ## 5. Arquitetura do Agente de IA
 
-O sistema implementa um padrão robusto de "Function Calling" (Chamada de Função), permitindo que o LLM interaja com o banco de dados de forma determinística e segura.
+O sistema implementa um padrão de "Function Calling".
 
 ### Componentes Principais (`app/core/`)
 
-1.  **`LLMProvider` (Interface):** Classe base abstrata que define como comunicar com diferentes IAs (OpenAI, Ollama, etc.). Isso permite trocar o "cérebro" da aplicação sem alterar o código do assistente.
-2.  **`ToolRegistry`:** Um registro central onde funções Python decoradas com `@tool` são armazenadas. Ele gera automaticamente os schemas JSON que são enviados para o LLM.
-3.  **`ToolExecutor`:** Responsável por receber a solicitação do LLM (nome da ferramenta + argumentos JSON), validar, executar a função Python real e retornar o resultado.
+1.  **`LLMProvider`:** Interface abstrata para provedores de IA.
+2.  **`ToolRegistry`:** Registro central de ferramentas (`@tool`).
+3.  **`ToolExecutor`:** Executor seguro que valida argumentos e invoca as funções Python.
 
-### Fluxo de Execução
-
-```mermaid
-sequenceDiagram
-    participant User as Usuário
-    participant AS as AssistantService
-    participant LLM as LLM Provider
-    participant TE as ToolExecutor
-    participant DB as Banco de Dados
-
-    User->>AS: Envia mensagem (ex: "Cadastre o aluno João")
-    AS->>LLM: Envia histórico + Schemas das Ferramentas
-    LLM-->>AS: Resposta: "Desejo chamar add_new_student(...)"
-    AS->>TE: Executa add_new_student(nome="João")
-    TE->>DB: INSERT INTO students...
-    DB-->>TE: ID do novo aluno
-    TE-->>AS: Retorno: "Aluno criado com ID 123"
-    AS->>LLM: Envia resultado da ferramenta
-    LLM-->>AS: Resposta Final: "O aluno João foi cadastrado com sucesso."
-    AS-->>User: Exibe resposta
-```
+### Fluxo de Execução Típico
+1.  Usuário solicita uma ação.
+2.  `AssistantService` envia contexto + definições de ferramentas para o LLM.
+3.  LLM decide chamar uma ferramenta (ex: `get_global_dashboard_stats`).
+4.  `ToolExecutor` executa a função e retorna o JSON resultante.
+5.  `AssistantService` devolve o resultado ao LLM, que gera a resposta final em linguagem natural.
 
 ## 6. Camada de Interface (UI) e Assincronismo
 
-A interface utiliza **CustomTkinter** e roda em um loop de eventos principal (Main Thread). No entanto, o sistema realiza muitas operações de I/O (Banco de Dados, Chamadas de API de IA) que são bloqueantes.
+A interface utiliza **CustomTkinter** e roda em um loop de eventos principal.
 
 ### Solução Híbrida (Tkinter + Asyncio)
-Para manter a UI responsiva, o `MainApp` (`app/ui/main_app.py`) implementa um mecanismo de integração:
-
-1.  **Loop Asyncio:** Um loop de eventos `asyncio` roda controlado pelo loop do Tkinter através de polling (`self.after(20, self.update_asyncio)`).
-2.  **Fila de Comunicação (`Queue`):** As tarefas assíncronas (executadas em threads separadas ou no loop asyncio) comunicam resultados de volta para a thread da UI através de uma `queue.Queue`.
-3.  **`run_async_task`:** Um utilitário em `app/utils/async_utils.py` facilita o despacho de corrotinas para o background e define callbacks para atualizar a UI quando terminarem.
+Para evitar travamentos da UI em operações longas (I/O, IA):
+1.  **Loop Asyncio:** Integrado ao loop do Tkinter via polling (`update_asyncio`).
+2.  **`run_async_task`:** Utilitário (`app/utils/async_utils.py`) para despachar corrotinas para background, com callbacks thread-safe para atualizar a interface.
 
 ## 7. Desenvolvimento e Testes
 
--   **Testes:** Rodam com `pytest`. O arquivo `tests/conftest.py` configura um banco de dados SQLite **em memória** para garantir que os testes sejam rápidos e isolados (não afetam o banco de dados de desenvolvimento).
--   **Injeção de Dependência:** As Views recebem instâncias de `DataService` e `AssistantService` no construtor, facilitando a substituição por Mocks durante os testes.
+-   **Testes:** Rodam com `pytest` utilizando banco de dados SQLite **em memória** (`tests/conftest.py`) para isolamento e performance.

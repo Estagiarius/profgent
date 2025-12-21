@@ -1,42 +1,38 @@
-# ProfGent - Sistema Simples de Administração Interna de Professores com Agente de IA Embutido
+# ProfGent - Sistema de Gestão Acadêmica com Assistente de IA
 
 ## Sobre o Projeto
 
-Este projeto é um sistema de gerenciamento acadêmico, desenvolvido em Python, que visa simplificar a administração de estudantes, cursos, turmas e notas. A aplicação possui uma interface gráfica intuitiva construída com CustomTkinter e um banco de dados relacional gerenciado pelo SQLAlchemy.
-
-O grande diferencial deste sistema é a integração de um **Assistente de IA**, que permite aos usuários interagir com o sistema através de linguagem natural para realizar consultas e executar operações de gerenciamento, otimizando o fluxo de trabalho e tornando a gestão acadêmica mais eficiente.
+O **ProfGent** é um sistema de gerenciamento escolar desenvolvido em Python, projetado para simplificar a administração de turmas, alunos, notas e horários. A aplicação combina uma interface gráfica moderna (CustomTkinter) com um banco de dados robusto (SQLite/SQLAlchemy) e um **Assistente de IA integrado**, que permite realizar tarefas complexas através de comandos em linguagem natural.
 
 ## Funcionalidades Principais
 
-*   **Gerenciamento Acadêmico Abrangente (CRUD):** Interface completa para criar, visualizar, atualizar e deletar registros de estudantes, cursos, turmas, matrículas, avaliações, notas, aulas e incidentes disciplinares.
-*   **Assistente de IA Integrado:** Utilize comandos em linguagem natural para interagir com o banco de dados, como "liste todos os alunos da turma de Cálculo" ou "adicione o curso de História". O assistente utiliza um framework de ferramentas seguro para executar operações de leitura e escrita.
-*   **Interface Gráfica Intuitiva:** Uma aplicação desktop desenvolvida com a biblioteca CustomTkinter, garantindo uma experiência de usuário moderna e agradável.
-*   **Visualização de Dados:** Geração de gráficos e visualizações para análise de dados acadêmicos, como a distribuição de notas por curso.
-*   **Importação de Dados:** Funcionalidade para importar listas de alunos para uma turma a partir de arquivos `.csv`.
-*   **Banco de Dados Persistente:** Utiliza SQLite com o ORM SQLAlchemy para um acesso seguro e eficiente aos dados.
+*   **Gestão Acadêmica Completa (CRUD):** Controle total sobre Alunos, Turmas, Disciplinas, Avaliações e Notas.
+*   **Horário Escolar:** Configuração flexível de grades horárias, definição de tempos de aula e alocação semanal de disciplinas por turma.
+*   **Planejamento com BNCC:** Ferramentas dedicadas para o registro de aulas e seleção de competências da Base Nacional Comum Curricular (BNCC).
+*   **Ferramentas de Produtividade:**
+    *   **Cópia de Turmas:** Replique a estrutura completa de uma turma (disciplinas, avaliações) para um novo ano ou semestre.
+    *   **Replicação de Aulas:** Copie planos de aula e conteúdos entre turmas diferentes.
+    *   **Importação Inteligente:** Carregue listas de alunos via CSV com parser determinístico que ajusta nomes e formatações automaticamente.
+*   **Visualização de Desempenho:** Geração automática de gráficos de distribuição de notas e boletins de desempenho individual (formato texto e visualização em tela).
+*   **Assistente de IA:** Um agente inteligente capaz de executar operações de banco de dados ("Cadastre o aluno X"), analisar dados ("Qual a média da turma Y?") e gerar conteúdos de aula.
+*   **Interface Moderna:** GUI baseada em CustomTkinter com suporte a temas e modo escuro.
 
 ## Tecnologias Utilizadas
 
-A aplicação é construída com um conjunto de tecnologias modernas e eficientes do ecossistema Python:
-
 *   **Linguagem:** Python 3.10+
-*   **Interface Gráfica (GUI):** CustomTkinter
-*   **Banco de Dados:** SQLite
-*   **ORM (Object-Relational Mapping):** SQLAlchemy
-*   **Gerenciador de Dependências:** Poetry
-*   **Framework de Testes:** Pytest
-*   **Inteligência Artificial:** Integração com a API da OpenAI
+*   **Interface (GUI):** CustomTkinter
+*   **Banco de Dados:** SQLite + SQLAlchemy (ORM)
+*   **Análise e Gráficos:** Matplotlib
+*   **IA e LLM:** Integração com APIs compatíveis com OpenAI
+*   **Gerenciamento:** Poetry (Dependências) e Pytest (Testes)
 
 ## Como Instalar e Rodar
 
-Siga os passos abaixo para configurar o ambiente de desenvolvimento e executar a aplicação.
-
 ### Pré-requisitos
+*   Python 3.10 ou superior (versões 3.10 a 3.14 suportadas).
+*   [Poetry](https://python-poetry.org/) instalado.
 
-*   Python (versão >=3.10, <3.15)
-*   Poetry instalado
-
-### Instalação
+### Passo a Passo
 
 1.  **Clone o repositório:**
     ```bash
@@ -45,33 +41,27 @@ Siga os passos abaixo para configurar o ambiente de desenvolvimento e executar a
     ```
 
 2.  **Instale as dependências:**
-    Utilize o Poetry para instalar todas as dependências do projeto.
     ```bash
     poetry install
     ```
 
-### Execução
+3.  **Execute a aplicação:**
+    ```bash
+    poetry run python main.py
+    ```
+    *O banco de dados `academic_management.db` será criado automaticamente na primeira execução.*
 
-Após a instalação das dependências, execute o comando abaixo para iniciar a aplicação:
+## Executando Testes
 
-```bash
-poetry run python main.py
-```
-
-Ao ser iniciada, a aplicação verifica a existência do banco de dados. Se o arquivo do banco de dados não for encontrado, ele será criado automaticamente com todas as tabelas necessárias, garantindo que o sistema esteja pronto para uso.
-
-## Como Executar os Testes
-
-O projeto utiliza Pytest para os testes unitários e de integração. Para executar a suíte de testes, utilize o seguinte comando:
+Para rodar a suíte de testes automatizados:
 
 ```bash
 poetry run pytest
 ```
 
-Os testes são configurados para rodar em um banco de dados SQLite em memória para garantir isolamento e velocidade.
-
 ## Documentação Técnica
 
-Para desenvolvedores e mantenedores do sistema, foi criada uma documentação detalhada da arquitetura, incluindo diagramas de banco de dados e fluxos de execução:
+Para desenvolvedores e mantenedores, consulte a documentação detalhada:
 
-*   [Arquitetura do Sistema (ARCHITECTURE.md)](ARCHITECTURE.md)
+*   [Guia de Arquitetura (ARCHITECTURE.md)](ARCHITECTURE.md): Estrutura do código, diagrama de dados e fluxo da IA.
+*   [Guia para Agentes (AGENTS.md)](AGENTS.md): Diretrizes para desenvolvimento e manutenção por agentes de IA.
