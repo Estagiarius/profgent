@@ -20,7 +20,7 @@ class CopyLessonDialog(ctk.CTkToplevel):
         self.callback = callback
 
         self.title("Copiar Aulas")
-        self.geometry("600x500")
+        self.geometry("720x480")
 
         # Centraliza na tela (opcional, mas bom UX)
         self.update_idletasks()

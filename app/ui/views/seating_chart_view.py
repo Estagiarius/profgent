@@ -76,7 +76,7 @@ class SeatingChartView(ctk.CTkFrame):
 
         # Canvas for Drawing
         self.canvas_frame = ScrollableCanvasFrame(self.grid_container)
-        self.canvas_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.canvas_frame.grid(row=1, column=0, sticky="nsew", padx=50, pady=50)
 
         # Bind events on canvas
         self.canvas = self.canvas_frame.canvas

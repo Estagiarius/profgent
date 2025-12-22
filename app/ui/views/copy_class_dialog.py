@@ -15,7 +15,7 @@ class CopyClassDialog(ctk.CTkToplevel):
         super().__init__(parent)
         self.callback = callback
         self.title(title)
-        self.geometry("400x350")
+        self.geometry("1280x720")
 
         # Centraliza a janela
         self.update_idletasks()

@@ -15,7 +15,7 @@ class AttendanceDialog(ctk.CTkToplevel):
     def __init__(self, parent, title, lesson_id, students, attendance_map, save_callback):
         super().__init__(parent)
         self.title(title)
-        self.geometry("600x500")
+        self.geometry("1280x720")
         self.resizable(False, True)
 
         self.lesson_id = lesson_id
