@@ -36,7 +36,7 @@ class SeatingChartView(ctk.CTkFrame):
         # --- Sidebar ---
         self.sidebar_frame = ctk.CTkFrame(self, width=250)
         self.sidebar_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
-        self.sidebar_frame.grid_rowconfigure(3, weight=1) # Student list expands
+        self.sidebar_frame.grid_rowconfigure(4, weight=1) # Student list expands (Row 4)
 
         # Layout Selector
         ctk.CTkLabel(self.sidebar_frame, text="Layouts Salvos:", font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, padx=10, pady=(10, 5), sticky="w")
