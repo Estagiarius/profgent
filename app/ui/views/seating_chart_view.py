@@ -202,7 +202,8 @@ class SeatingChartView(ctk.CTkFrame):
         self.populate_layout_combo()
 
     # --- Drawing Logic ---
-    CELL_SIZE = 60
+    CELL_WIDTH = 150
+    CELL_HEIGHT = 100
     PADDING = 20
 
     def draw_grid(self):
@@ -215,18 +216,18 @@ class SeatingChartView(ctk.CTkFrame):
         assignments = self.chart_data['assignments_map']
 
         # Calculate canvas size
-        width = cols * self.CELL_SIZE + (self.PADDING * 2)
-        height = rows * self.CELL_SIZE + (self.PADDING * 2)
+        width = cols * self.CELL_WIDTH + (self.PADDING * 2)
+        height = rows * self.CELL_HEIGHT + (self.PADDING * 2)
 
         # Configure scroll region
         self.canvas_frame.canvas.configure(scrollregion=(0, 0, width, height))
 
         for r in range(rows):
             for c in range(cols):
-                x1 = self.PADDING + (c * self.CELL_SIZE)
-                y1 = self.PADDING + (r * self.CELL_SIZE)
-                x2 = x1 + self.CELL_SIZE
-                y2 = y1 + self.CELL_SIZE
+                x1 = self.PADDING + (c * self.CELL_WIDTH)
+                y1 = self.PADDING + (r * self.CELL_HEIGHT)
+                x2 = x1 + self.CELL_WIDTH
+                y2 = y1 + self.CELL_HEIGHT
 
                 cell_key = f"{r},{c}"
                 cell_type = layout_config.get(cell_key, "student_seat")
@@ -238,11 +239,11 @@ class SeatingChartView(ctk.CTkFrame):
 
                 elif cell_type == "door":
                     self.canvas.create_rectangle(x1, y1, x2, y2, fill="#8B4513", outline="black")
-                    self.canvas.create_text((x1+x2)/2, (y1+y2)/2, text="Porta", fill="white", font=("Arial", 10, "bold"))
+                    self.canvas.create_text((x1+x2)/2, (y1+y2)/2, text="Porta", fill="white", font=("Arial", 12, "bold"))
 
                 elif cell_type == "teacher_desk":
                     self.canvas.create_rectangle(x1, y1, x2, y2, fill="#D3D3D3", outline="black")
-                    self.canvas.create_text((x1+x2)/2, (y1+y2)/2, text="Mesa\nProf.", justify="center", font=("Arial", 9))
+                    self.canvas.create_text((x1+x2)/2, (y1+y2)/2, text="Mesa\nProf.", justify="center", font=("Arial", 11))
 
                 elif cell_type == "student_seat":
                     # Draw Seat
@@ -255,29 +256,31 @@ class SeatingChartView(ctk.CTkFrame):
                         call_num = assignment.get('call_number')
                         call_str = f"{call_num}" if call_num is not None else "?"
 
-                        # Display: Call Number (top left) + Name (center)
-                        # Call Number
-                        self.canvas.create_text(x1+5, y1+5, text=call_str, anchor="nw", fill="blue", font=("Arial", 8, "bold"))
+                        # Display: Call Number (top left)
+                        self.canvas.create_text(x1+8, y1+8, text=call_str, anchor="nw", fill="blue", font=("Arial", 10, "bold"))
 
-                        # Name Truncate
-                        display_name = name.split()[0] # First name only
-                        self.canvas.create_text((x1+x2)/2, (y1+y2)/2, text=display_name, fill="black", font=("Arial", 10))
+                        # Name: Try to display more complete name
+                        # Split name and take up to 2 parts, join with newline if needed
+                        parts = name.split()
+                        if len(parts) >= 2:
+                            display_name = f"{parts[0]}\n{parts[-1]}"
+                        else:
+                            display_name = name
+
+                        self.canvas.create_text((x1+x2)/2, (y1+y2)/2, text=display_name, justify="center", fill="black", font=("Arial", 12), width=self.CELL_WIDTH-10)
                     else:
-                        self.canvas.create_text((x1+x2)/2, (y1+y2)/2, text="Vazio", fill="#AAA", font=("Arial", 8))
+                        self.canvas.create_text((x1+x2)/2, (y1+y2)/2, text="Vazio", fill="#AAA", font=("Arial", 10))
 
     def on_canvas_click(self, event):
         if not self.chart_data: return
 
         # Translate canvas coordinates accounting for scroll
-        # The event.x/y are relative to the visible part of canvas, but canvas methods expect absolute if scrolled?
-        # No, Tkinter event.x/y are relative to widget. Canvas methods like find_closest use canvas coords.
-        # But we need to use canvasx/canvasy to map window coord to canvas coord
         cx = self.canvas.canvasx(event.x)
         cy = self.canvas.canvasy(event.y)
 
         # Determine Cell
-        col = int((cx - self.PADDING) // self.CELL_SIZE)
-        row = int((cy - self.PADDING) // self.CELL_SIZE)
+        col = int((cx - self.PADDING) // self.CELL_WIDTH)
+        row = int((cy - self.PADDING) // self.CELL_HEIGHT)
 
         if 0 <= row < self.chart_data['rows'] and 0 <= col < self.chart_data['columns']:
             self.handle_cell_click(row, col)
@@ -333,8 +336,8 @@ class SeatingChartView(ctk.CTkFrame):
 
         cx = self.canvas.canvasx(event.x)
         cy = self.canvas.canvasy(event.y)
-        col = int((cx - self.PADDING) // self.CELL_SIZE)
-        row = int((cy - self.PADDING) // self.CELL_SIZE)
+        col = int((cx - self.PADDING) // self.CELL_WIDTH)
+        row = int((cy - self.PADDING) // self.CELL_HEIGHT)
 
         if 0 <= row < self.chart_data['rows'] and 0 <= col < self.chart_data['columns']:
             # Show Context Menu
