@@ -18,7 +18,7 @@ class LessonDialog(ctk.CTkToplevel):
     def __init__(self, parent, class_subject_id, lesson_date, lesson_data=None, on_save=None):
         super().__init__(parent)
         self.title("Registro de Aula")
-        self.geometry("600x500")
+        self.geometry("1600x900")
         self.class_subject_id = class_subject_id
         self.lesson_date = lesson_date
         self.lesson_data = lesson_data

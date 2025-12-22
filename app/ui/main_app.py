@@ -95,7 +95,8 @@ class MainApp(ctk.CTk):
             ctk.set_default_color_theme("blue")
 
         self.title("Profgent")
-        self.geometry("1100x800")
+        self.geometry("1600x900")
+        self.attributes("-zoomed", True)
 
         # Define uma função a ser chamada quando o usuário tenta fechar a janela.
         self.protocol("WM_DELETE_WINDOW", self.on_closing)

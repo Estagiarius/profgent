@@ -17,6 +17,7 @@ from app.services.data.lesson_service import LessonService
 from app.services.data.incident_service import IncidentService
 from app.services.data.schedule_service import ScheduleService
 from app.services.data.dashboard_service import DashboardService
+from app.services.data.seating_chart_service import SeatingChartService
 from contextlib import contextmanager
 
 class DataService:
@@ -36,6 +37,7 @@ class DataService:
         self.incident_service = IncidentService(db_session)
         self.schedule_service = ScheduleService(db_session)
         self.dashboard_service = DashboardService(db_session)
+        self.seating_chart_service = SeatingChartService(db_session)
 
     @contextmanager
     def _get_db(self):
@@ -280,6 +282,25 @@ class DataService:
 
     def get_students_at_risk(self, *args, **kwargs):
         return self.dashboard_service.get_students_at_risk(*args, **kwargs)
+
+    # --- Seating Chart Service Delegations ---
+    def create_seating_chart(self, *args, **kwargs):
+        return self.seating_chart_service.create_seating_chart(*args, **kwargs)
+
+    def get_seating_charts_for_class(self, *args, **kwargs):
+        return self.seating_chart_service.get_seating_charts_for_class(*args, **kwargs)
+
+    def get_seating_chart_details(self, *args, **kwargs):
+        return self.seating_chart_service.get_seating_chart_details(*args, **kwargs)
+
+    def update_seating_chart_layout(self, *args, **kwargs):
+        return self.seating_chart_service.update_seating_chart_layout(*args, **kwargs)
+
+    def save_seat_assignments(self, *args, **kwargs):
+        return self.seating_chart_service.save_seat_assignments(*args, **kwargs)
+
+    def delete_seating_chart(self, *args, **kwargs):
+        return self.seating_chart_service.delete_seating_chart(*args, **kwargs)
 
     # Legacy private method used by CSV import in StudentService
     # Since StudentService now handles this internally, we might not need to expose it here

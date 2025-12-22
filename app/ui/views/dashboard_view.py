@@ -66,7 +66,6 @@ class DashboardView(ctk.CTkFrame):
 
     def setup_overview_tab(self):
         """Configura os elementos da aba Visão Geral."""
-        self.tab_overview.grid_columnconfigure(0, weight=1)
         self.tab_overview.grid_columnconfigure(1, weight=1)
         self.tab_overview.grid_rowconfigure(1, weight=1)
 

@@ -15,7 +15,7 @@ class BNCCSelectionDialog(ctk.CTkToplevel):
     def __init__(self, parent, title="Selecionar Habilidades BNCC", initial_selection=None, callback=None):
         super().__init__(parent)
         self.title(title)
-        self.geometry("800x600")
+        self.geometry("1600x900")
         self.callback = callback
         self.selected_codes = set(initial_selection.split(',')) if initial_selection else set()
         # Clean up empty strings

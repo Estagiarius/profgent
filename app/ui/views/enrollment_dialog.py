@@ -15,7 +15,7 @@ class EnrollmentDialog(ctk.CTkToplevel):
     def __init__(self, parent, title: str, students: List[Dict[str, Any]], enroll_callback: Callable[[List[int]], None]):
         super().__init__(parent)
         self.title(title)
-        self.geometry("600x500")
+        self.geometry("1280x720")
 
         self.students = students
         self.enroll_callback = enroll_callback
