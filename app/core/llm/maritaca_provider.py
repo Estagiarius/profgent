@@ -33,16 +33,22 @@ class MaritacaProvider(LLMProvider):
         return await self._create_chat_completion(messages, tools)
 
     async def list_models(self) -> List[str]:
+        fallback_models = ["sabia-3.1", "sabia-3", "sabiazim-3"]
         try:
             models = await self.client.models.list()
             # Cast model to Any to avoid linter errors about dynamic attributes
-            model_list = sorted([model.id for model in models])
-            if not model_list:
-                 return ["sabia-3.1", "sabia-3", "sabiazim-3"]
-            return model_list
+            all_models = sorted([model.id for model in models])
+
+            # Filter out deprecated models (e.g., sabia-2 family)
+            # We keep only models that do NOT start with 'sabia-2'
+            active_models = [m for m in all_models if not m.startswith("sabia-2")]
+
+            if not active_models:
+                 return fallback_models
+            return active_models
         except Exception as e:
             print(f"Error listing Maritaca models: {e}")
-            return ["sabia-3.1", "sabia-3", "sabiazim-3"]
+            return fallback_models
 
     async def close(self):
         await self.client.close()
