@@ -1368,12 +1368,34 @@ class ClassDetailView(ctk.CTkFrame):
 
     # Método estático para busca inicial de dados
     @staticmethod
-    def _fetch_initial_details(class_id):
+    def _fetch_initial_details(class_id, preferred_subject_id=None):
+        class_data = data_service.get_class_by_id(class_id)
+        subjects = data_service.get_subjects_for_class(class_id)
+        enrollments = data_service.get_enrollments_for_class(class_id)
+        incidents = data_service.get_incidents_for_class(class_id)
+
+        subject_data = None
+        target_subject_id = None
+
+        # Determina qual disciplina carregar (preferida ou a primeira da lista)
+        if subjects:
+            ids = [s['id'] for s in subjects]
+            if preferred_subject_id and preferred_subject_id in ids:
+                target_subject_id = preferred_subject_id
+            else:
+                target_subject_id = subjects[0]['id']
+
+        # Se identificou uma disciplina alvo, carrega seus dados
+        if target_subject_id:
+            subject_data = ClassDetailView._fetch_subject_data(target_subject_id, class_id)
+            subject_data['id'] = target_subject_id
+
         return {
-            "class_data": data_service.get_class_by_id(class_id),
-            "subjects": data_service.get_subjects_for_class(class_id),
-            "enrollments": data_service.get_enrollments_for_class(class_id),
-            "incidents": data_service.get_incidents_for_class(class_id)
+            "class_data": class_data,
+            "subjects": subjects,
+            "enrollments": enrollments,
+            "incidents": incidents,
+            "initial_subject_data": subject_data
         }
 
     def _on_initial_details_fetched(self, result):
@@ -1387,13 +1409,40 @@ class ClassDetailView(ctk.CTkFrame):
         class_data = result['class_data']
         self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
 
-        self.populate_student_list(enrollments_data=result['enrollments'])
+        # Recupera dados combinados
+        initial_subject_data = result.get('initial_subject_data')
+        subjects = result['subjects']
 
-        self.populate_incident_list(incidents_data=result['incidents'])
+        # Configura o ID da disciplina atual ANTES de popular o combo.
+        # Isso impede que o populate_subject_combo dispare o evento on_change desnecessariamente.
+        if initial_subject_data:
+            self.current_subject_id = initial_subject_data['id']
 
         # Popula dropdown de subjects
-        self.populate_subject_combo(subjects=result['subjects'])
+        self.populate_subject_combo(subjects=subjects)
         self.populate_report_student_combo()
+        self.populate_incident_list(incidents_data=result['incidents'])
+
+        # Se temos dados da disciplina, populamos tudo
+        if initial_subject_data:
+            # Popula abas específicas da disciplina
+            self.populate_assessment_list(assessments_data=initial_subject_data['assessments'])
+            self.populate_lesson_list(lessons_data=initial_subject_data['lessons'])
+            self.populate_grade_grid(
+                assessments_data=initial_subject_data['assessments'],
+                grades_data=initial_subject_data['grades'],
+                enrollments_data=result['enrollments'],
+                averages_data=initial_subject_data['batch_averages']
+            )
+            # Popula lista de alunos COM FREQUÊNCIA (Attendance Stats)
+            self.populate_student_list(
+                enrollments_data=result['enrollments'],
+                attendance_stats=initial_subject_data['attendance_stats']
+            )
+            self.populate_bncc_tab(report_data=initial_subject_data['bncc_report'])
+        else:
+            # Caso sem disciplina, popula apenas a lista básica de alunos
+            self.populate_student_list(enrollments_data=result['enrollments'])
 
         # Força renderização e atrasa remoção do overlay
         self.update_idletasks()
@@ -1438,6 +1487,15 @@ class ClassDetailView(ctk.CTkFrame):
             # Mostra Overlay
             if not hasattr(self, 'loading_overlay') or self.loading_overlay is None:
                 self.loading_overlay = LoadingOverlay(self, text="Carregando Detalhes da Turma...")
+
+            # Passa o self.current_subject_id (se houver) como preferência
+            # Embora no on_show ele possa ser de uma turma anterior,
+            # o ideal seria resetar ou tentar manter se fizer sentido.
+            # Como a view é recriada/reusada, melhor passar None para resetar ou
+            # confiar na lógica do fetch (pegar o primeiro).
+            # Se quisermos persistir a escolha de disciplina ao voltar para a turma,
+            # precisaríamos armazenar isso na MainApp ou algo assim.
+            # Por padrão, vamos deixar None para pegar a primeira.
 
             run_async_task(
                 asyncio.to_thread(self._fetch_initial_details, class_id),
