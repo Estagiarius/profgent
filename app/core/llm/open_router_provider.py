@@ -34,13 +34,39 @@ class OpenRouterProvider(LLMProvider):
         return await self._create_chat_completion(messages=messages, tools=tools)
 
     async def list_models(self) -> List[str]:
+        fallback_models = ["openai/gpt-oss-20b:free"]
         try:
             models = await self.client.models.list()
-            # Cast model to Any to avoid linter errors about dynamic attributes
-            return sorted([model.id for model in models])  # type: ignore
+            model_ids = []
+
+            # models is likely an AsyncCursorPage or list
+            # We iterate and check type of each item to be defensive
+            for model in models:
+                if hasattr(model, 'id'):
+                    model_ids.append(model.id)
+                elif isinstance(model, dict) and 'id' in model:
+                    model_ids.append(model['id'])
+                elif isinstance(model, tuple):
+                    # If it's a tuple, we assume the first element is ID or try to find it
+                    # This handles the specific reported error case
+                    if len(model) > 0:
+                        # Defensive check if the tuple element itself is an object with id
+                        if hasattr(model[0], 'id'):
+                             model_ids.append(model[0].id)
+                        else:
+                             # Fallback: assume the first string in tuple is the ID
+                             model_ids.append(str(model[0]))
+                elif isinstance(model, str):
+                    model_ids.append(model)
+
+            if not model_ids:
+                return fallback_models
+
+            return sorted(model_ids)
+
         except Exception as e:
             print(f"Error listing OpenRouter models: {e}")
-            return []
+            return fallback_models
 
     async def close(self):
         await self.client.close()
