@@ -17,13 +17,23 @@ from app.services import data_service
 # Importa o AssistantService
 from app.services.assistant_service import AssistantService
 from app.data.migrations import migrate_database
+import sys
+from pathlib import Path
+from app.core.config import CONFIG_DIR
+
+# Determina o arquivo de log baseado no modo de execução (Frozen vs Dev)
+if getattr(sys, 'frozen', False):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = CONFIG_DIR / "app.log"
+else:
+    log_file = "app.log"
 
 # Configuração básica de logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("app.log"),
+        logging.FileHandler(str(log_file)),
         logging.StreamHandler()  # Também exibe no console para debug durante o desenvolvimento
     ]
 )
