@@ -23,6 +23,7 @@ from app.ui.views.class_selection_view import ClassSelectionView
 from app.ui.views.class_detail_view import ClassDetailView
 from app.ui.views.schedule_view import ScheduleView
 from app.core.config import load_setting
+from app.utils.path_utils import get_resource_path
 
 # Importa as classes de serviço que contêm a lógica de negócios e da IA.
 from app.services.data_service import DataService
@@ -87,11 +88,15 @@ class MainApp(ctk.CTk):
         ctk.set_appearance_mode("Dark")
 
         # Carrega o tema salvo ou usa o padrão "Black & Orange"
-        theme_path = load_setting("app_theme_path", "app/ui/themes/black_orange.json")
+        # Usa get_resource_path para garantir que funcione no executável (PyInstaller)
+        theme_relative_path = load_setting("app_theme_path", "app/ui/themes/black_orange.json")
+        theme_path = get_resource_path(theme_relative_path)
+
         try:
             ctk.set_default_color_theme(theme_path)
         except FileNotFoundError:
             # Fallback seguro caso o arquivo de tema não exista mais
+            print(f"AVISO: Tema não encontrado em {theme_path}. Usando tema padrão.")
             ctk.set_default_color_theme("blue")
 
         self.title("Profgent")

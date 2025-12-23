@@ -68,11 +68,12 @@ class SeatingChartView(ctk.CTkFrame):
         # Header with Legend
         self.legend_frame = ctk.CTkFrame(self.grid_container, height=40)
         self.legend_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
-
+        self._create_legend_item("Clique com o botão direito sobre a grade para abrir o menu e selecionar entre:", "transparent", "white")
         self._create_legend_item("Carteira", "white", "black")
         self._create_legend_item("Mesa Prof.", "#D3D3D3", "black")
         self._create_legend_item("Porta", "#8B4513", "white")
         self._create_legend_item("Vazio", "transparent", "white") # Logic visualization only
+ # Logic visualization only
 
         # Canvas for Drawing
         self.canvas_frame = ScrollableCanvasFrame(self.grid_container)
@@ -202,8 +203,8 @@ class SeatingChartView(ctk.CTkFrame):
         self.populate_layout_combo()
 
     # --- Drawing Logic ---
-    CELL_WIDTH = 150
-    CELL_HEIGHT = 100
+    CELL_WIDTH = 140
+    CELL_HEIGHT = 80
     PADDING = 20
 
     def draw_grid(self):
