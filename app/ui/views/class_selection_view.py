@@ -15,8 +15,11 @@ from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
 from app.ui.ui_utils import bind_global_mouse_scroll # Importa utilitário de rolagem
 from app.ui.views.copy_class_dialog import CopyClassDialog
+from app.ui.widgets.loading_overlay import LoadingOverlay # Importa o overlay de carregamento.
+from app.utils.async_utils import run_async_task # Importa o utilitário assíncrono.
 from customtkinter import CTkInputDialog # Importa a janela de diálogo de entrada de texto padrão do customtkinter.
 from tkinter import messagebox # Importa a biblioteca tkinter para exibir caixas de mensagem.
+import asyncio
 
 # Define a classe para a tela de seleção de turmas.
 class ClassSelectionView(ctk.CTkFrame):
@@ -42,23 +45,67 @@ class ClassSelectionView(ctk.CTkFrame):
         self.scrollable_frame.grid_columnconfigure(0, weight=1) # Permite que os cards se expandam horizontalmente.
         bind_global_mouse_scroll(self.scrollable_frame)
 
-        # Chama o método para preencher a lista de turmas ao iniciar.
-        self.populate_class_cards()
+    # Método estático para buscar dados em thread separada
+    @staticmethod
+    def _fetch_classes():
+        return data_service.get_all_classes()
 
-    # Método para buscar os dados das turmas e criar os cards na tela.
-    def populate_class_cards(self):
+    # Callback executado na thread principal após buscar dados
+    def _on_classes_fetched(self, classes_data):
+        if isinstance(classes_data, Exception):
+            # Se houve erro, remove overlay imediatamente para mostrar o erro
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.loading_overlay.destroy()
+                self.loading_overlay = None
+            messagebox.showerror("Erro", f"Erro ao carregar turmas: {classes_data}")
+            return
+
+        # Popula a lista com os dados recebidos
+        self.populate_class_cards(classes_data)
+
+        # Força o processamento de tarefas de geometria pendentes (renderização dos cards)
+        self.update_idletasks()
+
+        # Remove o overlay com um pequeno atraso para garantir que o usuário veja a tela pronta
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.after(100, self._remove_overlay)
+
+    def _remove_overlay(self):
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.loading_overlay.destroy()
+            self.loading_overlay = None
+
+    # Método para criar os cards na tela, agora recebendo os dados como argumento.
+    def populate_class_cards(self, classes_data=None):
+        # Se os dados não forem fornecidos, dispara o carregamento assíncrono
+        if classes_data is None:
+            self.load_classes_async()
+            return
+
         # Limpa todos os widgets existentes no frame de rolagem antes de recriá-los.
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
-        # Busca todas as turmas do banco de dados através do serviço.
-        classes_data = data_service.get_all_classes()
         # Itera sobre os dados de cada turma.
         for i, class_data in enumerate(classes_data):
             # Cria um widget de card para a turma.
             card = self.create_class_card(self.scrollable_frame, class_data)
             # Posiciona o card na grade do frame de rolagem.
             card.grid(row=i, column=0, padx=10, pady=10, sticky="ew")
+
+    # Inicia o processo de carregamento assíncrono
+    def load_classes_async(self):
+        # Exibe o overlay de carregamento
+        if not hasattr(self, 'loading_overlay') or self.loading_overlay is None:
+            self.loading_overlay = LoadingOverlay(self, text="Carregando Turmas...")
+
+        # Dispara a tarefa assíncrona
+        run_async_task(
+            asyncio.to_thread(self._fetch_classes),
+            self.main_app.loop,
+            self.main_app.async_queue,
+            self._on_classes_fetched
+        )
 
     # Método que cria um único widget de card para uma turma.
     def create_class_card(self, parent, class_data):
@@ -106,7 +153,7 @@ class ClassSelectionView(ctk.CTkFrame):
             # Chama o serviço para deletar a turma.
             data_service.delete_class(class_id)
             # Atualiza a lista de cards na tela.
-            self.populate_class_cards()
+            self.load_classes_async()
 
     # Navega para a tela de detalhes da turma.
     def view_class_details(self, class_id):
@@ -120,7 +167,7 @@ class ClassSelectionView(ctk.CTkFrame):
             new_name = data.get("name")
             if new_name:
                 data_service.update_class(class_id, new_name)
-                self.populate_class_cards()
+                self.load_classes_async()
 
         # Configuração dos campos para o diálogo de edição.
         fields = {"name": "Nome da Turma"}
@@ -139,7 +186,7 @@ class ClassSelectionView(ctk.CTkFrame):
                     copy_students=data["copy_students"]
                 )
                 messagebox.showinfo("Sucesso", f"Turma '{class_data['name']}' copiada para '{data['name']}' com sucesso!")
-                self.populate_class_cards()
+                self.load_classes_async()
             except ValueError as e:
                 messagebox.showerror("Erro", str(e))
             except Exception as e:
@@ -161,7 +208,7 @@ class ClassSelectionView(ctk.CTkFrame):
                 # Chama o serviço para criar a nova turma (agora sem curso obrigatório).
                 data_service.create_class(name=class_name)
                 # Atualiza a lista de cards.
-                self.populate_class_cards()
+                self.load_classes_async()
             except ValueError as e:
                 messagebox.showerror("Erro", str(e))
             except Exception as e:
@@ -175,4 +222,4 @@ class ClassSelectionView(ctk.CTkFrame):
     # Método chamado sempre que a view é exibida.
     def on_show(self, **kwargs):
         # Atualiza a lista de turmas para garantir que os dados estejam sempre recentes.
-        self.populate_class_cards()
+        self.load_classes_async()
