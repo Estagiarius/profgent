@@ -30,44 +30,19 @@ class MaritacaProvider(LLMProvider):
         return "Maritaca"
 
     async def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=512,
-            )
-
-            message = response.choices[0].message
-            content = message.content or ""
-
-            # Convert tool_calls objects (Pydantic models) to dictionaries
-            tool_calls = None
-            if message.tool_calls:
-                tool_calls = []
-                for tc in message.tool_calls:
-                    if hasattr(tc, 'model_dump'):
-                        tool_calls.append(tc.model_dump())
-                    elif hasattr(tc, 'dict'):
-                        tool_calls.append(tc.dict())
-                    else:
-                        tool_calls.append(tc)
-
-            return AssistantResponse(content=content, tool_calls=tool_calls)
-
-        except Exception as e:
-            print(f"An error occurred with the Maritaca API: {e}")
-            return AssistantResponse(content=f"Error: {e}")
+        return await self._create_chat_completion(messages, tools)
 
     async def list_models(self) -> List[str]:
         try:
             models = await self.client.models.list()
             # Cast model to Any to avoid linter errors about dynamic attributes
-            return sorted([model.id for model in models])  # type: ignore
+            model_list = sorted([model.id for model in models])
+            if not model_list:
+                 return ["sabia-3.1", "sabia-3", "sabiazim-3"]
+            return model_list
         except Exception as e:
             print(f"Error listing Maritaca models: {e}")
-            return []
-        # Antigo retorno, com a chamada forçada. return ["sabia-3", "sabia-2-small"]
+            return ["sabia-3.1", "sabia-3", "sabiazim-3"]
 
     async def close(self):
         await self.client.close()
