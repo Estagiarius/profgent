@@ -65,7 +65,7 @@ class MaritacaProvider(LLMProvider):
             # Cast model to Any to avoid linter errors about dynamic attributes
             return sorted([model.id for model in models])  # type: ignore
         except Exception as e:
-            print(f"Error listing OpenRouter models: {e}")
+            print(f"Error listing Maritaca models: {e}")
             return []
         # Antigo retorno, com a chamada forçada. return ["sabia-3", "sabia-2-small"]
 
