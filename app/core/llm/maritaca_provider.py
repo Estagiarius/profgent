@@ -60,9 +60,14 @@ class MaritacaProvider(LLMProvider):
             return AssistantResponse(content=f"Error: {e}")
 
     async def list_models(self) -> List[str]:
-        # Maritaca's OpenAI-compatible endpoint does not seem to support listing models.
-        # We will return the known models manually.
-        return ["sabia-3", "sabia-2-small"]
+        try:
+            models = await self.client.models.list()
+            # Cast model to Any to avoid linter errors about dynamic attributes
+            return sorted([model.id for model in models])  # type: ignore
+        except Exception as e:
+            print(f"Error listing OpenRouter models: {e}")
+            return []
+        # Antigo retorno, com a chamada forçada. return ["sabia-3", "sabia-2-small"]
 
     async def close(self):
         await self.client.close()

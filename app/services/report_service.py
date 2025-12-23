@@ -66,7 +66,9 @@ class ReportService:
             assigned_map[(a['row_index'], a['col_index'])] = a
 
         # Plot setup
-        fig, ax = plt.subplots(figsize=(cols * 2, rows * 2))
+        # Modifique a linha do figsize para ter retângulos ao invés de quadrados
+        # Multiplicamos a largura por 2 e a altura por 1.2 para criar um formato retangular
+        fig, ax = plt.subplots(figsize=(cols * 2, rows * 1.2))
         ax.set_xlim(0, cols)
         ax.set_ylim(0, rows)
         ax.set_aspect('equal')
@@ -111,7 +113,8 @@ class ReportService:
                         # Add Call Number text (top-left)
                         # With inverted Y axis, r is top, r+1 is bottom.
                         # Position at r + 0.1 (near top)
-                        ax.text(c + 0.05, r + 0.1, call_str,
+                        # Ajuste a posição do texto do número de chamada
+                        ax.text(c + 0.05, r + 0.5, call_str,
                                 ha='left', va='top', fontsize=8, fontweight='bold', color='blue')
 
                         label = student_name
@@ -119,7 +122,9 @@ class ReportService:
                         label = "Vazio"
 
                 # Draw Rectangle
-                rect = Rectangle((c, r), 1, 1, facecolor=facecolor, edgecolor=edgecolor)
+                # E mais abaixo, onde é criado o retângulo, modifique:
+                # Em vez de um quadrado 1x1, faremos um retângulo 1x0.6
+                rect = Rectangle((c, r), 1, 0.6, facecolor=facecolor, edgecolor=edgecolor)
                 ax.add_patch(rect)
 
                 # Draw Text centered (Name)
@@ -133,7 +138,8 @@ class ReportService:
                         else:
                             display_label = label[:15] + "..."
 
-                    ax.text(c + 0.5, r + 0.5, display_label,
+                    # Ajuste a posição do nome do aluno
+                    ax.text(c + 0.5, r + 0.3, display_label,
                             ha='center', va='center', fontsize=10,
                             color='white' if cell_type == 'door' else 'black')
                 else:
