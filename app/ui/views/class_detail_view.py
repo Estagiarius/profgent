@@ -35,6 +35,7 @@ from app.ui.widgets.loading_overlay import LoadingOverlay
 # Importa o serviço de relatórios.
 from app.services.report_service import ReportService
 import os
+import asyncio
 from PIL import Image
 
 # Define a classe para a tela de detalhes da turma.
@@ -418,7 +419,7 @@ class ClassDetailView(ctk.CTkFrame):
                 self.loading_overlay = LoadingOverlay(self, text="Carregando Disciplina...")
 
             run_async_task(
-                lambda: self._fetch_subject_data(self.current_subject_id, self.class_id),
+                asyncio.to_thread(self._fetch_subject_data, self.current_subject_id, self.class_id),
                 self.main_app.loop,
                 self.main_app.async_queue,
                 self._on_subject_data_fetched
@@ -1426,7 +1427,7 @@ class ClassDetailView(ctk.CTkFrame):
                 self.loading_overlay = LoadingOverlay(self, text="Carregando Detalhes da Turma...")
 
             run_async_task(
-                lambda: self._fetch_initial_details(class_id),
+                asyncio.to_thread(self._fetch_initial_details, class_id),
                 self.main_app.loop,
                 self.main_app.async_queue,
                 self._on_initial_details_fetched

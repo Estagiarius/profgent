@@ -19,6 +19,7 @@ from app.ui.widgets.loading_overlay import LoadingOverlay # Importa o overlay de
 from app.utils.async_utils import run_async_task # Importa o utilitário assíncrono.
 from customtkinter import CTkInputDialog # Importa a janela de diálogo de entrada de texto padrão do customtkinter.
 from tkinter import messagebox # Importa a biblioteca tkinter para exibir caixas de mensagem.
+import asyncio
 
 # Define a classe para a tela de seleção de turmas.
 class ClassSelectionView(ctk.CTkFrame):
@@ -89,7 +90,7 @@ class ClassSelectionView(ctk.CTkFrame):
 
         # Dispara a tarefa assíncrona
         run_async_task(
-            self._fetch_classes,
+            asyncio.to_thread(self._fetch_classes),
             self.main_app.loop,
             self.main_app.async_queue,
             self._on_classes_fetched
