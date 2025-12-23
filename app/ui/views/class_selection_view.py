@@ -52,17 +52,28 @@ class ClassSelectionView(ctk.CTkFrame):
 
     # Callback executado na thread principal após buscar dados
     def _on_classes_fetched(self, classes_data):
-        # Remove o overlay de carregamento se existir
-        if hasattr(self, 'loading_overlay') and self.loading_overlay:
-            self.loading_overlay.destroy()
-            self.loading_overlay = None
-
         if isinstance(classes_data, Exception):
+            # Se houve erro, remove overlay imediatamente para mostrar o erro
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.loading_overlay.destroy()
+                self.loading_overlay = None
             messagebox.showerror("Erro", f"Erro ao carregar turmas: {classes_data}")
             return
 
         # Popula a lista com os dados recebidos
         self.populate_class_cards(classes_data)
+
+        # Força o processamento de tarefas de geometria pendentes (renderização dos cards)
+        self.update_idletasks()
+
+        # Remove o overlay com um pequeno atraso para garantir que o usuário veja a tela pronta
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.after(100, self._remove_overlay)
+
+    def _remove_overlay(self):
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.loading_overlay.destroy()
+            self.loading_overlay = None
 
     # Método para criar os cards na tela, agora recebendo os dados como argumento.
     def populate_class_cards(self, classes_data=None):

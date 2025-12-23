@@ -386,11 +386,10 @@ class ClassDetailView(ctk.CTkFrame):
         }
 
     def _on_subject_data_fetched(self, result):
-        if hasattr(self, 'loading_overlay') and self.loading_overlay:
-            self.loading_overlay.destroy()
-            self.loading_overlay = None
-
         if isinstance(result, Exception):
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.loading_overlay.destroy()
+                self.loading_overlay = None
             messagebox.showerror("Erro", f"Erro ao carregar dados da disciplina: {result}")
             return
 
@@ -408,6 +407,11 @@ class ClassDetailView(ctk.CTkFrame):
             attendance_stats=result['attendance_stats']
         )
         self.populate_bncc_tab(report_data=result['bncc_report'])
+
+        # Força renderização e atrasa remoção do overlay
+        self.update_idletasks()
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.after(100, self._remove_overlay)
 
     def on_subject_change(self, selected_subject_name):
         """Callback para quando a disciplina é trocada no dropdown."""
@@ -1373,11 +1377,10 @@ class ClassDetailView(ctk.CTkFrame):
         }
 
     def _on_initial_details_fetched(self, result):
-        if hasattr(self, 'loading_overlay') and self.loading_overlay:
-            self.loading_overlay.destroy()
-            self.loading_overlay = None
-
         if isinstance(result, Exception):
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.loading_overlay.destroy()
+                self.loading_overlay = None
             messagebox.showerror("Erro", f"Erro ao carregar turma: {result}")
             return
 
@@ -1391,6 +1394,16 @@ class ClassDetailView(ctk.CTkFrame):
         # Popula dropdown de subjects
         self.populate_subject_combo(subjects=result['subjects'])
         self.populate_report_student_combo()
+
+        # Força renderização e atrasa remoção do overlay
+        self.update_idletasks()
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.after(100, self._remove_overlay)
+
+    def _remove_overlay(self):
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.loading_overlay.destroy()
+            self.loading_overlay = None
 
     # Sobrecarga para populate_incident_list aceitar dados
     def populate_incident_list(self, incidents_data=None):
