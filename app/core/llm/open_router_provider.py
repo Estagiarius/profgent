@@ -36,28 +36,39 @@ class OpenRouterProvider(LLMProvider):
     async def list_models(self) -> List[str]:
         fallback_models = ["openai/gpt-oss-20b:free"]
         try:
-            models = await self.client.models.list()
+            response = await self.client.models.list()
             model_ids = []
 
-            # models is likely an AsyncCursorPage or list
-            # We iterate and check type of each item to be defensive
-            for model in models:
+            # OpenAI client typically returns a SyncCursorPage or similar object
+            # which might iterate over keys if treated as a dict, or items if treated as list.
+            # The actual list of models is usually in the 'data' attribute.
+
+            models_list = []
+            if hasattr(response, 'data'):
+                models_list = response.data
+            elif isinstance(response, dict) and 'data' in response:
+                models_list = response['data']
+            elif isinstance(response, list):
+                models_list = response
+            else:
+                # Fallback: try iterating whatever we got
+                models_list = response
+
+            for model in models_list:
                 if hasattr(model, 'id'):
                     model_ids.append(model.id)
                 elif isinstance(model, dict) and 'id' in model:
                     model_ids.append(model['id'])
                 elif isinstance(model, tuple):
-                    # If it's a tuple, we assume the first element is ID or try to find it
-                    # This handles the specific reported error case
                     if len(model) > 0:
-                        # Defensive check if the tuple element itself is an object with id
                         if hasattr(model[0], 'id'):
                              model_ids.append(model[0].id)
                         else:
-                             # Fallback: assume the first string in tuple is the ID
                              model_ids.append(str(model[0]))
                 elif isinstance(model, str):
-                    model_ids.append(model)
+                    # Filter out keys like 'object' or 'data' if we accidentally iterated a dict wrapper
+                    if model not in ('object', 'data'):
+                        model_ids.append(model)
 
             if not model_ids:
                 return fallback_models
