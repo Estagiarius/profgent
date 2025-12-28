@@ -10,6 +10,7 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 # Importa a biblioteca 'asyncio' para gerenciar o loop de eventos assíncrono.
 import asyncio
+import platform
 # Importa a biblioteca 'customtkinter' para criar os componentes da interface gráfica.
 import customtkinter as ctk
 # Importa 'Queue' para comunicação thread-safe e 'Empty' para exceções de fila vazia.
@@ -101,7 +102,12 @@ class MainApp(ctk.CTk):
 
         self.title("Profgent")
         self.geometry("1600x900")
-        self.attributes("-zoomed", True)
+
+        # Maximiza a janela de acordo com o sistema operacional
+        if platform.system() == "Windows":
+            self.state("zoomed")
+        else:
+            self.attributes("-zoomed", True)
 
         # Define uma função a ser chamada quando o usuário tenta fechar a janela.
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
