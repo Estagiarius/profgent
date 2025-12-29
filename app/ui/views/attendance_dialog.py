@@ -10,11 +10,11 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from tkinter import messagebox
+from app.ui.views.base_dialog import BaseDialog
 
-class AttendanceDialog(ctk.CTkToplevel):
+class AttendanceDialog(BaseDialog):
     def __init__(self, parent, title, lesson_id, students, attendance_map, save_callback):
-        super().__init__(parent)
-        self.title(title)
+        super().__init__(parent, title)
         self.geometry("1280x720")
         self.resizable(False, True)
 
@@ -65,9 +65,6 @@ class AttendanceDialog(ctk.CTkToplevel):
         # Mark all buttons
         ctk.CTkButton(self.actions_frame, text="Marcar Todos Presentes", command=lambda: self.set_all('P')).pack(side="left", padx=10, pady=10)
         ctk.CTkButton(self.actions_frame, text="Marcar Todos Faltantes", fg_color="#D9534F", hover_color="#C9302C", command=lambda: self.set_all('F')).pack(side="left", padx=10, pady=10)
-
-        self.transient(parent)
-        self.grab_set()
 
     def set_all(self, status):
         for btn in self.status_vars.values():

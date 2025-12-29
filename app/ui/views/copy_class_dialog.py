@@ -9,21 +9,14 @@
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
+from app.ui.views.base_dialog import BaseDialog
 
-class CopyClassDialog(ctk.CTkToplevel):
+class CopyClassDialog(BaseDialog):
     def __init__(self, parent, title="Copiar Turma", initial_name="", callback=None):
-        super().__init__(parent)
+        super().__init__(parent, title)
         self.callback = callback
-        self.title(title)
-        self.geometry("1280x720")
-
-        # Centraliza a janela
-        self.update_idletasks()
-        width = 400
-        height = 350
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.geometry("400x350")
+        self.center_on_screen()
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(4, weight=1) # Espaço vazio empurra botões para baixo
@@ -87,10 +80,6 @@ class CopyClassDialog(ctk.CTkToplevel):
 
         # Foco no input
         self.after(100, self.name_entry.focus)
-
-        # Modal
-        self.transient(parent)
-        self.grab_set()
 
     def _toggle_assessments(self):
         # Se desmarcar disciplinas, desmarca e desabilita avaliações

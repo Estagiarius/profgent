@@ -10,11 +10,11 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from app.services.bncc_service import BNCCService
+from app.ui.views.base_dialog import BaseDialog
 
-class BNCCSelectionDialog(ctk.CTkToplevel):
+class BNCCSelectionDialog(BaseDialog):
     def __init__(self, parent, title="Selecionar Habilidades BNCC", initial_selection=None, callback=None):
-        super().__init__(parent)
-        self.title(title)
+        super().__init__(parent, title)
         self.geometry("1600x900")
         self.callback = callback
         self.selected_codes = set(initial_selection.split(',')) if initial_selection else set()

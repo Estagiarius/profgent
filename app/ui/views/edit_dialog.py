@@ -13,14 +13,15 @@ import customtkinter as ctk
 # Importa tipos para anotações, melhorando a clareza do código.
 from typing import Dict, Callable, List, Union, Tuple
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
+from app.ui.views.base_dialog import BaseDialog
 
-# Define a classe EditDialog, que herda de CTkToplevel para criar uma janela secundária (pop-up).
-class EditDialog(ctk.CTkToplevel):
+# Define a classe EditDialog, que herda de BaseDialog para criar uma janela secundária (pop-up).
+class EditDialog(BaseDialog):
     # O método construtor da janela de diálogo.
     def __init__(self, parent, title: str, fields: Dict[str, str], data: Dict[str, any], save_callback: Callable, dropdowns: Dict[str, Tuple[str, List[str]]] = None):
         # Chama o construtor da classe pai.
-        super().__init__(parent)
-        self.title(title)
+        super().__init__(parent, title)
+
         self.save_callback = save_callback
         self.data = data
         self.entries: Dict[str, Union[ctk.CTkEntry, ctk.CTkOptionMenu]] = {}
