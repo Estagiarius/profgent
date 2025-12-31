@@ -12,12 +12,12 @@ import customtkinter as ctk
 from datetime import date, datetime
 from app.services import data_service
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
+from app.ui.views.base_dialog import BaseDialog
 from tkinter import messagebox
 
-class LessonDialog(ctk.CTkToplevel):
+class LessonDialog(BaseDialog):
     def __init__(self, parent, class_subject_id, lesson_date, lesson_data=None, on_save=None):
-        super().__init__(parent)
-        self.title("Registro de Aula")
+        super().__init__(parent, "Registro de Aula")
         self.geometry("1600x900")
         self.class_subject_id = class_subject_id
         self.lesson_date = lesson_date

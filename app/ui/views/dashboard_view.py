@@ -12,6 +12,7 @@ import customtkinter as ctk # Importa a biblioteca 'customtkinter' para os compo
 # Importa utilitário de rolagem
 from app.ui.ui_utils import bind_global_mouse_scroll
 from app.utils.charts import create_grade_distribution_chart, create_approval_pie_chart # Importa a função utilitária que gera o gráfico de distribuição de notas.
+from app.ui.views.base_dialog import BaseDialog
 from PIL import Image # Importa a biblioteca Pillow (PIL) para manipulação de imagens.
 import os # Importa o módulo 'os' para interagir com o sistema de arquivos (verificar se o arquivo do gráfico existe).
 
@@ -158,14 +159,9 @@ class DashboardView(ctk.CTkFrame):
             messagebox.showinfo("Informação", "Nenhum aluno nesta categoria no momento.")
             return
 
-        dialog = ctk.CTkToplevel(self)
-        dialog.title(title)
+        dialog = BaseDialog(self, title)
         dialog.geometry("500x400")
-        dialog.transient(self)
-        
-        # Aguarda a janela estar pronta
-        dialog.wait_visibility()
-        dialog.grab_set()
+        dialog.center_on_screen()
 
         ctk.CTkLabel(dialog, text=title, font=ctk.CTkFont(size=18, weight="bold")).pack(pady=10)
 

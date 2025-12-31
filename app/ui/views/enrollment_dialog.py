@@ -10,11 +10,11 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from typing import List, Dict, Callable, Any, Set
+from app.ui.views.base_dialog import BaseDialog
 
-class EnrollmentDialog(ctk.CTkToplevel):
+class EnrollmentDialog(BaseDialog):
     def __init__(self, parent, title: str, students: List[Dict[str, Any]], enroll_callback: Callable[[List[int]], None]):
-        super().__init__(parent)
-        self.title(title)
+        super().__init__(parent, title)
         self.geometry("1280x720")
 
         self.students = students
@@ -32,11 +32,6 @@ class EnrollmentDialog(ctk.CTkToplevel):
         self._setup_ui()
         # Initial population
         self._populate_list()
-
-        # Bring to front
-        self.lift()
-        self.focus_force()
-        self.grab_set()
 
     def _setup_ui(self):
         # Configure grid layout

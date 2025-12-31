@@ -14,6 +14,7 @@ from datetime import date, timedelta, datetime
 from app.services import data_service
 from app.ui.views.lesson_dialog import LessonDialog
 from app.ui.views.add_dialog import AddDialog
+from app.ui.views.base_dialog import BaseDialog
 
 class ScheduleView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
@@ -190,9 +191,9 @@ class ScheduleView(ctk.CTkFrame):
         self.show_allocation_popup(slot_item['slot_id'])
 
     def show_allocation_popup(self, slot_id):
-        top = ctk.CTkToplevel(self)
-        top.title("Alocar Turma")
+        top = BaseDialog(self, "Alocar Turma")
         top.geometry("400x300")
+        top.center_on_screen()
 
         ctk.CTkLabel(top, text="Selecione a Turma:").pack(pady=10)
         class_combo = ctk.CTkComboBox(top, values=[])

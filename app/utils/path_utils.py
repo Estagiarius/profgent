@@ -10,7 +10,23 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import sys
 import os
+import subprocess
+import platform
 from pathlib import Path
+
+def open_file_in_os(filepath: str):
+    """
+    Abre um arquivo ou diretório usando o aplicativo padrão do sistema operacional.
+    Compatível com Windows, MacOS e Linux.
+
+    :param filepath: Caminho absoluto do arquivo a ser aberto.
+    """
+    if platform.system() == 'Windows':
+        os.startfile(filepath)
+    elif platform.system() == 'Darwin':  # MacOS
+        subprocess.Popen(['open', filepath])
+    else:  # Linux e outros Unix-like
+        subprocess.Popen(['xdg-open', filepath])
 
 def get_resource_path(relative_path: str | Path) -> str:
     """
