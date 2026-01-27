@@ -1,5 +1,16 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 # Importa a biblioteca 'asyncio' para gerenciar o loop de eventos assíncrono.
 import asyncio
+import platform
 # Importa a biblioteca 'customtkinter' para criar os componentes da interface gráfica.
 import customtkinter as ctk
 # Importa 'Queue' para comunicação thread-safe e 'Empty' para exceções de fila vazia.
@@ -13,6 +24,7 @@ from app.ui.views.class_selection_view import ClassSelectionView
 from app.ui.views.class_detail_view import ClassDetailView
 from app.ui.views.schedule_view import ScheduleView
 from app.core.config import load_setting
+from app.utils.path_utils import get_resource_path
 
 # Importa as classes de serviço que contêm a lógica de negócios e da IA.
 from app.services.data_service import DataService
@@ -77,15 +89,25 @@ class MainApp(ctk.CTk):
         ctk.set_appearance_mode("Dark")
 
         # Carrega o tema salvo ou usa o padrão "Black & Orange"
-        theme_path = load_setting("app_theme_path", "app/ui/themes/black_orange.json")
+        # Usa get_resource_path para garantir que funcione no executável (PyInstaller)
+        theme_relative_path = load_setting("app_theme_path", "app/ui/themes/black_orange.json")
+        theme_path = get_resource_path(theme_relative_path)
+
         try:
             ctk.set_default_color_theme(theme_path)
         except FileNotFoundError:
             # Fallback seguro caso o arquivo de tema não exista mais
+            print(f"AVISO: Tema não encontrado em {theme_path}. Usando tema padrão.")
             ctk.set_default_color_theme("blue")
 
         self.title("Profgent")
-        self.geometry("1100x800")
+        self.geometry("1600x900")
+
+        # Maximiza a janela de acordo com o sistema operacional
+        if platform.system() == "Windows":
+            self.state("zoomed")
+        else:
+            self.attributes("-zoomed", True)
 
         # Define uma função a ser chamada quando o usuário tenta fechar a janela.
         self.protocol("WM_DELETE_WINDOW", self.on_closing)

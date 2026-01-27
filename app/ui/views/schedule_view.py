@@ -1,9 +1,20 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from tkinter import messagebox
 from datetime import date, timedelta, datetime
 from app.services import data_service
 from app.ui.views.lesson_dialog import LessonDialog
 from app.ui.views.add_dialog import AddDialog
+from app.ui.views.base_dialog import BaseDialog
 
 class ScheduleView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
@@ -180,9 +191,9 @@ class ScheduleView(ctk.CTkFrame):
         self.show_allocation_popup(slot_item['slot_id'])
 
     def show_allocation_popup(self, slot_id):
-        top = ctk.CTkToplevel(self)
-        top.title("Alocar Turma")
+        top = BaseDialog(self, "Alocar Turma")
         top.geometry("400x300")
+        top.center_on_screen()
 
         ctk.CTkLabel(top, text="Selecione a Turma:").pack(pady=10)
         class_combo = ctk.CTkComboBox(top, values=[])

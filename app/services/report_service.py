@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import csv
 import os
 from datetime import datetime
@@ -6,6 +16,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from app.services.data_service import DataService
+from matplotlib.patches import Rectangle, Circle
 
 class ReportService:
     """
@@ -27,6 +38,218 @@ class ReportService:
     def _get_file_path(self, filename: str) -> str:
         """Returns the full path for a report file."""
         return os.path.join(self.REPORTS_DIR, filename)
+
+    def generate_seating_chart_pdf(self, chart_id: int) -> str:
+        """
+        Generates a visual representation of the seating chart as a PDF (via matplotlib).
+
+        :param chart_id: ID of the seating chart.
+        :return: Path to the generated PDF file.
+        """
+        chart_details = self.data_service.get_seating_chart_details(chart_id)
+        if not chart_details:
+            raise ValueError("Seating chart not found.")
+
+        rows = chart_details['rows']
+        cols = chart_details['columns']
+        assignments = chart_details['assignments']
+        # layout_config is a JSON string, we need to parse it if we want to draw special cells (Door, Teacher)
+        import json
+        try:
+            layout_config = json.loads(chart_details.get('layout_config', '{}'))
+        except json.JSONDecodeError:
+            layout_config = {}
+
+        # Determine cell assignments map
+        assigned_map = {}
+        for a in assignments:
+            assigned_map[(a['row_index'], a['col_index'])] = a
+
+        # Plot setup
+        # Modifique a linha do figsize para ter retângulos ao invés de quadrados
+        # Multiplicamos a largura por 2 e a altura por 1.2 para criar um formato retangular
+        fig, ax = plt.subplots(figsize=(cols * 2, rows * 1.2))
+        ax.set_xlim(0, cols)
+        ax.set_ylim(0, rows)
+        ax.set_aspect('equal')
+
+        # Invert Y axis so row 0 is at top
+        ax.invert_yaxis()
+
+        # Remove axes
+        ax.axis('off')
+
+        # Draw Cells
+        for r in range(rows):
+            for c in range(cols):
+                cell_key = f"{r},{c}"
+                cell_type = layout_config.get(cell_key, "student_seat")
+
+                # Coords: x=c, y=r. Rectangle starts at (c, r)
+
+                if cell_type == "void":
+                    continue # Draw nothing
+
+                # Colors/Styles based on type
+                facecolor = 'white'
+                edgecolor = 'black'
+                label = ""
+
+                if cell_type == "teacher_desk":
+                    facecolor = '#D3D3D3' # Light Gray
+                    label = "Mesa Prof."
+                elif cell_type == "door":
+                    facecolor = '#8B4513' # SaddleBrown
+                    label = "Porta"
+                elif cell_type == "student_seat":
+                    facecolor = 'white'
+                    # Check assignment
+                    assignment_data = assigned_map.get((r, c))
+                    if assignment_data:
+                        student_name = assignment_data['student_name']
+                        call_num = assignment_data.get('call_number')
+                        call_str = f"{call_num}" if call_num is not None else "?"
+
+                        # Add Call Number text (top-left)
+                        # With inverted Y axis, r is top, r+1 is bottom.
+                        # Position at r + 0.1 (near top)
+                        # Ajuste a posição do texto do número de chamada
+                        ax.text(c + 0.05, r + 0.5, call_str,
+                                ha='left', va='top', fontsize=8, fontweight='bold', color='blue')
+
+                        label = student_name
+                    else:
+                        label = "Vazio"
+
+                # Draw Rectangle
+                # E mais abaixo, onde é criado o retângulo, modifique:
+                # Em vez de um quadrado 1x1, faremos um retângulo 1x0.6
+                rect = Rectangle((c, r), 1, 0.6, facecolor=facecolor, edgecolor=edgecolor)
+                ax.add_patch(rect)
+
+                # Draw Text centered (Name)
+                if label != "Vazio":
+                     # Split name if too long
+                    display_label = label
+                    if len(label) > 15:
+                        parts = label.split()
+                        if len(parts) > 1:
+                            display_label = f"{parts[0]}\n{parts[-1]}"
+                        else:
+                            display_label = label[:15] + "..."
+
+                    # Ajuste a posição do nome do aluno
+                    ax.text(c + 0.5, r + 0.3, display_label,
+                            ha='center', va='center', fontsize=10,
+                            color='white' if cell_type == 'door' else 'black')
+                else:
+                    # Draw "Vazio" fainter
+                    ax.text(c + 0.5, r + 0.5, "Vazio",
+                            ha='center', va='center', fontsize=8,
+                            color='#AAAAAA')
+
+        plt.title(f"Mapa de Sala: {chart_details['name']}", fontsize=16)
+
+        # Save file
+        filename = f"seating_chart_{chart_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        filepath = self._get_file_path(filename)
+        plt.savefig(filepath, format='pdf', bbox_inches='tight')
+        plt.close()
+
+        return filepath
+
+    def generate_seating_chart_svg(self, chart_id: int) -> str:
+        """
+        Generates a visual representation of the seating chart as an SVG (vector).
+
+        :param chart_id: ID of the seating chart.
+        :return: Path to the generated SVG file.
+        """
+        # Reuse PDF logic but save as SVG.
+        # Refactor? Ideally yes, but for now copying the plotting logic is safer to avoid breaking changes in the patch.
+        # Or better: Extract plotting logic.
+
+        # Let's extract plotting logic since it's identical.
+        return self._generate_seating_chart_plot(chart_id, 'svg')
+
+    def _generate_seating_chart_plot(self, chart_id: int, format: str) -> str:
+        chart_details = self.data_service.get_seating_chart_details(chart_id)
+        if not chart_details:
+            raise ValueError("Seating chart not found.")
+
+        rows = chart_details['rows']
+        cols = chart_details['columns']
+        assignments = chart_details['assignments']
+        import json
+        try:
+            layout_config = json.loads(chart_details.get('layout_config', '{}'))
+        except json.JSONDecodeError:
+            layout_config = {}
+
+        assigned_map = {}
+        for a in assignments:
+            assigned_map[(a['row_index'], a['col_index'])] = a
+
+        fig, ax = plt.subplots(figsize=(cols * 2, rows * 2))
+        ax.set_xlim(0, cols)
+        ax.set_ylim(0, rows)
+        ax.set_aspect('equal')
+        ax.invert_yaxis()
+        ax.axis('off')
+
+        for r in range(rows):
+            for c in range(cols):
+                cell_key = f"{r},{c}"
+                cell_type = layout_config.get(cell_key, "student_seat")
+
+                if cell_type == "void":
+                    continue
+
+                facecolor = 'white'
+                edgecolor = 'black'
+                label = ""
+
+                if cell_type == "teacher_desk":
+                    facecolor = '#D3D3D3'
+                    label = "Mesa Prof."
+                elif cell_type == "door":
+                    facecolor = '#8B4513'
+                    label = "Porta"
+                elif cell_type == "student_seat":
+                    facecolor = 'white'
+                    assignment_data = assigned_map.get((r, c))
+                    if assignment_data:
+                        student_name = assignment_data['student_name']
+                        call_num = assignment_data.get('call_number')
+                        call_str = f"{call_num}" if call_num is not None else "?"
+                        ax.text(c + 0.05, r + 0.9, call_str, ha='left', va='top', fontsize=8, fontweight='bold', color='blue')
+                        label = student_name
+                    else:
+                        label = "Vazio"
+
+                rect = Rectangle((c, r), 1, 1, facecolor=facecolor, edgecolor=edgecolor)
+                ax.add_patch(rect)
+
+                if label != "Vazio":
+                    display_label = label
+                    if len(label) > 15:
+                        parts = label.split()
+                        if len(parts) > 1:
+                            display_label = f"{parts[0]}\n{parts[-1]}"
+                        else:
+                            display_label = label[:15] + "..."
+                    ax.text(c + 0.5, r + 0.5, display_label, ha='center', va='center', fontsize=10, color='white' if cell_type == 'door' else 'black')
+                else:
+                    # Draw "Vazio" fainter
+                    ax.text(c + 0.5, r + 0.5, "Vazio", ha='center', va='center', fontsize=8, color='#AAAAAA')
+
+        plt.title(f"Mapa de Sala: {chart_details['name']}", fontsize=16)
+
+        filename = f"seating_chart_{chart_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{format}"
+        filepath = self._get_file_path(filename)
+        plt.savefig(filepath, format=format, bbox_inches='tight')
+        plt.close()
+        return filepath
 
     def generate_student_grade_chart(self, student_id: int, class_id: int) -> str:
         """

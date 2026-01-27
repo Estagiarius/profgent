@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 from openai import AsyncOpenAI
 from app.core.llm.base import LLMProvider, AssistantResponse
 from typing import List
@@ -20,39 +30,25 @@ class MaritacaProvider(LLMProvider):
         return "Maritaca"
 
     async def get_chat_response(self, messages: list, tools: list | None = None) -> AssistantResponse:
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.7,
-                max_tokens=512,
-            )
-
-            message = response.choices[0].message
-            content = message.content or ""
-
-            # Convert tool_calls objects (Pydantic models) to dictionaries
-            tool_calls = None
-            if message.tool_calls:
-                tool_calls = []
-                for tc in message.tool_calls:
-                    if hasattr(tc, 'model_dump'):
-                        tool_calls.append(tc.model_dump())
-                    elif hasattr(tc, 'dict'):
-                        tool_calls.append(tc.dict())
-                    else:
-                        tool_calls.append(tc)
-
-            return AssistantResponse(content=content, tool_calls=tool_calls)
-
-        except Exception as e:
-            print(f"An error occurred with the Maritaca API: {e}")
-            return AssistantResponse(content=f"Error: {e}")
+        return await self._create_chat_completion(messages, tools)
 
     async def list_models(self) -> List[str]:
-        # Maritaca's OpenAI-compatible endpoint does not seem to support listing models.
-        # We will return the known models manually.
-        return ["sabia-3", "sabia-2-small"]
+        fallback_models = ["sabia-3.1", "sabia-3", "sabiazim-3"]
+        try:
+            models = await self.client.models.list()
+            # Cast model to Any to avoid linter errors about dynamic attributes
+            all_models = sorted([model.id for model in models])
+
+            # Filter out deprecated models (e.g., sabia-2 family)
+            # We keep only models that do NOT start with 'sabia-2'
+            active_models = [m for m in all_models if not m.startswith("sabia-2")]
+
+            if not active_models:
+                 return fallback_models
+            return active_models
+        except Exception as e:
+            print(f"Error listing Maritaca models: {e}")
+            return fallback_models
 
     async def close(self):
         await self.client.close()

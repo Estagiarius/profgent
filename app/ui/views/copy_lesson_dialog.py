@@ -1,24 +1,27 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from tkinter import messagebox
 from app.services import data_service
+from app.ui.views.base_dialog import BaseDialog
 
-class CopyLessonDialog(ctk.CTkToplevel):
+class CopyLessonDialog(BaseDialog):
     def __init__(self, parent, source_class_id, source_subject_id, callback=None):
-        super().__init__(parent)
+        super().__init__(parent, "Copiar Aulas")
         self.source_class_id = source_class_id
         self.source_subject_id = source_subject_id
         self.callback = callback
 
-        self.title("Copiar Aulas")
-        self.geometry("600x500")
-
-        # Centraliza na tela (opcional, mas bom UX)
-        self.update_idletasks()
-        width = self.winfo_width()
-        height = self.winfo_height()
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
-        self.geometry(f"{width}x{height}+{x}+{y}")
+        self.geometry("720x480")
+        self.center_on_screen()
 
         self.grid_rowconfigure(2, weight=1) # Lista de aulas expande
         self.grid_columnconfigure(0, weight=1)

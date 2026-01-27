@@ -1,11 +1,21 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from tkinter import messagebox
+from app.ui.views.base_dialog import BaseDialog
 
-class AttendanceDialog(ctk.CTkToplevel):
+class AttendanceDialog(BaseDialog):
     def __init__(self, parent, title, lesson_id, students, attendance_map, save_callback):
-        super().__init__(parent)
-        self.title(title)
-        self.geometry("600x500")
+        super().__init__(parent, title)
+        self.geometry("1280x720")
         self.resizable(False, True)
 
         self.lesson_id = lesson_id
@@ -55,9 +65,6 @@ class AttendanceDialog(ctk.CTkToplevel):
         # Mark all buttons
         ctk.CTkButton(self.actions_frame, text="Marcar Todos Presentes", command=lambda: self.set_all('P')).pack(side="left", padx=10, pady=10)
         ctk.CTkButton(self.actions_frame, text="Marcar Todos Faltantes", fg_color="#D9534F", hover_color="#C9302C", command=lambda: self.set_all('F')).pack(side="left", padx=10, pady=10)
-
-        self.transient(parent)
-        self.grab_set()
 
     def set_all(self, status):
         for btn in self.status_vars.values():

@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 # Importa componentes e utilitários do tkinter e customtkinter.
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
@@ -12,7 +22,7 @@ from app.ui.views.enrollment_dialog import EnrollmentDialog
 from app.ui.views.attendance_dialog import AttendanceDialog
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
 from app.ui.views.copy_lesson_dialog import CopyLessonDialog
-from app.ui.views.copy_lesson_dialog import CopyLessonDialog
+from app.ui.views.seating_chart_view import SeatingChartView
 from customtkinter import CTkInputDialog
 # Importa utilitários para tarefas assíncronas e de importação.
 from app.utils.async_utils import run_async_task
@@ -21,9 +31,11 @@ from app.utils.format_utils import parse_float_input, format_float_output
 # Importa widgets e utilitários de UI
 from app.ui.widgets.scrollable_canvas_frame import ScrollableCanvasFrame
 from app.ui.ui_utils import bind_global_mouse_scroll
+from app.ui.widgets.loading_overlay import LoadingOverlay
 # Importa o serviço de relatórios.
 from app.services.report_service import ReportService
 import os
+import asyncio
 from PIL import Image
 
 # Define a classe para a tela de detalhes da turma.
@@ -76,6 +88,7 @@ class ClassDetailView(ctk.CTkFrame):
         self.tab_view.add("Aulas")
         self.tab_view.add("Incidentes")
         self.tab_view.add("Quadro de Notas")
+        self.tab_view.add("Mapa de Sala")
         self.tab_view.add("BNCC")
         self.tab_view.add("Relatórios")
 
@@ -317,13 +330,25 @@ class ClassDetailView(ctk.CTkFrame):
         self.edit_bncc_button = ctk.CTkButton(self.bncc_actions_frame, text="Editar Currículo Global", command=self.open_bncc_editor)
         self.edit_bncc_button.pack(side="left", padx=5)
 
+        # --- Aba Mapa de Sala ---
+        seating_tab = self.tab_view.tab("Mapa de Sala")
+        seating_tab.grid_rowconfigure(0, weight=1)
+        seating_tab.grid_columnconfigure(0, weight=1)
+
+        # O self.class_id é None no init, então precisamos configurar a view e atualizá-la depois
+        self.seating_chart_view = SeatingChartView(seating_tab, self.class_id)
+        self.seating_chart_view.grid(row=0, column=0, sticky="nsew")
+
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
 
-    def populate_subject_combo(self):
+    def populate_subject_combo(self, subjects=None):
         """Busca as disciplinas da turma e preenche o combobox."""
         if not self.class_id: return
 
-        subjects = data_service.get_subjects_for_class(self.class_id)
+        if subjects is None:
+            # Fallback para caso seja chamado sem dados (não deveria, se on_show usar a nova lógica)
+            subjects = data_service.get_subjects_for_class(self.class_id)
+
         if not subjects:
             self.subject_combo.configure(values=["Nenhuma Disciplina"], state="disabled")
             self.current_subject_id = None
@@ -340,17 +365,69 @@ class ClassDetailView(ctk.CTkFrame):
                  first_subject_name = subject_names[0]
                  self.subject_combo.set(first_subject_name)
                  self.on_subject_change(first_subject_name)
+            # Se já houver um selecionado, garante que o UI mostre o nome correto
+            elif self.current_subject_id in self.subject_mapping.values():
+                # Encontra o nome pelo ID
+                name = next((n for n, id_ in self.subject_mapping.items() if id_ == self.current_subject_id), None)
+                if name: self.subject_combo.set(name)
+
+
+    # Método estático para buscar dados do subject em background
+    @staticmethod
+    def _fetch_subject_data(subject_id, class_id):
+        return {
+            "assessments": data_service.get_assessments_for_subject(subject_id),
+            "lessons": data_service.get_lessons_for_subject(subject_id),
+            "grades": data_service.get_grades_for_subject(subject_id),
+            "enrollments": data_service.get_enrollments_for_class(class_id),
+            "attendance_stats": data_service.get_class_attendance_stats(subject_id),
+            "bncc_report": data_service.get_bncc_coverage(subject_id),
+            "batch_averages": data_service.get_class_period_averages(subject_id)
+        }
+
+    def _on_subject_data_fetched(self, result):
+        if isinstance(result, Exception):
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.loading_overlay.destroy()
+                self.loading_overlay = None
+            messagebox.showerror("Erro", f"Erro ao carregar dados da disciplina: {result}")
+            return
+
+        # Distribui os dados carregados para os métodos de população
+        self.populate_assessment_list(assessments_data=result['assessments'])
+        self.populate_lesson_list(lessons_data=result['lessons'])
+        self.populate_grade_grid(
+            assessments_data=result['assessments'],
+            grades_data=result['grades'],
+            enrollments_data=result['enrollments'],
+            averages_data=result['batch_averages']
+        )
+        self.populate_student_list(
+            enrollments_data=result['enrollments'],
+            attendance_stats=result['attendance_stats']
+        )
+        self.populate_bncc_tab(report_data=result['bncc_report'])
+
+        # Força renderização e atrasa remoção do overlay
+        self.update_idletasks()
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.after(100, self._remove_overlay)
 
     def on_subject_change(self, selected_subject_name):
         """Callback para quando a disciplina é trocada no dropdown."""
         if selected_subject_name in self.subject_mapping:
             self.current_subject_id = self.subject_mapping[selected_subject_name]
-            # Atualiza as abas que dependem da disciplina
-            self.populate_assessment_list()
-            self.populate_lesson_list()
-            self.populate_grade_grid()
-            self.populate_student_list() # Atualiza lista de alunos para mostrar % de freq da matéria
-            self.populate_bncc_tab()
+
+            # Inicia o carregamento assíncrono
+            if not hasattr(self, 'loading_overlay') or self.loading_overlay is None:
+                self.loading_overlay = LoadingOverlay(self, text="Carregando Disciplina...")
+
+            run_async_task(
+                asyncio.to_thread(self._fetch_subject_data, self.current_subject_id, self.class_id),
+                self.main_app.loop,
+                self.main_app.async_queue,
+                self._on_subject_data_fetched
+            )
 
     def add_subject_popup(self):
         if not self.class_id: return
@@ -415,7 +492,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         BNCCSelectionDialog(self, title="Editar Currículo Global", initial_selection=current_bncc, callback=save_callback)
 
-    def populate_bncc_tab(self):
+    def populate_bncc_tab(self, report_data=None):
         """Preenche a aba de relatório BNCC."""
         # Limpa conteúdo
         for widget in self.bncc_scroll_frame.winfo_children():
@@ -425,7 +502,8 @@ class ClassDetailView(ctk.CTkFrame):
             ctk.CTkLabel(self.bncc_scroll_frame, text="Selecione uma disciplina.").pack(pady=20)
             return
 
-        report = data_service.get_bncc_coverage(self.current_subject_id)
+        report = report_data if report_data is not None else data_service.get_bncc_coverage(self.current_subject_id)
+
         if not report:
              ctk.CTkLabel(self.bncc_scroll_frame, text="Dados não disponíveis.").pack(pady=20)
              return
@@ -638,7 +716,7 @@ class ClassDetailView(ctk.CTkFrame):
             messagebox.showinfo("Aviso", "Nenhuma nota final para salvar.")
 
     # Método para construir e preencher o quadro de notas.
-    def populate_grade_grid(self):
+    def populate_grade_grid(self, assessments_data=None, grades_data=None, enrollments_data=None, averages_data=None):
         # Identifica a aba atual
         current_tab_name = self.grades_tabview.get()
         frame = self.grade_frames[current_tab_name]
@@ -654,8 +732,8 @@ class ClassDetailView(ctk.CTkFrame):
             ctk.CTkLabel(frame, text="Selecione uma disciplina.").pack(pady=20)
             return
 
-        # Busca alunos
-        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        # Busca alunos (usa dados passados ou busca novos)
+        enrollments = enrollments_data if enrollments_data is not None else data_service.get_enrollments_for_class(self.class_id)
         if self.show_active_only_grades_checkbox.get():
             enrollments = [e for e in enrollments if e['status'] == 'Active']
 
@@ -665,7 +743,7 @@ class ClassDetailView(ctk.CTkFrame):
             target_period = period_map.get(current_tab_name, 1)
 
             # Busca avaliações DO PERÍODO
-            all_assessments = data_service.get_assessments_for_subject(self.current_subject_id)
+            all_assessments = assessments_data if assessments_data is not None else data_service.get_assessments_for_subject(self.current_subject_id)
             period_assessments = [a for a in all_assessments if a.get('grading_period', 1) == target_period]
 
             if not period_assessments:
@@ -679,7 +757,7 @@ class ClassDetailView(ctk.CTkFrame):
                 label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
 
             # Dados
-            grades = data_service.get_grades_for_subject(self.current_subject_id)
+            grades = grades_data if grades_data is not None else data_service.get_grades_for_subject(self.current_subject_id)
 
             # --- OTIMIZAÇÃO: Indexar grades em um dicionário para acesso O(1) ---
             grades_map = {(g['student_id'], g['assessment_id']): g for g in grades}
@@ -725,7 +803,7 @@ class ClassDetailView(ctk.CTkFrame):
                 label.grid(row=0, column=col, padx=10, pady=5, sticky="w")
 
             # --- OTIMIZAÇÃO: Batch fetch de médias finais ---
-            batch_averages = data_service.get_class_period_averages(self.current_subject_id)
+            batch_averages = averages_data if averages_data is not None else data_service.get_class_period_averages(self.current_subject_id)
 
             for row, enrollment in enumerate(enrollments, start=1):
                 student_id = enrollment['student_id']
@@ -964,7 +1042,7 @@ class ClassDetailView(ctk.CTkFrame):
         AddDialog(self, "Adicionar Nova Avaliação", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
 
     # Preenche a lista de avaliações separada por bimestres.
-    def populate_assessment_list(self):
+    def populate_assessment_list(self, assessments_data=None):
         # Limpa todas as abas
         tab_names = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"]
         frames = {}
@@ -979,7 +1057,7 @@ class ClassDetailView(ctk.CTkFrame):
              ctk.CTkLabel(frames["1º Bimestre"], text="Selecione ou adicione uma disciplina.").pack(pady=10)
              return
 
-        assessments = data_service.get_assessments_for_subject(self.current_subject_id)
+        assessments = assessments_data if assessments_data is not None else data_service.get_assessments_for_subject(self.current_subject_id)
 
         # Filtra e popula cada aba
         for period_idx, tab_name in enumerate(tab_names, start=1):
@@ -1087,20 +1165,22 @@ class ClassDetailView(ctk.CTkFrame):
         )
 
     # Preenche a lista de alunos matriculados.
-    def populate_student_list(self):
+    def populate_student_list(self, enrollments_data=None, attendance_stats=None):
         for widget in self.student_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
-        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        enrollments = enrollments_data if enrollments_data is not None else data_service.get_enrollments_for_class(self.class_id)
 
         # Filtra por alunos ativos se o checkbox estiver marcado.
         if self.show_active_only_checkbox.get():
             enrollments = [e for e in enrollments if e['status'] == 'Active']
 
         # Carrega estatísticas de frequência em lote para evitar N+1 queries
-        batch_attendance_stats = {}
-        if self.current_subject_id:
+        batch_attendance_stats = attendance_stats
+        if batch_attendance_stats is None and self.current_subject_id:
              batch_attendance_stats = data_service.get_class_attendance_stats(self.current_subject_id)
+        elif batch_attendance_stats is None:
+            batch_attendance_stats = {}
 
         headers = ["Nº de Chamada", "Nome do Aluno", "Freq. %", "Data de Nascimento", "Status"]
         for i, header in enumerate(headers):
@@ -1216,7 +1296,7 @@ class ClassDetailView(ctk.CTkFrame):
             messagebox.showinfo("Sucesso", f"{success_count} alunos importados com sucesso!")
 
     # Preenche a lista de aulas.
-    def populate_lesson_list(self):
+    def populate_lesson_list(self, lessons_data=None):
         for widget in self.lesson_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
@@ -1224,7 +1304,7 @@ class ClassDetailView(ctk.CTkFrame):
              ctk.CTkLabel(self.lesson_list_frame, text="Selecione ou adicione uma disciplina.").pack(pady=10)
              return
 
-        lessons = data_service.get_lessons_for_subject(self.current_subject_id)
+        lessons = lessons_data if lessons_data is not None else data_service.get_lessons_for_subject(self.current_subject_id)
 
         headers = ["Data", "Título", "Ações"]
         for i, header in enumerate(headers):
@@ -1286,18 +1366,140 @@ class ClassDetailView(ctk.CTkFrame):
         # 4. Abre dialogo
         AttendanceDialog(self, f"Chamada - {lesson_title}", lesson_id, students, attendance_map, save_attendance)
 
+    # Método estático para busca inicial de dados
+    @staticmethod
+    def _fetch_initial_details(class_id, preferred_subject_id=None):
+        class_data = data_service.get_class_by_id(class_id)
+        subjects = data_service.get_subjects_for_class(class_id)
+        enrollments = data_service.get_enrollments_for_class(class_id)
+        incidents = data_service.get_incidents_for_class(class_id)
+
+        subject_data = None
+        target_subject_id = None
+
+        # Determina qual disciplina carregar (preferida ou a primeira da lista)
+        if subjects:
+            ids = [s['id'] for s in subjects]
+            if preferred_subject_id and preferred_subject_id in ids:
+                target_subject_id = preferred_subject_id
+            else:
+                target_subject_id = subjects[0]['id']
+
+        # Se identificou uma disciplina alvo, carrega seus dados
+        if target_subject_id:
+            subject_data = ClassDetailView._fetch_subject_data(target_subject_id, class_id)
+            subject_data['id'] = target_subject_id
+
+        return {
+            "class_data": class_data,
+            "subjects": subjects,
+            "enrollments": enrollments,
+            "incidents": incidents,
+            "initial_subject_data": subject_data
+        }
+
+    def _on_initial_details_fetched(self, result):
+        if isinstance(result, Exception):
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.loading_overlay.destroy()
+                self.loading_overlay = None
+            messagebox.showerror("Erro", f"Erro ao carregar turma: {result}")
+            return
+
+        class_data = result['class_data']
+        self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
+
+        # Recupera dados combinados
+        initial_subject_data = result.get('initial_subject_data')
+        subjects = result['subjects']
+
+        # Configura o ID da disciplina atual ANTES de popular o combo.
+        # Isso impede que o populate_subject_combo dispare o evento on_change desnecessariamente.
+        if initial_subject_data:
+            self.current_subject_id = initial_subject_data['id']
+
+        # Popula dropdown de subjects
+        self.populate_subject_combo(subjects=subjects)
+        self.populate_report_student_combo()
+        self.populate_incident_list(incidents_data=result['incidents'])
+
+        # Se temos dados da disciplina, populamos tudo
+        if initial_subject_data:
+            # Popula abas específicas da disciplina
+            self.populate_assessment_list(assessments_data=initial_subject_data['assessments'])
+            self.populate_lesson_list(lessons_data=initial_subject_data['lessons'])
+            self.populate_grade_grid(
+                assessments_data=initial_subject_data['assessments'],
+                grades_data=initial_subject_data['grades'],
+                enrollments_data=result['enrollments'],
+                averages_data=initial_subject_data['batch_averages']
+            )
+            # Popula lista de alunos COM FREQUÊNCIA (Attendance Stats)
+            self.populate_student_list(
+                enrollments_data=result['enrollments'],
+                attendance_stats=initial_subject_data['attendance_stats']
+            )
+            self.populate_bncc_tab(report_data=initial_subject_data['bncc_report'])
+        else:
+            # Caso sem disciplina, popula apenas a lista básica de alunos
+            self.populate_student_list(enrollments_data=result['enrollments'])
+
+        # Força renderização e atrasa remoção do overlay
+        self.update_idletasks()
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.after(100, self._remove_overlay)
+
+    def _remove_overlay(self):
+        if hasattr(self, 'loading_overlay') and self.loading_overlay:
+            self.loading_overlay.destroy()
+            self.loading_overlay = None
+
+    # Sobrecarga para populate_incident_list aceitar dados
+    def populate_incident_list(self, incidents_data=None):
+        for widget in self.incident_list_frame.winfo_children(): widget.destroy()
+        if not self.class_id: return
+
+        incidents = incidents_data if incidents_data is not None else data_service.get_incidents_for_class(self.class_id)
+
+        # Cria cabeçalhos.
+        headers = ["Nome do Aluno", "Data", "Descrição"]
+        for i, header in enumerate(headers):
+            label = ctk.CTkLabel(self.incident_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
+            label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
+
+        # Cria as linhas com os dados dos incidentes.
+        for i, incident in enumerate(incidents, start=1):
+            student_name = f"{incident['student_first_name']} {incident['student_last_name']}"
+            ctk.CTkLabel(self.incident_list_frame, text=student_name).grid(row=i, column=0, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.incident_list_frame, text=incident['date']).grid(row=i, column=1, padx=10, pady=5, sticky="w")
+            ctk.CTkLabel(self.incident_list_frame, text=incident['description'], wraplength=400, justify="left").grid(row=i, column=2, padx=10, pady=5, sticky="w")
+
     # Método chamado quando esta view é exibida.
     def on_show(self, class_id=None):
         self.class_id = class_id
+
+        # Atualiza a view do mapa de sala com o ID novo
+        self.seating_chart_view.class_id = class_id
+        # Reseta o estado do mapa
+        self.seating_chart_view.populate_layout_combo()
+
         if class_id:
-            # Atualiza o título e preenche todas as listas/quadros com os dados da turma selecionada.
-            class_data = data_service.get_class_by_id(self.class_id)
-            self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
-            self.populate_student_list()
-            self.populate_incident_list()
+            # Mostra Overlay
+            if not hasattr(self, 'loading_overlay') or self.loading_overlay is None:
+                self.loading_overlay = LoadingOverlay(self, text="Carregando Detalhes da Turma...")
 
-            # Popula o dropdown de disciplinas e dispara a atualização das outras abas
-            self.populate_subject_combo()
+            # Passa o self.current_subject_id (se houver) como preferência
+            # Embora no on_show ele possa ser de uma turma anterior,
+            # o ideal seria resetar ou tentar manter se fizer sentido.
+            # Como a view é recriada/reusada, melhor passar None para resetar ou
+            # confiar na lógica do fetch (pegar o primeiro).
+            # Se quisermos persistir a escolha de disciplina ao voltar para a turma,
+            # precisaríamos armazenar isso na MainApp ou algo assim.
+            # Por padrão, vamos deixar None para pegar a primeira.
 
-            # Atualiza o combobox de alunos na aba de relatórios
-            self.populate_report_student_combo()
+            run_async_task(
+                asyncio.to_thread(self._fetch_initial_details, class_id),
+                self.main_app.loop,
+                self.main_app.async_queue,
+                self._on_initial_details_fetched
+            )

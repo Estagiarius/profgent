@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import logging
 from sqlalchemy import inspect
 from app.ui.main_app import MainApp
@@ -7,13 +17,23 @@ from app.services import data_service
 # Importa o AssistantService
 from app.services.assistant_service import AssistantService
 from app.data.migrations import migrate_database
+import sys
+from pathlib import Path
+from app.core.config import CONFIG_DIR
+
+# Determina o arquivo de log baseado no modo de execução (Frozen vs Dev)
+if getattr(sys, 'frozen', False):
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = CONFIG_DIR / "app.log"
+else:
+    log_file = "app.log"
 
 # Configuração básica de logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("app.log"),
+        logging.FileHandler(str(log_file)),
         logging.StreamHandler()  # Também exibe no console para debug durante o desenvolvimento
     ]
 )

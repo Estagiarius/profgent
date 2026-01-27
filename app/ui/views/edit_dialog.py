@@ -1,16 +1,27 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 # Importa a biblioteca 'customtkinter' para os componentes da interface.
 import customtkinter as ctk
 # Importa tipos para anotações, melhorando a clareza do código.
 from typing import Dict, Callable, List, Union, Tuple
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
+from app.ui.views.base_dialog import BaseDialog
 
-# Define a classe EditDialog, que herda de CTkToplevel para criar uma janela secundária (pop-up).
-class EditDialog(ctk.CTkToplevel):
+# Define a classe EditDialog, que herda de BaseDialog para criar uma janela secundária (pop-up).
+class EditDialog(BaseDialog):
     # O método construtor da janela de diálogo.
     def __init__(self, parent, title: str, fields: Dict[str, str], data: Dict[str, any], save_callback: Callable, dropdowns: Dict[str, Tuple[str, List[str]]] = None):
         # Chama o construtor da classe pai.
-        super().__init__(parent)
-        self.title(title)
+        super().__init__(parent, title)
+
         self.save_callback = save_callback
         self.data = data
         self.entries: Dict[str, Union[ctk.CTkEntry, ctk.CTkOptionMenu]] = {}

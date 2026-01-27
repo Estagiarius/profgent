@@ -1,14 +1,24 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from datetime import date, datetime
 from app.services import data_service
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
+from app.ui.views.base_dialog import BaseDialog
 from tkinter import messagebox
 
-class LessonDialog(ctk.CTkToplevel):
+class LessonDialog(BaseDialog):
     def __init__(self, parent, class_subject_id, lesson_date, lesson_data=None, on_save=None):
-        super().__init__(parent)
-        self.title("Registro de Aula")
-        self.geometry("600x500")
+        super().__init__(parent, "Registro de Aula")
+        self.geometry("1600x900")
         self.class_subject_id = class_subject_id
         self.lesson_date = lesson_date
         self.lesson_data = lesson_data

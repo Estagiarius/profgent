@@ -1,11 +1,21 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from typing import List, Dict, Callable, Any, Set
+from app.ui.views.base_dialog import BaseDialog
 
-class EnrollmentDialog(ctk.CTkToplevel):
+class EnrollmentDialog(BaseDialog):
     def __init__(self, parent, title: str, students: List[Dict[str, Any]], enroll_callback: Callable[[List[int]], None]):
-        super().__init__(parent)
-        self.title(title)
-        self.geometry("600x500")
+        super().__init__(parent, title)
+        self.geometry("1280x720")
 
         self.students = students
         self.enroll_callback = enroll_callback
@@ -22,11 +32,6 @@ class EnrollmentDialog(ctk.CTkToplevel):
         self._setup_ui()
         # Initial population
         self._populate_list()
-
-        # Bring to front
-        self.lift()
-        self.focus_force()
-        self.grab_set()
 
     def _setup_ui(self):
         # Configure grid layout

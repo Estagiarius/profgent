@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 # Importa a função create_engine do SQLAlchemy para criar a conexão com o banco de dados.
 from sqlalchemy import create_engine
 # Importa a função sessionmaker para criar sessões de banco de dados.
@@ -7,9 +17,20 @@ from contextlib import contextmanager
 # Importa a classe Base declarativa da qual todos os modelos herdam.
 from app.models.base import Base
 
+import sys
+from pathlib import Path
+from app.core.config import CONFIG_DIR
+
 # Define a URL de conexão para o banco de dados SQLite.
-# O banco será um arquivo chamado 'academic_management.db' no mesmo diretório.
-DATABASE_URL = "sqlite:///academic_management.db"
+# Se estiver rodando como executável (frozen), usa o diretório de configuração do usuário.
+# Caso contrário (desenvolvimento), usa o diretório atual.
+if getattr(sys, 'frozen', False):
+    # Garante que o diretório existe
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    db_path = CONFIG_DIR / "academic_management.db"
+    DATABASE_URL = f"sqlite:///{db_path}"
+else:
+    DATABASE_URL = "sqlite:///academic_management.db"
 
 # Cria a 'engine' do SQLAlchemy, que gerencia a conexão com o banco de dados.
 # connect_args={"check_same_thread": False} é necessário para o SQLite permitir conexões de múltiplas threads,

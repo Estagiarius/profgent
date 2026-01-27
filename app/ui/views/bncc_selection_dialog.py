@@ -1,11 +1,21 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from app.services.bncc_service import BNCCService
+from app.ui.views.base_dialog import BaseDialog
 
-class BNCCSelectionDialog(ctk.CTkToplevel):
+class BNCCSelectionDialog(BaseDialog):
     def __init__(self, parent, title="Selecionar Habilidades BNCC", initial_selection=None, callback=None):
-        super().__init__(parent)
-        self.title(title)
-        self.geometry("800x600")
+        super().__init__(parent, title)
+        self.geometry("1600x900")
         self.callback = callback
         self.selected_codes = set(initial_selection.split(',')) if initial_selection else set()
         # Clean up empty strings

@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 # Importa as bibliotecas necessárias para os testes.
 import pytest
 from sqlalchemy import create_engine
@@ -56,11 +66,9 @@ def data_service(db_session: Session, mocker: MockerFixture) -> DataService:
     def mock_get_db_session():
         yield db_session
 
-    # Usa o `mocker` do pytest-mock para substituir a função `get_db_session` real
-    # no módulo `data_service` pelo nosso gerenciador de contexto falso.
-    mocker.patch("app.services.data_service.get_db_session", new=mock_get_db_session)
-    # As 'tools' não chamam `get_db_session` diretamente, elas usam o `data_service`,
-    # então só precisamos 'mockar' a camada de serviço.
+    # Usa o `mocker` do pytest-mock para substituir a função `get_db_session` real.
+    # Com a refatoração para serviços dedicados, o patch deve ser aplicado no BaseDataService.
+    mocker.patch("app.services.data.base_service.get_db_session", new=mock_get_db_session)
 
     # Cria uma instância do DataService. Agora, sempre que este serviço tentar
     # obter uma sessão de banco de dados, ele receberá a sessão de teste em memória.

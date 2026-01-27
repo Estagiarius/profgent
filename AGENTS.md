@@ -21,6 +21,20 @@ O projeto utiliza o **Poetry** para gerenciamento de dependências.
 Para manter a consistência e estabilidade do código, siga estas regras estritamente:
 
 *   **Idioma:** Todo o código visível ao usuário (interface, logs, saídas de ferramentas) e comentários devem ser em **Português do Brasil**. Identificadores de código (variáveis, funções, classes) devem permanecer em **Inglês**.
+*   **Cabeçalho de Propriedade Intelectual:** Todo arquivo de código-fonte (especialmente `.py`) deve iniciar com o seguinte cabeçalho (respeitando shebangs/encodings):
+    ```python
+    # Author: Victor Hugo Garcia de Oliveira
+    # Date: [Data de Criação do Arquivo no Formato YYYY-MM-DD]
+    #
+    # This Source Code Form is subject to the terms of the Mozilla Public
+    # License, v. 2.0. If a copy of the MPL was not distributed with this
+    # file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    #
+    # Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+    # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+    # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
+    ```
+    *Para arquivos novos, use a data atual. Para arquivos existentes, preserve a data da primeira inserção.*
 *   **Interface Gráfica e Assincronismo:** A aplicação usa `CustomTkinter` (CTK) em um loop de eventos principal.
     *   **NUNCA** execute código bloqueante (ex: `time.sleep`, requisições HTTP síncronas, queries pesadas) diretamente na thread da UI. Isso congelará a aplicação.
     *   Utilize o utilitário `run_async_task` (`app/utils/async_utils.py`) para despachar corrotinas para background.
@@ -55,7 +69,10 @@ Para manter a consistência e estabilidade do código, siga estas regras estrita
     *   `core/`: Núcleo estrutural (Configuração, Segurança, Framework de IA).
     *   `data/`: Configuração do banco (`database.py`) e arquivos estáticos da BNCC.
     *   `models/`: Definições de modelos SQLAlchemy (`student.py`, `schedule.py`, etc.).
-    *   `services/`: Lógica de negócios (`DataService`, `AssistantService`, `ReportService`, `BNCCService`).
+    *   `services/`: Lógica de negócios.
+        *   `DataService` (`data_service.py`): **Fachada** que centraliza o acesso aos dados.
+        *   `data/`: Submódulo contendo os serviços especializados (`StudentService`, `GradeService`, etc.) que compõem o `DataService`.
+        *   Outros serviços: `AssistantService`, `ReportService`, `BNCCService`.
     *   `tools/`: Implementações concretas das ferramentas do Assistente.
     *   `ui/`: Camada de apresentação (`views/`, `widgets/` e `main_app.py`).
     *   `utils/`: Utilitários compartilhados (`async_utils.py`, `student_csv_parser.py`, `charts.py`).
