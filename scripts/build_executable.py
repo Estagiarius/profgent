@@ -108,9 +108,6 @@ def build_executable():
         "app.services.data.dashboard_service",
         "app.services.data.seating_chart_service",
         "app.services.report_service",
-        # Providers de LLM (se houver import dinâmico)
-        "app.core.llm.openai_provider",
-        "app.core.llm.anthropic_provider",
     ]
 
     # 3. Argumentos Comuns

@@ -14,8 +14,6 @@ from app.ui.main_app import MainApp
 from app.data.database import engine, Base
 # Importa o DataService singleton (instância compartilhada) para garantir consistência com as ferramentas da IA
 from app.services import data_service
-# Importa o AssistantService
-from app.services.assistant_service import AssistantService
 from app.data.migrations import migrate_database
 import sys
 from pathlib import Path
@@ -72,16 +70,12 @@ def main():
         initialize_database()
         migrate_database(engine)
 
-        # 2. Inicializa os serviços
+        # 2. Inicializa a Interface Gráfica
         # O data_service já foi importado como singleton.
-        # Inicializa o serviço do assistente (que carrega configurações e ferramentas)
-        assistant_service = AssistantService()
-
-        # 3. Inicializa a Interface Gráfica
         logging.info("Inicializando interface gráfica...")
-        app = MainApp(data_service=data_service, assistant_service=assistant_service)
+        app = MainApp(data_service=data_service)
 
-        # 4. Inicia o loop principal
+        # 3. Inicia o loop principal
         app.mainloop()
 
         logging.info("Aplicação encerrada pelo usuário.")

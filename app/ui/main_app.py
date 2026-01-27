@@ -17,7 +17,6 @@ import customtkinter as ctk
 from queue import Queue, Empty
 # Importa as classes de cada tela (view) da aplicação.
 from app.ui.views.dashboard_view import DashboardView
-from app.ui.views.assistant_view import AssistantView
 from app.ui.views.settings_view import SettingsView
 from app.ui.views.management_view import ManagementView
 from app.ui.views.class_selection_view import ClassSelectionView
@@ -28,7 +27,6 @@ from app.utils.path_utils import get_resource_path
 
 # Importa as classes de serviço que contêm a lógica de negócios e da IA.
 from app.services.data_service import DataService
-from app.services.assistant_service import AssistantService
 
 # Define a classe principal da aplicação, que herda de ctk.CTk (a janela principal).
 class MainApp(ctk.CTk):
@@ -42,9 +40,6 @@ class MainApp(ctk.CTk):
     :ivar data_service: Serviço para manipulação e acesso aos dados.
                         Responsável por operações relacionadas a dados persistentes.
     :type data_service: DataService
-    :ivar assistant_service: Serviço para funcionalidades de assistente inteligente
-                             baseado em IA.
-    :type assistant_service: AssistantService
     :ivar loop: Loop de eventos asyncio, utilizado para integrar tarefas assíncronas
                 com o loop de eventos do tkinter.
     :type loop: asyncio.AbstractEventLoop
@@ -66,8 +61,6 @@ class MainApp(ctk.CTk):
     :type management_button: ctk.CTkButton
     :ivar class_selection_button: Botão de navegação para a seleção de turmas.
     :type class_selection_button: ctk.CTkButton
-    :ivar assistant_button: Botão de navegação para o assistente IA.
-    :type assistant_button: ctk.CTkButton
     :ivar settings_button: Botão de navegação para configurações.
     :type settings_button: ctk.CTkButton
     :ivar main_frame: Frame principal onde as diferentes telas (views) são exibidas.
@@ -77,13 +70,12 @@ class MainApp(ctk.CTk):
     :type views: dict
     """
     # O método construtor, que recebe as instâncias dos serviços por injeção de dependência.
-    def __init__(self, data_service: DataService, assistant_service: AssistantService):
+    def __init__(self, data_service: DataService):
         # Chama o construtor da classe pai (ctk.CTk).
         super().__init__()
 
         # Armazena as instâncias dos serviços como atributos da classe.
         self.data_service = data_service
-        self.assistant_service = assistant_service
 
         # Define o título e o tamanho inicial da janela principal.
         ctk.set_appearance_mode("Dark")
@@ -150,14 +142,11 @@ class MainApp(ctk.CTk):
         self.schedule_button = ctk.CTkButton(self.navigation_frame, text="Horário", command=lambda: self.show_view("schedule"))
         self.schedule_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
 
-        self.assistant_button = ctk.CTkButton(self.navigation_frame, text="Assistente IA", command=lambda: self.show_view("assistant"))
-        self.assistant_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
-
         self.management_button = ctk.CTkButton(self.navigation_frame, text="Gestão de Dados", command=lambda: self.show_view("management"))
-        self.management_button.grid(row=5, column=0, padx=20, pady=10, sticky="ew")
+        self.management_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
 
         self.settings_button = ctk.CTkButton(self.navigation_frame, text="Configurações", command=lambda: self.show_view("settings"))
-        self.settings_button.grid(row=6, column=0, padx=20, pady=10, sticky="ew")
+        self.settings_button.grid(row=5, column=0, padx=20, pady=10, sticky="ew")
 
 
         # Cria o frame principal onde o conteúdo de cada tela será exibido.
@@ -174,7 +163,6 @@ class MainApp(ctk.CTk):
             "management": lambda: ManagementView(self.main_frame, self),
             "class_selection": lambda: ClassSelectionView(self.main_frame, self),
             "class_detail": lambda: ClassDetailView(self.main_frame, self),
-            "assistant": lambda: AssistantView(self.main_frame, self, assistant_service=self.assistant_service),
             "settings": lambda: SettingsView(self.main_frame, self)
         }
 
@@ -240,10 +228,6 @@ class MainApp(ctk.CTk):
 
         # Define e agenda a tarefa final de limpeza assíncrona.
         async def cleanup():
-            # Fecha a conexão do serviço do assistente, se ele foi inicializado.
-            if self.assistant_service and self.assistant_service.provider:
-                await self.assistant_service.close()
-
             # Cancela quaisquer outras tarefas pendentes do asyncio.
             tasks = [t for t in asyncio.all_tasks(loop=self.loop) if t is not asyncio.current_task()]
             for task in tasks:
