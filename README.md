@@ -59,6 +59,12 @@ Para rodar a suíte de testes automatizados:
 poetry run pytest
 ```
 
+## Gerando Executáveis (Build)
+
+Para gerar instaladores ou executáveis standalone (Windows .exe, MacOS .app/dmg, Linux binary), consulte o guia dedicado:
+
+*   [Guia de Compilação e Deploy (GUIA_DE_COMPILACAO.md)](docs/GUIA_DE_COMPILACAO.md)
+
 ## Documentação Técnica
 
 Para desenvolvedores e mantenedores, consulte a documentação detalhada:
