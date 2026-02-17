@@ -56,9 +56,6 @@ class DashboardView(ctk.CTkFrame):
         self.main_scroll.grid_rowconfigure(1, weight=1)
         self.main_scroll.grid_rowconfigure(2, weight=1)
 
-        # Habilita rolagem global no container principal
-        bind_global_mouse_scroll(self.main_scroll)
-
         # Bind para redimensionamento responsivo
         self.main_scroll.bind("<Configure>", self.on_resize)
         self.layout_mode = "desktop"  # "desktop" ou "mobile"
@@ -93,6 +90,9 @@ class DashboardView(ctk.CTkFrame):
         self.birthdays_scrollable_frame = ctk.CTkScrollableFrame(self.birthdays_frame_container, label_text="")
         self.birthdays_scrollable_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
         bind_global_mouse_scroll(self.birthdays_scrollable_frame)
+
+        # Habilita rolagem global no container principal (deve ser chamado por último para capturar todos os filhos)
+        bind_global_mouse_scroll(self.main_scroll)
 
     def setup_overview_tab(self) -> None:
         """Configura os elementos da aba Visão Geral."""
