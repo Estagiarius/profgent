@@ -51,15 +51,20 @@ def bind_global_mouse_scroll(widget, command=None, recursive=True):
              scroll_func(direction)
 
     def apply_binding(w):
-        # Linux (Button-4: Up, Button-5: Down)
-        # Direction is -1 for UP (scrolling back), 1 for DOWN (scrolling fwd)
-        w.bind("<Button-4>", lambda e: scroll_handler(-1), add="+")
-        w.bind("<Button-5>", lambda e: scroll_handler(1), add="+")
+        try:
+            # Linux (Button-4: Up, Button-5: Down)
+            # Direction is -1 for UP (scrolling back), 1 for DOWN (scrolling fwd)
+            w.bind("<Button-4>", lambda e: scroll_handler(-1), add="+")
+            w.bind("<Button-5>", lambda e: scroll_handler(1), add="+")
 
-        # Windows (MouseWheel)
-        # Delta is usually 120. Negative delta means down, Positive means up.
-        # We want negative delta to map to +1 (scroll down)
-        w.bind("<MouseWheel>", lambda e: scroll_handler(int(-1 * (e.delta / 120))), add="+")
+            # Windows (MouseWheel)
+            # Delta is usually 120. Negative delta means down, Positive means up.
+            # We want negative delta to map to +1 (scroll down)
+            w.bind("<MouseWheel>", lambda e: scroll_handler(int(-1 * (e.delta / 120))), add="+")
+        except NotImplementedError:
+            # Some CustomTkinter widgets or base classes may not implement 'bind'
+            # and raise NotImplementedError. We simply skip binding for them.
+            pass
 
     if recursive:
         _bind_recursive(widget, apply_binding)
