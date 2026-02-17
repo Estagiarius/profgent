@@ -45,18 +45,31 @@ class DashboardView(ctk.CTkFrame):
         self.failed_details_data: List[Dict[str, Any]] = []
         self.honor_roll_data: List[Dict[str, Any]] = []
 
-        # Configura o layout de grade da view.
-        self.grid_columnconfigure(0, weight=3)
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        # --- Scrollable Main Container ---
+        # Substitui o grid direto no self por um CTkScrollableFrame que contém tudo.
+        self.main_scroll = ctk.CTkScrollableFrame(self)
+        self.main_scroll.pack(fill="both", expand=True)
+
+        # Configura o layout de grade do container principal.
+        self.main_scroll.grid_columnconfigure(0, weight=3)
+        self.main_scroll.grid_columnconfigure(1, weight=1)
+        self.main_scroll.grid_rowconfigure(1, weight=1)
+        self.main_scroll.grid_rowconfigure(2, weight=1)
+
+        # Habilita rolagem global no container principal
+        bind_global_mouse_scroll(self.main_scroll)
+
+        # Bind para redimensionamento responsivo
+        self.main_scroll.bind("<Configure>", self.on_resize)
+        self.layout_mode = "desktop"  # "desktop" ou "mobile"
+        self.resize_job = None
 
         # --- Título ---
-        self.title_label = ctk.CTkLabel(self, text="Dashboard de Análises", font=ctk.CTkFont(size=20, weight="bold"))
+        self.title_label = ctk.CTkLabel(self.main_scroll, text="Dashboard de Análises", font=ctk.CTkFont(size=20, weight="bold"))
         self.title_label.grid(row=0, column=0, columnspan=2, padx=20, pady=(20, 10), sticky="ew")
 
         # --- Sistema de Abas ---
-        self.tabview = ctk.CTkTabview(self)
+        self.tabview = ctk.CTkTabview(self.main_scroll)
         self.tabview.grid(row=1, column=0, rowspan=2, padx=20, pady=10, sticky="nsew")
 
         self.tab_overview = self.tabview.add("Visão Geral")
@@ -69,7 +82,7 @@ class DashboardView(ctk.CTkFrame):
         self.setup_analysis_tab()
 
         # --- Frame de Aniversariantes ---
-        self.birthdays_frame_container = ctk.CTkFrame(self)
+        self.birthdays_frame_container = ctk.CTkFrame(self.main_scroll)
         self.birthdays_frame_container.grid(row=1, column=1, rowspan=2, padx=(0, 20), pady=10, sticky="nsew")
         self.birthdays_frame_container.grid_rowconfigure(1, weight=1)
         self.birthdays_frame_container.grid_columnconfigure(0, weight=1)
@@ -104,19 +117,19 @@ class DashboardView(ctk.CTkFrame):
         self.approval_frame.grid_columnconfigure(1, weight=1)
 
         # -- Coluna 0: Texto e Botão --
-        text_container = ctk.CTkFrame(self.approval_frame, fg_color="transparent")
-        text_container.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
+        self.approval_text_container = ctk.CTkFrame(self.approval_frame, fg_color="transparent")
+        self.approval_text_container.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
-        ctk.CTkLabel(text_container, text="Índice Global de Aprovação\n(Média >= 5.0)", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 5))
+        ctk.CTkLabel(self.approval_text_container, text="Índice Global de Aprovação\n(Média >= 5.0)", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 5))
 
-        self.approval_label = ctk.CTkLabel(text_container, text="--%", font=ctk.CTkFont(size=40, weight="bold"))
+        self.approval_label = ctk.CTkLabel(self.approval_text_container, text="--%", font=ctk.CTkFont(size=40, weight="bold"))
         self.approval_label.pack(pady=10)
 
-        self.approval_detail_label = ctk.CTkLabel(text_container, text="Aprovados: 0 | Abaixo da Média: 0", text_color=COLOR_TEXT_GRAY)
+        self.approval_detail_label = ctk.CTkLabel(self.approval_text_container, text="Aprovados: 0 | Abaixo da Média: 0", text_color=COLOR_TEXT_GRAY)
         self.approval_detail_label.pack(pady=(0, 20))
 
         self.btn_details = ctk.CTkButton(
-            text_container,
+            self.approval_text_container,
             text="Ver Alunos em Risco",
             command=self.open_risk_details_dialog,
             fg_color=COLOR_RISK,
@@ -184,6 +197,111 @@ class DashboardView(ctk.CTkFrame):
         self.chart_label.pack(expand=True, fill="both")
         self.chart_image = None
 
+    def on_resize(self, event):
+        """Callback acionado quando a janela é redimensionada."""
+        # Debounce: Agenda a execução para 100ms depois. Se chamado novamente, cancela o anterior.
+        if self.resize_job:
+            self.after_cancel(self.resize_job)
+
+        self.resize_job = self.after(100, lambda: self._perform_resize(event.width))
+
+    def _perform_resize(self, width: int):
+        """Executa a lógica de redimensionamento após o debounce."""
+        self.resize_job = None
+
+        # Define o modo de layout baseado na largura (Breakpoint: 1000px)
+        new_mode = "desktop" if width >= 1000 else "mobile"
+
+        if new_mode != self.layout_mode:
+            self.layout_mode = new_mode
+            self._apply_layout(new_mode)
+
+        # Atualiza o tamanho dos gráficos dinamicamente
+        self._resize_charts(width)
+
+    def _resize_charts(self, width: int):
+        """Redimensiona os gráficos baseando-se na largura disponível."""
+        if width < 100: return
+
+        # --- Gráfico de Pizza (Aprovação) ---
+        if hasattr(self, 'cached_pie_img') and self.cached_pie_img:
+            # Cálculo da largura alvo
+            if self.layout_mode == "mobile":
+                # Mobile: Largura total menos padding
+                target_w = width - 80
+            else:
+                # Desktop: Coluna da aba (75%) -> Coluna do gráfico (50% da aba) -> ~35% do total
+                target_w = (width * 0.35) - 40
+
+            # Limites (Clamping)
+            target_w = max(200, min(target_w, 600))
+
+            # Mantém proporção
+            orig_w, orig_h = self.cached_pie_img.size
+            ratio = orig_h / orig_w
+            target_h = int(target_w * ratio)
+
+            # Recria a imagem com novo tamanho (evita pixelização excessiva se a original for grande o suficiente)
+            self.pie_chart_image = ctk.CTkImage(light_image=self.cached_pie_img, size=(int(target_w), target_h))
+            self.pie_chart_label.configure(image=self.pie_chart_image)
+
+        # --- Gráfico de Barras (Análise) ---
+        if hasattr(self, 'cached_bar_img') and self.cached_bar_img:
+            if self.layout_mode == "mobile":
+                target_w = width - 60
+            else:
+                # Desktop: Coluna da aba (75%) -> Full width da aba
+                target_w = (width * 0.70) - 60
+
+            target_w = max(300, min(target_w, 1200))
+
+            orig_w, orig_h = self.cached_bar_img.size
+            ratio = orig_h / orig_w
+            target_h = int(target_w * ratio)
+
+            self.chart_image = ctk.CTkImage(light_image=self.cached_bar_img, size=(int(target_w), target_h))
+            self.chart_label.configure(image=self.chart_image)
+
+    def _apply_layout(self, mode: str):
+        """Aplica as configurações de grid baseadas no modo (desktop/mobile)."""
+        if mode == "mobile":
+            # --- Top Level (Mobile) ---
+            # Empilha abas e aniversariantes verticalmente
+            self.main_scroll.grid_columnconfigure(0, weight=1)
+            self.main_scroll.grid_columnconfigure(1, weight=0)
+
+            self.tabview.grid(row=1, column=0, columnspan=2, rowspan=1, sticky="nsew", padx=20, pady=(10, 5))
+            self.birthdays_frame_container.grid(row=2, column=0, columnspan=2, rowspan=1, sticky="nsew", padx=20, pady=(5, 10))
+
+            # --- Overview Tab (Mobile) ---
+            # Empilha Texto/Botão e Gráfico Pizza
+            self.approval_text_container.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=10)
+            self.pie_chart_container.grid(row=1, column=0, columnspan=2, sticky="ew", padx=20, pady=10)
+
+            # --- Rankings Tab (Mobile) ---
+            # Empilha Honor Roll e Incidentes
+            self.honor_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
+            self.incidents_frame.grid(row=1, column=0, columnspan=2, sticky="ew", padx=10, pady=10)
+
+        else: # Desktop
+            # --- Top Level (Desktop) ---
+            # Lado a lado: Abas (Esq) e Aniversariantes (Dir)
+            self.main_scroll.grid_columnconfigure(0, weight=3)
+            self.main_scroll.grid_columnconfigure(1, weight=1)
+
+            self.tabview.grid(row=1, column=0, columnspan=1, rowspan=2, sticky="nsew", padx=20, pady=10)
+            self.birthdays_frame_container.grid(row=1, column=1, columnspan=1, rowspan=2, sticky="nsew", padx=(0, 20), pady=10)
+
+            # --- Overview Tab (Desktop) ---
+            # Lado a lado
+            self.approval_text_container.grid(row=0, column=0, columnspan=1, sticky="nsew", padx=20, pady=20)
+            self.pie_chart_container.grid(row=0, column=1, columnspan=1, sticky="nsew", padx=20, pady=20)
+
+            # --- Rankings Tab (Desktop) ---
+            # Lado a lado
+            self.honor_frame.grid(row=0, column=0, columnspan=1, sticky="nsew", padx=10, pady=10)
+            self.incidents_frame.grid(row=0, column=1, columnspan=1, sticky="nsew", padx=10, pady=10)
+
     def on_show(self, **kwargs) -> None:
         try:
             _ = kwargs
@@ -234,9 +352,17 @@ class DashboardView(ctk.CTkFrame):
             # Atualiza Gráfico Pizza
             pie_chart_path = create_approval_pie_chart(approved, failed)
             if os.path.exists(pie_chart_path):
-                img = Image.open(pie_chart_path)
-                self.pie_chart_image = ctk.CTkImage(light_image=img, size=img.size)
+                # Carrega a imagem e mantém em cache (copia para memória para garantir acesso)
+                with Image.open(pie_chart_path) as img:
+                    self.cached_pie_img = img.copy()
+
+                # Renderização inicial (será ajustada pelo resize)
+                self.pie_chart_image = ctk.CTkImage(light_image=self.cached_pie_img, size=self.cached_pie_img.size)
                 self.pie_chart_label.configure(image=self.pie_chart_image, text="")
+
+                # Força um update de layout se possível
+                if hasattr(self, 'main_scroll'):
+                    self._resize_charts(self.main_scroll.winfo_width())
             else:
                 self.pie_chart_label.configure(image=None, text="Erro no Gráfico")
 
@@ -301,9 +427,14 @@ class DashboardView(ctk.CTkFrame):
             chart_path = create_grade_distribution_chart(averages, selected_course['course_name'])
 
             if os.path.exists(chart_path):
-                img = Image.open(chart_path)
-                self.chart_image = ctk.CTkImage(light_image=img, size=img.size)
+                with Image.open(chart_path) as img:
+                    self.cached_bar_img = img.copy()
+
+                self.chart_image = ctk.CTkImage(light_image=self.cached_bar_img, size=self.cached_bar_img.size)
                 self.chart_label.configure(image=self.chart_image, text="")
+
+                if hasattr(self, 'main_scroll'):
+                    self._resize_charts(self.main_scroll.winfo_width())
             else:
                 self.chart_label.configure(image=None, text="Não foi possível gerar o gráfico.")
         except Exception as e:
