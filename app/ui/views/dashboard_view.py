@@ -102,7 +102,7 @@ class DashboardView(ctk.CTkFrame):
 
         # Cards de Estatísticas
         # Força background sólido para evitar artefatos de rolagem
-        self.stats_frame = ctk.CTkFrame(self.tab_overview, fg_color=("gray90", "gray13"))
+        self.stats_frame = ctk.CTkFrame(self.tab_overview, fg_color=("gray90", "gray13"), corner_radius=0)
         self.stats_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
         self.stats_frame.grid_columnconfigure((0, 1), weight=1)
 
@@ -155,7 +155,7 @@ class DashboardView(ctk.CTkFrame):
         self.tab_rankings.grid_rowconfigure(0, weight=1)
 
         # --- Quadro de Honra ---
-        self.honor_frame = ctk.CTkFrame(self.tab_rankings, fg_color=("gray90", "gray13"))
+        self.honor_frame = ctk.CTkFrame(self.tab_rankings, fg_color=("gray90", "gray13"), corner_radius=0)
         self.honor_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
         ctk.CTkLabel(self.honor_frame, text="Quadro de Honra (Média >= 9.0)", font=ctk.CTkFont(weight="bold", size=16)).pack(pady=10)
@@ -168,7 +168,7 @@ class DashboardView(ctk.CTkFrame):
         # bind_global_mouse_scroll(self.honor_list_frame)
 
         # --- Ranking de Incidentes ---
-        self.incidents_frame = ctk.CTkFrame(self.tab_rankings, fg_color=("gray90", "gray13"))
+        self.incidents_frame = ctk.CTkFrame(self.tab_rankings, fg_color=("gray90", "gray13"), corner_radius=0)
         self.incidents_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
 
         ctk.CTkLabel(self.incidents_frame, text="Top Incidentes por Turma", font=ctk.CTkFont(weight="bold", size=16)).pack(pady=10)
@@ -495,8 +495,8 @@ class DashboardView(ctk.CTkFrame):
             ctk.CTkLabel(row_frame, text=score_text, text_color=score_color, font=ctk.CTkFont(weight="bold")).pack(side="right", padx=10, pady=5)
 
     def _create_stat_card(self, parent: ctk.CTkFrame, title: str, value: str, row: int, col: int) -> ctk.CTkLabel:
-        # Define cor explícita para o card para garantir opacidade
-        card = ctk.CTkFrame(parent, fg_color=("gray85", "gray17"))
+        # Define cor explícita para o card para garantir opacidade e remove bordas arredondadas
+        card = ctk.CTkFrame(parent, fg_color=("gray85", "gray17"), corner_radius=0)
         card.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
 
         title_lbl = ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12, weight="bold"), text_color=COLOR_TEXT_GRAY)
