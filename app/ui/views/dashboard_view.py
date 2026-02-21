@@ -496,13 +496,17 @@ class DashboardView(ctk.CTkFrame):
 
     def _create_stat_card(self, parent: ctk.CTkFrame, title: str, value: str, row: int, col: int) -> ctk.CTkLabel:
         # Define cor explícita para o card para garantir opacidade e remove bordas arredondadas
-        card = ctk.CTkFrame(parent, fg_color=("gray85", "gray17"), corner_radius=0)
+        card_color = ("gray85", "gray17")
+        card = ctk.CTkFrame(parent, fg_color=card_color, corner_radius=0)
         card.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
 
-        title_lbl = ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12, weight="bold"), text_color=COLOR_TEXT_GRAY)
+        # Labels com background explícito para evitar artefatos de transparência
+        title_lbl = ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12, weight="bold"),
+                                 text_color=COLOR_TEXT_GRAY, fg_color=card_color)
         title_lbl.pack(pady=(10, 0))
 
-        value_label = ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"))
+        value_label = ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"),
+                                   fg_color=card_color)
         value_label.pack(pady=(0, 10))
 
         # Bind explicit scroll events to the card and its children to prevent "scroll trapping"
