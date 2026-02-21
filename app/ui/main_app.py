@@ -324,10 +324,32 @@ class MainApp(ctk.CTk):
             # Linux: event.num (4 for up, 5 for down)
 
             direction = 0
-            if event.num == 4 or (event.delta > 0):
+            # Default scroll amount
+            units = "units"
+            amount = 1
+
+            if event.num == 4:
                 direction = -1 # Scroll Up
-            elif event.num == 5 or (event.delta < 0):
+            elif event.num == 5:
                 direction = 1 # Scroll Down
+            elif event.delta != 0:
+                # Windows (and macOS sometimes)
+                # Normalize delta. Typical delta is 120.
+                # Invert logic: positive delta is UP, negative is DOWN.
+                # However, Tkinter yview_scroll expects positive for down (units) usually?
+                # yview_scroll(-1, "units") -> scroll UP (to lower coords)
+                # yview_scroll(1, "units") -> scroll DOWN (to higher coords)
+
+                # event.delta > 0 (UP) -> should be -1
+                # event.delta < 0 (DOWN) -> should be 1
+
+                # Speed up scrolling slightly by multiplying factor (e.g. 2 or 3) if feeling stuck
+                scroll_factor = 2
+                direction = int(-1 * (event.delta / 120) * scroll_factor)
+
+                # Fallback if int conversion results in 0 for small deltas
+                if direction == 0:
+                    direction = -1 if event.delta > 0 else 1
 
             if direction == 0: return
 
@@ -342,16 +364,14 @@ class MainApp(ctk.CTk):
 
             if is_shift:
                 if hasattr(scrollable_widget, "xview_scroll"):
-                    scrollable_widget.xview_scroll(direction, "units")
-                # CTkScrollableFrame doesn't support xview_scroll directly usually, unless configured.
-                # But ScrollableCanvasFrame does.
+                    scrollable_widget.xview_scroll(direction, units)
             else:
                 if isinstance(scrollable_widget, ctk.CTkScrollableFrame):
                      # CTkScrollableFrame uses a private canvas for scrolling usually
                      if hasattr(scrollable_widget, "_parent_canvas"):
-                         scrollable_widget._parent_canvas.yview_scroll(direction, "units")
+                         scrollable_widget._parent_canvas.yview_scroll(direction, units)
                 elif hasattr(scrollable_widget, "yview_scroll"):
-                    scrollable_widget.yview_scroll(direction, "units")
+                    scrollable_widget.yview_scroll(direction, units)
 
         except Exception:
             # Ignore errors during scroll handling to prevent app crashes
