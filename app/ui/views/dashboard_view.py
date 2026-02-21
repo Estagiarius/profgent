@@ -29,7 +29,7 @@ COLOR_WARNING = "orange"
 COLOR_SUCCESS = "green"
 COLOR_HONOR = "#FFD700"
 COLOR_TEXT_GRAY = "gray"
-COLOR_PIE_CHART_BG = "#DCB538"
+COLOR_PIE_CHART_BG = "transparent" # Changed to transparent to fit better in dark/light themes
 COLOR_HOVER_RED = "#d32f2f"
 
 
@@ -242,7 +242,8 @@ class DashboardView(ctk.CTkFrame):
             target_h = int(target_w * ratio)
 
             # Recria a imagem com novo tamanho (evita pixelização excessiva se a original for grande o suficiente)
-            self.pie_chart_image = ctk.CTkImage(light_image=self.cached_pie_img, size=(int(target_w), target_h))
+            # Passa a mesma imagem para light e dark mode para garantir visualização
+            self.pie_chart_image = ctk.CTkImage(light_image=self.cached_pie_img, dark_image=self.cached_pie_img, size=(int(target_w), target_h))
             self.pie_chart_label.configure(image=self.pie_chart_image)
 
         # --- Gráfico de Barras (Análise) ---
@@ -253,13 +254,13 @@ class DashboardView(ctk.CTkFrame):
                 # Desktop: Coluna da aba (75%) -> Full width da aba
                 target_w = (width * 0.70) - 60
 
-            target_w = max(300, min(target_w, 1200))
+            target_w = max(250, min(target_w, 1200)) # Reduced min width slightly
 
             orig_w, orig_h = self.cached_bar_img.size
             ratio = orig_h / orig_w
             target_h = int(target_w * ratio)
 
-            self.chart_image = ctk.CTkImage(light_image=self.cached_bar_img, size=(int(target_w), target_h))
+            self.chart_image = ctk.CTkImage(light_image=self.cached_bar_img, dark_image=self.cached_bar_img, size=(int(target_w), target_h))
             self.chart_label.configure(image=self.chart_image)
 
     def _apply_layout(self, mode: str):
