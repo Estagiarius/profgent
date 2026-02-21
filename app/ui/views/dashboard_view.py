@@ -89,10 +89,10 @@ class DashboardView(ctk.CTkFrame):
 
         self.birthdays_scrollable_frame = ctk.CTkScrollableFrame(self.birthdays_frame_container, label_text="")
         self.birthdays_scrollable_frame.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
-        bind_global_mouse_scroll(self.birthdays_scrollable_frame)
+        # bind_global_mouse_scroll(self.birthdays_scrollable_frame) # Removed in favor of global handler
 
         # Habilita rolagem global no container principal (deve ser chamado por último para capturar todos os filhos)
-        bind_global_mouse_scroll(self.main_scroll)
+        # bind_global_mouse_scroll(self.main_scroll) # Removed in favor of global handler
 
     def setup_overview_tab(self) -> None:
         """Configura os elementos da aba Visão Geral."""
@@ -162,7 +162,7 @@ class DashboardView(ctk.CTkFrame):
 
         self.honor_list_frame = ctk.CTkScrollableFrame(self.honor_frame)
         self.honor_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        bind_global_mouse_scroll(self.honor_list_frame)
+        # bind_global_mouse_scroll(self.honor_list_frame)
 
         # --- Ranking de Incidentes ---
         self.incidents_frame = ctk.CTkFrame(self.tab_rankings)
@@ -172,7 +172,7 @@ class DashboardView(ctk.CTkFrame):
 
         self.incidents_list_frame = ctk.CTkScrollableFrame(self.incidents_frame)
         self.incidents_list_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        bind_global_mouse_scroll(self.incidents_list_frame)
+        # bind_global_mouse_scroll(self.incidents_list_frame)
 
     def setup_analysis_tab(self) -> None:
         """Configura os elementos da aba Análise por Disciplina."""

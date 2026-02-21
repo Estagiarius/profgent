@@ -125,6 +125,14 @@ class MainApp(ctk.CTk):
         # Inicia o loop que integra o asyncio com o loop de eventos do tkinter.
         self.update_asyncio()
 
+        # --- Global Scroll Event Binding ---
+        # Binds scroll events to the root window to handle scrolling for all views efficiently.
+        self.bind_all("<MouseWheel>", self._handle_global_scroll)
+        self.bind_all("<Button-4>", self._handle_global_scroll)
+        self.bind_all("<Button-5>", self._handle_global_scroll)
+        # Shift+Scroll for Horizontal Scrolling
+        self.bind_all("<Shift-MouseWheel>", self._handle_global_scroll)
+
         # Configura o layout de grade da janela principal (1 linha, 2 colunas).
         self.grid_rowconfigure(0, weight=1)    # A linha 0 se expande verticalmente.
         self.grid_columnconfigure(1, weight=1) # A coluna 1 se expande horizontalmente.
@@ -272,3 +280,79 @@ class MainApp(ctk.CTk):
         # Se a tarefa ainda não terminou, agenda uma nova verificação para daqui a 50ms.
         else:
             self.after(50, self._check_cleanup_done, task)
+
+    def _handle_global_scroll(self, event):
+        """
+        Global handler for mouse scroll events.
+        Identifies the scrollable widget under the mouse and triggers its scroll method.
+        Supports both vertical and horizontal scrolling (with Shift key).
+        """
+        try:
+            # Find the widget under the mouse cursor
+            widget = self.winfo_containing(event.x_root, event.y_root)
+
+            # Traverse up the widget hierarchy to find a scrollable container
+            scrollable_widget = None
+            current = widget
+            while current:
+                # Check for CustomTkinter Scrollable Frame
+                if isinstance(current, ctk.CTkScrollableFrame):
+                    scrollable_widget = current
+                    break
+                # Check for native Canvas (used in ScrollableCanvasFrame)
+                elif isinstance(current, ctk.CTkCanvas) or (hasattr(ctk, "CTkCanvas") and isinstance(current, ctk.CTkCanvas)):
+                     # If it's a canvas inside a ScrollableCanvasFrame, we might need to find the frame or just scroll the canvas
+                     # Usually the canvas itself is scrollable via yview_scroll
+                     scrollable_widget = current
+                     break
+                elif hasattr(current, "yview_scroll") and hasattr(current, "xview_scroll"):
+                     scrollable_widget = current
+                     break
+
+                # Move to parent
+                # CTk widgets store parent in master or _master
+                if hasattr(current, "master"):
+                    current = current.master
+                else:
+                    break
+
+            if not scrollable_widget:
+                return
+
+            # Determine Scroll Direction and Amount
+            # Windows: event.delta (120 or -120 usually)
+            # Linux: event.num (4 for up, 5 for down)
+
+            direction = 0
+            if event.num == 4 or (event.delta > 0):
+                direction = -1 # Scroll Up
+            elif event.num == 5 or (event.delta < 0):
+                direction = 1 # Scroll Down
+
+            if direction == 0: return
+
+            # Determine Axis (Vertical vs Horizontal)
+            # Shift key pressed usually means Horizontal Scroll
+            is_horizontal = (event.state & 0x0001) != 0 # Check Shift mask (usually bit 0 or 1 depending on OS, simplify for now)
+            # Better check:
+            # On Windows, Shift state is bit 0 (1). On Linux it might vary.
+            # Let's check event.state explicitly if possible or use a safe check.
+            # Tkinter event.state: Shift=1, Control=4, Alt=8 (modifiers)
+            is_shift = (event.state & 1) == 1
+
+            if is_shift:
+                if hasattr(scrollable_widget, "xview_scroll"):
+                    scrollable_widget.xview_scroll(direction, "units")
+                # CTkScrollableFrame doesn't support xview_scroll directly usually, unless configured.
+                # But ScrollableCanvasFrame does.
+            else:
+                if isinstance(scrollable_widget, ctk.CTkScrollableFrame):
+                     # CTkScrollableFrame uses a private canvas for scrolling usually
+                     if hasattr(scrollable_widget, "_parent_canvas"):
+                         scrollable_widget._parent_canvas.yview_scroll(direction, "units")
+                elif hasattr(scrollable_widget, "yview_scroll"):
+                    scrollable_widget.yview_scroll(direction, "units")
+
+        except Exception:
+            # Ignore errors during scroll handling to prevent app crashes
+            pass
