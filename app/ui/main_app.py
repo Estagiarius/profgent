@@ -336,20 +336,24 @@ class MainApp(ctk.CTk):
                 # Windows (and macOS sometimes)
                 # Normalize delta. Typical delta is 120.
                 # Invert logic: positive delta is UP, negative is DOWN.
-                # However, Tkinter yview_scroll expects positive for down (units) usually?
-                # yview_scroll(-1, "units") -> scroll UP (to lower coords)
-                # yview_scroll(1, "units") -> scroll DOWN (to higher coords)
-
                 # event.delta > 0 (UP) -> should be -1
                 # event.delta < 0 (DOWN) -> should be 1
 
                 # Speed up scrolling slightly by multiplying factor (e.g. 2 or 3) if feeling stuck
+                # IMPORTANT: Use abs() and integer math carefully to avoid 0 result on small deltas
                 scroll_factor = 2
-                direction = int(-1 * (event.delta / 120) * scroll_factor)
 
-                # Fallback if int conversion results in 0 for small deltas
-                if direction == 0:
-                    direction = -1 if event.delta > 0 else 1
+                if abs(event.delta) < 120:
+                    # High precision touchpads or mice
+                    # Ensure at least 1 unit of movement
+                    raw_val = -1 * (event.delta / 120) * scroll_factor
+                    if raw_val > 0:
+                        direction = max(1, int(raw_val)) if int(raw_val) != 0 else 1
+                    else:
+                        direction = min(-1, int(raw_val)) if int(raw_val) != 0 else -1
+                else:
+                    # Standard mouse wheel
+                    direction = int(-1 * (event.delta / 120) * scroll_factor)
 
             if direction == 0: return
 

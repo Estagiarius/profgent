@@ -47,7 +47,8 @@ class DashboardView(ctk.CTkFrame):
 
         # --- Scrollable Main Container ---
         # Substitui o grid direto no self por um CTkScrollableFrame que contém tudo.
-        self.main_scroll = ctk.CTkScrollableFrame(self)
+        # Define cor sólida para evitar transparência que causa artefatos visuais ao rolar
+        self.main_scroll = ctk.CTkScrollableFrame(self, fg_color=("gray95", "gray10"))
         self.main_scroll.pack(fill="both", expand=True)
 
         # Configura o layout de grade do container principal.
