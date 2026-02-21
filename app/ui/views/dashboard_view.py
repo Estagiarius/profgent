@@ -499,7 +499,21 @@ class DashboardView(ctk.CTkFrame):
         card = ctk.CTkFrame(parent, fg_color=("gray85", "gray17"))
         card.grid(row=row, column=col, padx=10, pady=10, sticky="ew")
 
-        ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12, weight="bold"), text_color=COLOR_TEXT_GRAY).pack(pady=(10, 0))
+        title_lbl = ctk.CTkLabel(card, text=title, font=ctk.CTkFont(size=12, weight="bold"), text_color=COLOR_TEXT_GRAY)
+        title_lbl.pack(pady=(10, 0))
+
         value_label = ctk.CTkLabel(card, text=value, font=ctk.CTkFont(size=24, weight="bold"))
         value_label.pack(pady=(0, 10))
+
+        # Bind explicit scroll events to the card and its children to prevent "scroll trapping"
+        # This ensures that even if the mouse is over the card, the main window scrolls.
+        # We use the global handler from MainApp.
+        if hasattr(self.main_app, "_handle_global_scroll"):
+            handler = self.main_app._handle_global_scroll
+            for widget in [card, title_lbl, value_label]:
+                widget.bind("<MouseWheel>", handler)
+                widget.bind("<Button-4>", handler)
+                widget.bind("<Button-5>", handler)
+                widget.bind("<Shift-MouseWheel>", handler)
+
         return value_label
