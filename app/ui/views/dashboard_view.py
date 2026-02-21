@@ -117,7 +117,7 @@ class DashboardView(ctk.CTkFrame):
         self.approval_frame.grid_columnconfigure(1, weight=1)
 
         # -- Coluna 0: Texto e Botão --
-        self.approval_text_container = ctk.CTkFrame(self.approval_frame, fg_color="transparent")
+        self.approval_text_container = ctk.CTkFrame(self.approval_frame)
         self.approval_text_container.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
         ctk.CTkLabel(self.approval_text_container, text="Índice Global de Aprovação\n(Média >= 5.0)", font=ctk.CTkFont(size=16, weight="bold")).pack(pady=(10, 5))
@@ -138,7 +138,7 @@ class DashboardView(ctk.CTkFrame):
         self.btn_details.pack(pady=10)
 
         # -- Coluna 1: Gráfico Pizza --
-        self.pie_chart_container = ctk.CTkFrame(self.approval_frame, fg_color=COLOR_PIE_CHART_BG)
+        self.pie_chart_container = ctk.CTkFrame(self.approval_frame)
         self.pie_chart_container.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
 
         self.pie_chart_label = ctk.CTkLabel(self.pie_chart_container, text="")
