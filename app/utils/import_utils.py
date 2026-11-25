@@ -10,6 +10,18 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import asyncio
 
+def _read_text_with_fallback(filepath: str) -> str:
+    """Lê o arquivo texto testando codificações comuns em sistemas brasileiros."""
+    for encoding in ("utf-8-sig", "cp1252", "latin-1"):
+        try:
+            with open(filepath, mode="r", encoding=encoding) as file:
+                return file.read()
+        except UnicodeDecodeError:
+            continue
+    with open(filepath, mode="r", encoding="utf-8", errors="replace") as file:
+        return file.read()
+
+
 async def async_import_students(filepath: str, class_id: int, data_service) -> tuple[int, list]:
     """
     Importa registros de estudantes para uma classe específica a partir de um
@@ -33,10 +45,9 @@ async def async_import_students(filepath: str, class_id: int, data_service) -> t
     :rtype: tuple[int, list]
     """
     try:
-        # Step 1: Read the file content asynchronously to not block the UI.
+        # Passo 1: Lê o arquivo em thread separada com fallback de codificação para não bloquear a UI.
         loop = asyncio.get_running_loop()
-        with open(filepath, mode='r', encoding='utf-8', errors='ignore') as file:
-            file_content = await loop.run_in_executor(None, file.read, -1)
+        file_content = await loop.run_in_executor(None, _read_text_with_fallback, filepath)
 
     except Exception as e:
         return 0, [f"Erro fatal ao ler o arquivo CSV: {e}"]

@@ -9,11 +9,15 @@ from .base_service import BaseDataService
 
 class ScheduleService(BaseDataService):
     def create_time_slot(self, day_of_week: int, period_index: int, start_time: str, end_time: str) -> dict | None:
+        if not (0 <= day_of_week <= 6):
+            raise ValueError("Dia da semana deve estar entre 0 (Segunda) e 6 (Domingo).")
         try:
-             start = datetime.strptime(start_time, "%H:%M").time()
-             end = datetime.strptime(end_time, "%H:%M").time()
+            start = datetime.strptime(start_time, "%H:%M").time()
+            end = datetime.strptime(end_time, "%H:%M").time()
         except ValueError:
-             raise ValueError("Horários devem estar no formato HH:MM.")
+            raise ValueError("Horários devem estar no formato HH:MM.")
+        if start >= end:
+            raise ValueError("O horário de início deve ser anterior ao horário de término.")
 
         with self._get_db() as db:
             existing = db.query(TimeSlot).filter(

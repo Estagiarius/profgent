@@ -46,6 +46,16 @@ COMMON_COMPOUND_NAMES = [
 ]
 
 
+import unicodedata
+
+
+def _normalize_text(text: str) -> str:
+    """Remove acentos e converte o texto para maiúsculas para comparação."""
+    normalized = unicodedata.normalize("NFD", text)
+    without_accents = "".join(ch for ch in normalized if unicodedata.category(ch) != "Mn")
+    return without_accents.upper()
+
+
 def split_full_name(full_name, compound_names_list=None):
     """
     Divide um nome completo em primeiro nome e sobrenome. Este método leva em consideração
@@ -61,38 +71,27 @@ def split_full_name(full_name, compound_names_list=None):
     :return: Uma tupla contendo o primeiro nome e o sobrenome correspondentes.
     :rtype: tuple[str, str]
     """
-    # Define a lista padrão de nomes compostos se nenhuma for fornecida.
-    # Isso evita o problema de usar um argumento padrão mutável.
     if compound_names_list is None:
         compound_names_list = COMMON_COMPOUND_NAMES
-    # Se o nome completo for nulo ou vazio, retorna duas strings vazias.
     if not full_name:
         return "", ""
 
-    # Converte o nome completo para maiúsculas para uma comparação sem distinção de caso.
-    full_name_upper = full_name.upper()
+    cleaned_name = " ".join(full_name.strip().split())
+    if not cleaned_name:
+        return "", ""
 
-    # Itera sobre cada nome composto na lista de nomes comuns.
+    words = cleaned_name.split(" ")
+    normalized_words = [_normalize_text(w) for w in words]
+
     for compound_name in compound_names_list:
-        # Verifica se o nome completo (em maiúsculas) começa com o nome composto seguido de um espaço.
-        # O espaço é importante para evitar correspondências parciais (ex: "ANA" em "ANABELA").
-        if full_name_upper.startswith(compound_name + " "):
-            # Se encontrou um nome composto correspondente, calcula onde ele termina.
-            first_name_end_index = len(compound_name)
-            # Extrai o primeiro nome do nome completo original, preservando a capitalização original.
-            first_name = full_name[:first_name_end_index]
-            # Extrai o restante da string como o sobrenome e remove espaços em branco extras.
-            last_name = full_name[first_name_end_index:].strip()
-            # Retorna o nome e o sobrenome encontrados.
+        compound_parts = _normalize_text(compound_name).split()
+        part_count = len(compound_parts)
+        if len(words) > part_count and normalized_words[:part_count] == compound_parts:
+            first_name = " ".join(words[:part_count])
+            last_name = " ".join(words[part_count:]).strip()
             return first_name, last_name
 
-    # Se o loop terminar sem encontrar um nome composto, usa a lógica padrão.
-    # Divide o nome completo em palavras com base nos espaços.
-    parts = full_name.split(" ")
-    # A primeira palavra é considerada o primeiro nome.
-    first_name = parts[0]
-    # Todas as palavras restantes são juntadas para formar o sobrenome.
-    last_name = " ".join(parts[1:]).strip()
-
-    # Retorna o resultado da divisão padrão.
+    # Caso não corresponda a um nome composto, divide na primeira palavra.
+    first_name = words[0]
+    last_name = " ".join(words[1:]).strip()
     return first_name, last_name

@@ -187,10 +187,15 @@ class StudentService(BaseDataService):
                 student.birth_date = birth_date
 
     def delete_student(self, student_id: int):
+        from app.models.attendance import Attendance
+        from app.models.seating_chart import SeatAssignment
+
         with self._get_db() as db:
-            db.query(Incident).filter(Incident.student_id == student_id).delete()
-            db.query(Grade).filter(Grade.student_id == student_id).delete()
-            db.query(ClassEnrollment).filter(ClassEnrollment.student_id == student_id).delete()
+            db.query(Attendance).filter(Attendance.student_id == student_id).delete(synchronize_session=False)
+            db.query(SeatAssignment).filter(SeatAssignment.student_id == student_id).delete(synchronize_session=False)
+            db.query(Incident).filter(Incident.student_id == student_id).delete(synchronize_session=False)
+            db.query(Grade).filter(Grade.student_id == student_id).delete(synchronize_session=False)
+            db.query(ClassEnrollment).filter(ClassEnrollment.student_id == student_id).delete(synchronize_session=False)
 
             student = db.query(Student).filter(Student.id == student_id).first()
             if student:

@@ -128,7 +128,8 @@ class CourseService(BaseDataService):
                                 class_subject_id=new_subj.id,
                                 name=source_assess.name,
                                 weight=source_assess.weight,
-                                grading_period=source_assess.grading_period
+                                grading_period=source_assess.grading_period,
+                                bncc_codes=source_assess.bncc_codes,
                             )
                             db.add(new_assess)
 
@@ -200,26 +201,51 @@ class CourseService(BaseDataService):
             return None
 
     def update_class(self, class_id: int, name: str):
+        if not name or not name.strip():
+            raise ValueError("O nome da turma não pode ser vazio.")
+        cleaned_name = name.strip()
         with self._get_db() as db:
+            duplicate = db.query(Class).filter(
+                func.lower(Class.name) == func.lower(cleaned_name),
+                Class.id != class_id
+            ).first()
+            if duplicate:
+                raise ValueError(f"Uma turma com o nome '{cleaned_name}' já existe.")
+
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
-                class_.name = name
+                class_.name = cleaned_name
 
     def delete_class(self, class_id: int):
+        from app.models.attendance import Attendance
+        from app.models.schedule import WeeklySchedule
+        from app.models.seating_chart import SeatingChart, SeatAssignment
+
         with self._get_db() as db:
             subjects = db.query(ClassSubject).filter(ClassSubject.class_id == class_id).all()
             subject_ids = [s.id for s in subjects]
 
             if subject_ids:
-                 assessments = db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).all()
-                 assessment_ids = [a.id for a in assessments]
+                assessments = db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).all()
+                assessment_ids = [a.id for a in assessments]
+                if assessment_ids:
+                    db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).delete(synchronize_session=False)
 
-                 if assessment_ids:
-                     db.query(Grade).filter(Grade.assessment_id.in_(assessment_ids)).delete(synchronize_session=False)
+                lessons = db.query(Lesson).filter(Lesson.class_subject_id.in_(subject_ids)).all()
+                lesson_ids = [l.id for l in lessons]
+                if lesson_ids:
+                    db.query(Attendance).filter(Attendance.lesson_id.in_(lesson_ids)).delete(synchronize_session=False)
 
-                 db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
-                 db.query(Lesson).filter(Lesson.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
-                 db.query(ClassSubject).filter(ClassSubject.class_id == class_id).delete(synchronize_session=False)
+                db.query(WeeklySchedule).filter(WeeklySchedule.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
+                db.query(Assessment).filter(Assessment.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
+                db.query(Lesson).filter(Lesson.class_subject_id.in_(subject_ids)).delete(synchronize_session=False)
+                db.query(ClassSubject).filter(ClassSubject.class_id == class_id).delete(synchronize_session=False)
+
+            charts = db.query(SeatingChart).filter(SeatingChart.class_id == class_id).all()
+            chart_ids = [c.id for c in charts]
+            if chart_ids:
+                db.query(SeatAssignment).filter(SeatAssignment.chart_id.in_(chart_ids)).delete(synchronize_session=False)
+                db.query(SeatingChart).filter(SeatingChart.class_id == class_id).delete(synchronize_session=False)
 
             db.query(Incident).filter(Incident.class_id == class_id).delete(synchronize_session=False)
             db.query(ClassEnrollment).filter(ClassEnrollment.class_id == class_id).delete(synchronize_session=False)

@@ -77,8 +77,28 @@ class GradeService(BaseDataService):
 
     def get_assessments_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            assessments = db.query(Assessment.id, Assessment.name, Assessment.weight, Assessment.grading_period).filter(Assessment.class_subject_id == class_subject_id).order_by(Assessment.grading_period, Assessment.name).all()
-            return [{"id": a.id, "name": a.name, "weight": a.weight, "grading_period": a.grading_period} for a in assessments]
+            assessments = (
+                db.query(
+                    Assessment.id,
+                    Assessment.name,
+                    Assessment.weight,
+                    Assessment.grading_period,
+                    Assessment.bncc_codes,
+                )
+                .filter(Assessment.class_subject_id == class_subject_id)
+                .order_by(Assessment.grading_period, Assessment.name)
+                .all()
+            )
+            return [
+                {
+                    "id": a.id,
+                    "name": a.name,
+                    "weight": a.weight,
+                    "grading_period": a.grading_period,
+                    "bncc_codes": a.bncc_codes,
+                }
+                for a in assessments
+            ]
 
     def get_all_grades(self) -> list[dict]:
         with self._get_db() as db:
@@ -215,9 +235,19 @@ class GradeService(BaseDataService):
         if not (0 <= score <= 10):
             raise ValueError("Score must be between 0 and 10.")
 
-        today = date.today()
-        new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today.isoformat())
+        today_str = date.today().isoformat()
         with self._get_db() as db:
+            existing = db.query(Grade).filter(
+                Grade.student_id == student_id,
+                Grade.assessment_id == assessment_id
+            ).first()
+            if existing:
+                existing.score = score
+                existing.date_recorded = today_str
+                db.flush()
+                return {"id": existing.id, "score": existing.score}
+
+            new_grade = Grade(student_id=student_id, assessment_id=assessment_id, score=score, date_recorded=today_str)
             db.add(new_grade)
             db.flush()
             db.refresh(new_grade)
@@ -231,26 +261,40 @@ class GradeService(BaseDataService):
 
     def upsert_grades_for_subject(self, class_subject_id: int, grades_data: list[dict]):
         with self._get_db() as db:
-            existing_grades_query = db.query(Grade.id, Grade.student_id, Grade.assessment_id, Grade.score).join(Assessment).filter(Assessment.class_subject_id == class_subject_id)
+            valid_assessment_ids = {
+                row.id for row in db.query(Assessment.id).filter(Assessment.class_subject_id == class_subject_id).all()
+            }
+            existing_grades_query = (
+                db.query(Grade.id, Grade.student_id, Grade.assessment_id, Grade.score)
+                .join(Assessment)
+                .filter(Assessment.class_subject_id == class_subject_id)
+            )
             existing_grades_map = {(g.student_id, g.assessment_id): g for g in existing_grades_query}
+
+            # Deduplica entradas por (student_id, assessment_id), mantendo a última nota informada.
+            deduped_grades = {}
+            for grade_info in grades_data:
+                try:
+                    student_id = int(grade_info['student_id'])
+                    assessment_id = int(grade_info['assessment_id'])
+                except (ValueError, TypeError, KeyError):
+                    continue
+
+                score = grade_info['score']
+                if not (0 <= score <= 10):
+                    raise ValueError("Score must be between 0 and 10.")
+
+                if assessment_id not in valid_assessment_ids:
+                    continue
+
+                deduped_grades[(student_id, assessment_id)] = score
 
             to_insert = []
             to_update = []
             today_str = date.today().isoformat()
 
-            for grade_info in grades_data:
-                try:
-                    student_id = int(grade_info['student_id'])
-                    assessment_id = int(grade_info['assessment_id'])
-                except (ValueError, TypeError):
-                    continue
-
-                score = grade_info['score']
-                if not (0 <= score <= 10):
-                    raise ValueError(f"Score must be between 0 and 10.")
-
+            for (student_id, assessment_id), score in deduped_grades.items():
                 existing_grade = existing_grades_map.get((student_id, assessment_id))
-
                 if existing_grade:
                     if existing_grade.score != score:
                         to_update.append({"id": existing_grade.id, "score": score})
@@ -282,3 +326,20 @@ class GradeService(BaseDataService):
 
         weighted_sum = sum(student_grades.get(a['id'], 0.0) * a['weight'] for a in assessments)
         return weighted_sum / total_weight
+
+    @staticmethod
+    def calculate_subject_final_average(student_id: int, student_grades: dict[int, float], assessments: list[dict]) -> float:
+        """
+        Calcula a média final de uma disciplina respeitando a nota manual (grading_period == 5)
+        como override e excluindo-a do cálculo ponderado das avaliações regulares (períodos 1 a 4).
+        """
+        override_assessment = next((a for a in assessments if a.get('grading_period') == 5), None)
+        if override_assessment and override_assessment['id'] in student_grades:
+            return student_grades[override_assessment['id']]
+
+        regular_assessments = [a for a in assessments if a.get('grading_period', 1) != 5]
+        if not regular_assessments:
+            return 0.0
+
+        total_weight = sum(a['weight'] for a in regular_assessments)
+        return GradeService.calculate_weighted_average(student_id, student_grades, regular_assessments, total_weight=total_weight)

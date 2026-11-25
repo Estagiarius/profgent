@@ -61,4 +61,10 @@ def get_resource_path(relative_path: str | Path) -> str:
             relative_path = relative_path[2:]
         relative_path = Path(relative_path)
 
-    return str(base_path / relative_path)
+    resolved_path = base_path / relative_path
+    if not hasattr(sys, '_MEIPASS') and not getattr(sys, 'frozen', False) and not resolved_path.exists():
+        project_root_candidate = Path(__file__).resolve().parents[2] / relative_path
+        if project_root_candidate.exists():
+            return str(project_root_candidate)
+
+    return str(resolved_path)
