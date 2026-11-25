@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 from datetime import date
 from sqlalchemy import and_
 from sqlalchemy.orm import joinedload
@@ -14,9 +24,9 @@ class GradeService(BaseDataService):
     def add_assessment(self, class_subject_id: int, name: str, weight: float, grading_period: int = 1, bncc_codes: str = None) -> dict | None:
         if not all([class_subject_id, name, weight is not None]): return None
         if weight < 0:
-            raise ValueError("Assessment weight must be non-negative.")
+            raise ValueError("O peso da avaliação não pode ser negativo.")
         if not (1 <= grading_period <= 5):
-             raise ValueError("Grading period must be between 1 and 5.")
+             raise ValueError("O período de avaliação deve estar entre 1 e 5.")
 
         assessment = Assessment(class_subject_id=class_subject_id, name=name, weight=weight, grading_period=grading_period, bncc_codes=bncc_codes)
         with self._get_db() as db:
@@ -55,9 +65,9 @@ class GradeService(BaseDataService):
 
     def update_assessment(self, assessment_id: int, name: str, weight: float, grading_period: int = None, bncc_codes: str = None):
         if weight < 0:
-            raise ValueError("Assessment weight must be non-negative.")
+            raise ValueError("O peso da avaliação não pode ser negativo.")
         if grading_period is not None and not (1 <= grading_period <= 5):
-             raise ValueError("Grading period must be between 1 and 5.")
+             raise ValueError("O período de avaliação deve estar entre 1 e 5.")
 
         with self._get_db() as db:
             assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
@@ -233,7 +243,7 @@ class GradeService(BaseDataService):
     def add_grade(self, student_id: int, assessment_id: int, score: float) -> dict | None:
         if not all([student_id, assessment_id, score is not None]): return None
         if not (0 <= score <= 10):
-            raise ValueError("Score must be between 0 and 10.")
+            raise ValueError("A nota deve estar entre 0 e 10.")
 
         today_str = date.today().isoformat()
         with self._get_db() as db:
@@ -282,7 +292,7 @@ class GradeService(BaseDataService):
 
                 score = grade_info['score']
                 if not (0 <= score <= 10):
-                    raise ValueError("Score must be between 0 and 10.")
+                    raise ValueError("A nota deve estar entre 0 e 10.")
 
                 if assessment_id not in valid_assessment_ids:
                     continue

@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 from datetime import date
 from sqlalchemy.orm import joinedload
 from app.models.lesson import Lesson
@@ -78,7 +88,7 @@ class LessonService(BaseDataService):
         with self._get_db() as db:
             lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
             if not lesson:
-                raise ValueError(f"Lesson with id {lesson_id} not found.")
+                raise ValueError(f"Aula com ID {lesson_id} não encontrada.")
 
             existing_records = db.query(Attendance).filter(Attendance.lesson_id == lesson_id).all()
             existing_map = {att.student_id: att for att in existing_records}
