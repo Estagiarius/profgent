@@ -11,14 +11,14 @@
 # Importa a biblioteca 'customtkinter' para os componentes da interface.
 import customtkinter as ctk
 # Importa tipos para anotações, melhorando a clareza do código.
-from typing import Dict, Callable, List, Union, Tuple
+from typing import Any, Dict, Callable, List, Union, Tuple
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
 from app.ui.views.base_dialog import BaseDialog
 
 # Define a classe EditDialog, que herda de BaseDialog para criar uma janela secundária (pop-up).
 class EditDialog(BaseDialog):
     # O método construtor da janela de diálogo.
-    def __init__(self, parent, title: str, fields: Dict[str, str], data: Dict[str, any], save_callback: Callable, dropdowns: Dict[str, Tuple[str, List[str]]] = None):
+    def __init__(self, parent, title: str, fields: Dict[str, str], data: Dict[str, Any], save_callback: Callable, dropdowns: Dict[str, Tuple[str, List[str]]] = None):
         # Chama o construtor da classe pai.
         super().__init__(parent, title)
 
@@ -31,6 +31,8 @@ class EditDialog(BaseDialog):
         # Cria campos de entrada de texto
         for key, label in fields.items():
             ctk.CTkLabel(self, text=label).grid(row=current_row, column=0, padx=10, pady=10, sticky="w")
+            raw_val = data.get(key)
+            display_val = "" if raw_val is None else str(raw_val)
 
             if key in ['bncc', 'bncc_expected', 'bncc_codes']:
                 frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -38,7 +40,7 @@ class EditDialog(BaseDialog):
                 frame.grid_columnconfigure(0, weight=1)
 
                 entry = ctk.CTkEntry(frame)
-                entry.insert(0, str(data.get(key, '')))
+                entry.insert(0, display_val)
                 entry.grid(row=0, column=0, sticky="ew", padx=(0, 5))
 
                 btn = ctk.CTkButton(frame, text="Selecionar", width=80, command=lambda e=entry: self._open_bncc_selector(e))
@@ -47,7 +49,7 @@ class EditDialog(BaseDialog):
                 self.entries[key] = entry
             else:
                 entry = ctk.CTkEntry(self)
-                entry.insert(0, str(data.get(key, '')))
+                entry.insert(0, display_val)
                 entry.grid(row=current_row, column=1, padx=10, pady=10, sticky="ew")
                 self.entries[key] = entry
 

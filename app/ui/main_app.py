@@ -84,6 +84,8 @@ class MainApp(ctk.CTk):
         # Armazena as instâncias dos serviços como atributos da classe.
         self.data_service = data_service
         self.assistant_service = assistant_service
+        from app.services.report_service import ReportService
+        self.report_service = ReportService(data_service=self.data_service)
 
         # Define o título e o tamanho inicial da janela principal.
         ctk.set_appearance_mode("Dark")
@@ -101,18 +103,28 @@ class MainApp(ctk.CTk):
             ctk.set_default_color_theme("blue")
 
         self.title("Profgent")
-        self.geometry("1600x900")
+        self.geometry("1280x760")
 
         # Maximiza a janela de acordo com o sistema operacional
-        if platform.system() == "Windows":
+        system_name = platform.system()
+        if system_name == "Windows":
             self.state("zoomed")
+        elif system_name == "Darwin":
+            try:
+                self.state("zoomed")
+            except Exception:
+                pass
         else:
-            self.attributes("-zoomed", True)
+            try:
+                self.attributes("-zoomed", True)
+            except Exception:
+                pass
 
         # Define uma função a ser chamada quando o usuário tenta fechar a janela.
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        # Obtém o loop de eventos asyncio, que será usado para tarefas em segundo plano.
-        self.loop = asyncio.get_event_loop()
+        # Cria um loop de eventos asyncio dedicado (compatível com Python 3.10–3.14).
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
 
         # Cria uma fila thread-safe para comunicação entre a thread principal da UI e as threads de trabalho.
         self.async_queue = Queue()

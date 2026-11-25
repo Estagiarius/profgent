@@ -292,8 +292,13 @@ class ManagementView(ctk.CTkFrame):
 
     # Abre o diálogo de edição para um curso.
     def edit_course(self, c):
-        def cb(id, data): self.data_service.update_course(id, data['course_name'], data['course_code'], data.get('bncc_expected')); self.populate_data()
-        EditDialog(self, "Editar Disciplina", {"course_name":"Nome", "course_code":"Código", "bncc_expected": "BNCC Esperada (CSV)"}, c, cb)
+        def cb(id, data):
+            try:
+                self.data_service.update_course(id, data['course_name'], data['course_code'], data.get('bncc_expected'))
+                self.populate_data()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Falha ao atualizar disciplina: {e}")
+        EditDialog(self, "Editar Disciplina", {"course_name": "Nome", "course_code": "Código", "bncc_expected": "BNCC Esperada (CSV)"}, c, cb)
 
     # Abre o diálogo de adição para um novo aluno.
     def add_student_popup(self):
@@ -321,5 +326,10 @@ class ManagementView(ctk.CTkFrame):
 
     # Abre o diálogo de adição para um novo curso.
     def add_course_popup(self):
-        def cb(data): self.data_service.add_course(data['course_name'], data['course_code']); self.populate_data()
-        AddDialog(self, "Adicionar Disciplina", {"course_name":"Nome", "course_code":"Código"}, save_callback=cb)
+        def cb(data):
+            try:
+                self.data_service.add_course(data['course_name'], data['course_code'])
+                self.populate_data()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Falha ao adicionar disciplina: {e}")
+        AddDialog(self, "Adicionar Disciplina", {"course_name": "Nome", "course_code": "Código"}, save_callback=cb)

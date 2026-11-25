@@ -19,13 +19,18 @@ from app.utils.path_utils import open_file_in_os
 import os
 
 class SeatingChartView(ctk.CTkFrame):
-    def __init__(self, parent, class_id):
+    def __init__(self, parent, class_id, data_service=None, report_service=None):
         super().__init__(parent)
         self.class_id = class_id
-        self.report_service = ReportService()
+        if data_service is None:
+            from app.services import data_service as default_data_service
+            self.data_service = default_data_service
+        else:
+            self.data_service = data_service
+        self.report_service = report_service or ReportService(data_service=self.data_service)
 
         self.current_chart_id = None
-        self.chart_data = None # Holds current chart details {rows, cols, layout_config, assignments}
+        self.chart_data = None
 
         self.selected_student_id = None # From the sidebar list
         self.selected_cell = None # (row, col)
@@ -328,9 +333,10 @@ class SeatingChartView(ctk.CTkFrame):
             ]
             current_assignments.append(new_assign)
 
-            data_service.save_seat_assignments(self.current_chart_id, current_assignments)
+            self.data_service.save_seat_assignments(self.current_chart_id, current_assignments)
 
-            self.selected_student_id = None # Reset selection
+            self.selected_student_id = None
+            self.configure(cursor="")
             self.load_chart_data()
 
     def on_canvas_right_click(self, event):
@@ -342,7 +348,6 @@ class SeatingChartView(ctk.CTkFrame):
         row = int((cy - self.PADDING) // self.CELL_HEIGHT)
 
         if 0 <= row < self.chart_data['rows'] and 0 <= col < self.chart_data['columns']:
-            # Show Context Menu
             menu = Menu(self, tearoff=0)
             menu.add_command(label="Carteira (Aluno)", command=lambda: self.set_cell_type(row, col, "student_seat"))
             menu.add_command(label="Mesa Professor", command=lambda: self.set_cell_type(row, col, "teacher_desk"))
@@ -356,56 +361,38 @@ class SeatingChartView(ctk.CTkFrame):
 
         if new_type == "student_seat":
             if key in config:
-                del config[key] # Default is student_seat
+                del config[key]
         else:
             config[key] = new_type
 
-        # Update DB
-        data_service.update_seating_chart_layout(self.current_chart_id, json.dumps(config))
+        self.data_service.update_seating_chart_layout(self.current_chart_id, json.dumps(config))
         self.load_chart_data()
 
     def export_chart(self):
         if not self.current_chart_id: return
 
-        # Ask user for format
         filepath = filedialog.asksaveasfilename(
             title="Exportar Mapa de Sala",
             defaultextension=".pdf",
-            filetypes=[("PDF Document", "*.pdf"), ("Scalable Vector Graphics", "*.svg")],
+            filetypes=[("Documento PDF", "*.pdf"), ("Imagem Vetorial SVG", "*.svg")],
             initialfile=f"mapa_sala_{self.current_chart_id}"
         )
 
         if not filepath: return
 
-        # Determine format from extension
         _, ext = os.path.splitext(filepath)
         fmt = ext.lower().replace('.', '')
         if fmt not in ['pdf', 'svg']:
-            fmt = 'pdf' # Default
+            fmt = 'pdf'
 
         try:
-            # We need to expose a method in report_service that accepts a path or returns content,
-            # currently it generates its own path.
-            # Ideally report service should allow overriding path.
-            # But since report_service methods return a path inside 'reports/', let's just generate it there
-            # and then move/copy it, or assume the user wants it in the reports folder if they didn't pick location?
-            # Actually, standard flow in this app seems to be auto-gen in reports/ folder.
-            # But since we are asking for a save location now (standard for "Export"), we should respect it.
-            # However, ReportService currently hardcodes path.
+            generated_path = self.report_service.generate_seating_chart(self.current_chart_id, fmt)
 
-            # Let's call the internal generator directly or update ReportService?
-            # Updating ReportService is cleaner but might touch more files.
-            # Let's just generate it using the existing method which returns a path, then rename/move it to user selection.
-
-            generated_path = self.report_service._generate_seating_chart_plot(self.current_chart_id, fmt)
-
-            # Move to selected path
             import shutil
             shutil.move(generated_path, filepath)
 
             messagebox.showinfo("Sucesso", f"Mapa exportado com sucesso para:\n{filepath}")
 
-            # Abre o arquivo de forma segura e multiplataforma
             open_file_in_os(filepath)
 
         except Exception as e:

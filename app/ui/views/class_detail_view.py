@@ -44,7 +44,8 @@ class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
-        self.report_service = ReportService()
+        self.data_service = main_app.data_service
+        self.report_service = main_app.report_service
         # ID da turma que está sendo visualizada. Inicialmente nulo.
         self.class_id = None
         # ID da disciplina selecionada atualmente.
@@ -335,8 +336,12 @@ class ClassDetailView(ctk.CTkFrame):
         seating_tab.grid_rowconfigure(0, weight=1)
         seating_tab.grid_columnconfigure(0, weight=1)
 
-        # O self.class_id é None no init, então precisamos configurar a view e atualizá-la depois
-        self.seating_chart_view = SeatingChartView(seating_tab, self.class_id)
+        self.seating_chart_view = SeatingChartView(
+            seating_tab,
+            self.class_id,
+            data_service=self.data_service,
+            report_service=self.report_service,
+        )
         self.seating_chart_view.grid(row=0, column=0, sticky="nsew")
 
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
@@ -624,8 +629,9 @@ class ClassDetailView(ctk.CTkFrame):
         top.title(title)
         top.geometry("800x600")
 
-        # Carrega a imagem usando PIL e converte para CTkImage
-        pil_image = Image.open(filepath)
+        # Carrega a imagem usando PIL com context manager para fechar o descritor de arquivo
+        with Image.open(filepath) as img:
+            pil_image = img.copy()
         ctk_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(780, 580))
 
         label = ctk.CTkLabel(top, image=ctk_image, text="")
@@ -868,26 +874,6 @@ class ClassDetailView(ctk.CTkFrame):
         dropdowns = {"student": ("Aluno", student_names)}
         AddDialog(self, "Adicionar Novo Incidente", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
 
-    # Preenche a lista de incidentes na respectiva aba.
-    def populate_incident_list(self):
-        for widget in self.incident_list_frame.winfo_children(): widget.destroy()
-        if not self.class_id: return
-
-        incidents = data_service.get_incidents_for_class(self.class_id)
-
-        # Cria cabeçalhos.
-        headers = ["Nome do Aluno", "Data", "Descrição"]
-        for i, header in enumerate(headers):
-            label = ctk.CTkLabel(self.incident_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
-            label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
-
-        # Cria as linhas com os dados dos incidentes.
-        for i, incident in enumerate(incidents, start=1):
-            student_name = f"{incident['student_first_name']} {incident['student_last_name']}"
-            ctk.CTkLabel(self.incident_list_frame, text=student_name).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.incident_list_frame, text=incident['date']).grid(row=i, column=1, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.incident_list_frame, text=incident['description'], wraplength=400, justify="left").grid(row=i, column=2, padx=10, pady=5, sticky="w")
-
     # Mostra a view de edição/criação de aula.
     def show_lesson_editor(self, lesson=None):
         if not self.current_subject_id:
@@ -1085,8 +1071,9 @@ class ClassDetailView(ctk.CTkFrame):
         dialog = CTkInputDialog(text="Digite 'DELETE' para confirmar a exclusão:", title="Confirmar Exclusão")
         user_input = dialog.get_input()
         if user_input == "DELETE":
-            data_service.delete_assessment(assessment_id)
+            self.data_service.delete_assessment(assessment_id)
             self.populate_assessment_list()
+            self.populate_grade_grid()
 
     # Abre o pop-up para editar uma avaliação.
     def edit_assessment_popup(self, assessment):
@@ -1435,7 +1422,16 @@ class ClassDetailView(ctk.CTkFrame):
             )
             self.populate_bncc_tab(report_data=initial_subject_data['bncc_report'])
         else:
-            # Caso sem disciplina, popula apenas a lista básica de alunos
+            # Caso sem disciplina, limpa abas dependentes e popula apenas a lista básica de alunos
+            self.current_subject_id = None
+            for frame in (
+                self.assessment_list_frame,
+                self.lesson_list_frame,
+                self.grade_grid_frame.scrollable_frame,
+                self.bncc_scroll_frame,
+            ):
+                for widget in frame.winfo_children():
+                    widget.destroy()
             self.populate_student_list(enrollments_data=result['enrollments'])
 
         # Força renderização e atrasa remoção do overlay
@@ -1453,7 +1449,7 @@ class ClassDetailView(ctk.CTkFrame):
         for widget in self.incident_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
-        incidents = incidents_data if incidents_data is not None else data_service.get_incidents_for_class(self.class_id)
+        incidents = incidents_data if incidents_data is not None else self.data_service.get_incidents_for_class(self.class_id)
 
         # Cria cabeçalhos.
         headers = ["Nome do Aluno", "Data", "Descrição"]
@@ -1472,9 +1468,10 @@ class ClassDetailView(ctk.CTkFrame):
     def on_show(self, class_id=None):
         self.class_id = class_id
 
-        # Atualiza a view do mapa de sala com o ID novo
+        # Atualiza a view do mapa de sala com o ID novo e reseta estado anterior
         self.seating_chart_view.class_id = class_id
-        # Reseta o estado do mapa
+        self.seating_chart_view.current_chart_id = None
+        self.seating_chart_view.chart_data = None
         self.seating_chart_view.populate_layout_combo()
 
         if class_id:
