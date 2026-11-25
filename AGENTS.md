@@ -61,7 +61,7 @@ Para manter a consistência e estabilidade do código, siga estas regras estrita
 
 *   **Banco de Dados:** O arquivo é nomeado `academic_management.db`.
 *   **Inicialização:** Todas as tabelas são criadas automaticamente na primeira vez que a aplicação é executada (`main.py` -> `initialize_database`), utilizando `Base.metadata.create_all(engine)`.
-*   **Migrações:** Alterações de schema devem ser gerenciadas manualmente ou através de scripts de migração personalizados em `app/data/migrations.py` (se existirem), nunca via Alembic.
+*   **Migrações:** Alterações de schema e criação de índices são gerenciadas de forma idempotente através de `app/data/migrations.py` (`migrate_database`), executado automaticamente na inicialização em `main.py`, nunca via Alembic.
 
 ## Estrutura do Código
 

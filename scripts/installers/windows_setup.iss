@@ -15,14 +15,13 @@
 #define MyAppName "Profgent"
 #define MyAppVersion "1.0"
 #define MyAppPublisher "Victor Hugo Garcia de Oliveira"
-#define MyAppURL "https://github.com/seu-repo/profgent"
+#define MyAppURL "https://github.com/Estagiarius/profgent"
 #define MyAppExeName "Profgent.exe"
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
 ; Do not use the same AppId value in installers for other applications.
-; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
-AppId={{A1B2C3D4-E5F6-7890-1234-567890ABCDEF}
+AppId={{8F3D4B21-6C9A-4E75-B12F-9D8C7A6E5F41}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}

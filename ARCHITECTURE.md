@@ -29,18 +29,20 @@ A organização do código reflete a separação de responsabilidades:
 │   │   ├── llm/            # Abstração dos provedores de LLM
 │   │   ├── tools/          # Framework de execução de ferramentas da IA (Registry, Executor)
 │   │   └── config.py       # Gerenciamento de configurações
-│   ├── data/               # Configuração do banco e arquivos estáticos (JSONs da BNCC)
+│   ├── data/               # Configuração do banco, migrações (migrations.py) e JSONs da BNCC
 │   ├── models/             # Modelos ORM (SQLAlchemy) - Definição do Schema
-│   │   ├── ...             # student.py, class_.py, course.py, etc.
+│   │   ├── ...             # student.py, class_.py, course.py, attendance.py, seating_chart.py
 │   │   └── schedule.py     # Modelos de Horário Escolar
 │   ├── services/           # Lógica de Negócios
-│   │   ├── data_service.py      # CRUD Central
+│   │   ├── data/           # Serviços especializados (StudentService, GradeService, DashboardService, SeatingChartService, etc.)
+│   │   ├── data_service.py      # Fachada CRUD Central
 │   │   ├── assistant_service.py # Lógica do Agente IA
 │   │   ├── report_service.py    # Geração de Relatórios e Gráficos
 │   │   └── bncc_service.py      # Gestão da Base Nacional Comum Curricular
 │   ├── tools/              # Implementação concreta das ferramentas do Agente
 │   ├── ui/                 # Camada de Apresentação
-│   │   ├── views/          # Telas (Dashboard, Schedule, ClassDetail, etc.)
+│   │   ├── themes/         # Temas CustomTkinter (JSON)
+│   │   ├── views/          # Telas (Dashboard, Schedule, ClassDetail, SeatingChart, etc.)
 │   │   ├── widgets/        # Componentes reutilizáveis
 │   │   └── main_app.py     # Ponto de entrada da UI
 │   └── utils/              # Utilitários
@@ -55,10 +57,10 @@ A organização do código reflete a separação de responsabilidades:
 
 ## 3. Camada de Dados (Data Layer)
 
-A camada de dados utiliza o **SQLAlchemy** para mapear classes Python para tabelas do banco de dados SQLite (`academic_management.db`).
+A camada de dados utiliza o **SQLAlchemy** para mapear classes Python para tabelas do banco de dados SQLite (`academic_management.db`), com `PRAGMA foreign_keys=ON` habilitado.
 
 ### Inicialização
-A inicialização do banco de dados ocorre em `main.py`. O sistema verifica a existência das tabelas e as cria automaticamente usando `Base.metadata.create_all(engine)`.
+A inicialização do banco de dados ocorre em `main.py`. O sistema verifica a existência das tabelas, cria automaticamente via `Base.metadata.create_all(engine)` e executa migrações idempotentes via `app/data/migrations.py`.
 
 ### Diagrama ERD (Entidade-Relacionamento)
 
@@ -67,15 +69,20 @@ erDiagram
     STUDENT ||--o{ CLASS_ENROLLMENT : "possui"
     STUDENT ||--o{ GRADE : "recebe"
     STUDENT ||--o{ INCIDENT : "envolvido_em"
+    STUDENT ||--o{ ATTENDANCE : "registra"
+    STUDENT ||--o{ SEAT_ASSIGNMENT : "ocupa"
     CLASS ||--o{ CLASS_ENROLLMENT : "contém"
     CLASS ||--o{ CLASS_SUBJECT : "ensina"
     CLASS ||--o{ INCIDENT : "registra"
+    CLASS ||--o{ SEATING_CHART : "possui"
     COURSE ||--o{ CLASS_SUBJECT : "definido_em"
     CLASS_SUBJECT ||--o{ ASSESSMENT : "inclui"
     CLASS_SUBJECT ||--o{ LESSON : "rastreia"
     CLASS_SUBJECT ||--o{ WEEKLY_SCHEDULE : "ocupa"
     ASSESSMENT ||--o{ GRADE : "avaliado_por"
+    LESSON ||--o{ ATTENDANCE : "controla"
     TIME_SLOT ||--o{ WEEKLY_SCHEDULE : "define"
+    SEATING_CHART ||--o{ SEAT_ASSIGNMENT : "aloca"
 
     STUDENT {
         int id
@@ -101,6 +108,12 @@ erDiagram
         int id
         float score
     }
+    ATTENDANCE {
+        int id
+        int lesson_id
+        int student_id
+        string status
+    }
     TIME_SLOT {
         int id
         int day_of_week
@@ -111,6 +124,20 @@ erDiagram
         int id
         int time_slot_id
         int class_subject_id
+    }
+    SEATING_CHART {
+        int id
+        int class_id
+        string name
+        int rows
+        int columns
+    }
+    SEAT_ASSIGNMENT {
+        int id
+        int chart_id
+        int student_id
+        int row_index
+        int col_index
     }
 ```
 

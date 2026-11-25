@@ -36,13 +36,13 @@ O **ProfGent** é um sistema de gerenciamento escolar desenvolvido em Python, pr
 
 1.  **Clone o repositório:**
     ```bash
-    git clone <URL_DO_REPOSITORIO>
-    cd academic-management-app
+    git clone https://github.com/Estagiarius/profgent.git
+    cd profgent
     ```
 
 2.  **Instale as dependências:**
     ```bash
-    poetry install
+    poetry install --no-root --with dev
     ```
 
 3.  **Execute a aplicação:**

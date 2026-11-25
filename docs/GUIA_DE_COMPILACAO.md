@@ -18,9 +18,9 @@ Antes de iniciar, certifique-se de que sua máquina de desenvolvimento possui:
 Clone o repositório e instale as dependências do projeto (incluindo as de desenvolvimento, como o PyInstaller):
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
-cd academic-management-app
-poetry install --with dev
+git clone https://github.com/Estagiarius/profgent.git
+cd profgent
+poetry install --no-root --with dev
 ```
 
 ---
