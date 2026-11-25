@@ -389,31 +389,33 @@ class ClassDetailView(ctk.CTkFrame):
 
     def _on_subject_data_fetched(self, result):
         if isinstance(result, Exception):
-            if hasattr(self, 'loading_overlay') and self.loading_overlay:
-                self.loading_overlay.destroy()
-                self.loading_overlay = None
+            self._remove_overlay()
             messagebox.showerror("Erro", f"Erro ao carregar dados da disciplina: {result}")
             return
 
-        # Distribui os dados carregados para os métodos de população
-        self.populate_assessment_list(assessments_data=result['assessments'])
-        self.populate_lesson_list(lessons_data=result['lessons'])
-        self.populate_grade_grid(
-            assessments_data=result['assessments'],
-            grades_data=result['grades'],
-            enrollments_data=result['enrollments'],
-            averages_data=result['batch_averages']
-        )
-        self.populate_student_list(
-            enrollments_data=result['enrollments'],
-            attendance_stats=result['attendance_stats']
-        )
-        self.populate_bncc_tab(report_data=result['bncc_report'])
+        try:
+            # Distribui os dados carregados para os métodos de população
+            self.populate_assessment_list(assessments_data=result['assessments'])
+            self.populate_lesson_list(lessons_data=result['lessons'])
+            self.populate_grade_grid(
+                assessments_data=result['assessments'],
+                grades_data=result['grades'],
+                enrollments_data=result['enrollments'],
+                averages_data=result['batch_averages']
+            )
+            self.populate_student_list(
+                enrollments_data=result['enrollments'],
+                attendance_stats=result['attendance_stats']
+            )
+            self.populate_bncc_tab(report_data=result['bncc_report'])
 
-        # Força renderização e atrasa remoção do overlay
-        self.update_idletasks()
-        if hasattr(self, 'loading_overlay') and self.loading_overlay:
-            self.after(100, self._remove_overlay)
+            # Força renderização antes de remover o overlay
+            self.update_idletasks()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao exibir dados da disciplina: {e}")
+        finally:
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.after(100, self._remove_overlay)
 
     def on_subject_change(self, selected_subject_name):
         """Callback para quando a disciplina é trocada no dropdown."""
@@ -1436,63 +1438,66 @@ class ClassDetailView(ctk.CTkFrame):
 
     def _on_initial_details_fetched(self, result):
         if isinstance(result, Exception):
-            if hasattr(self, 'loading_overlay') and self.loading_overlay:
-                self.loading_overlay.destroy()
-                self.loading_overlay = None
+            self._remove_overlay()
             messagebox.showerror("Erro", f"Erro ao carregar turma: {result}")
             return
 
-        class_data = result['class_data']
-        self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
+        try:
+            class_data = result['class_data']
+            if not class_data:
+                messagebox.showerror("Erro", "Turma não encontrada.")
+                return
 
-        # Recupera dados combinados
-        initial_subject_data = result.get('initial_subject_data')
-        subjects = result['subjects']
+            self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
 
-        # Configura o ID da disciplina atual ANTES de popular o combo.
-        # Isso impede que o populate_subject_combo dispare o evento on_change desnecessariamente.
-        if initial_subject_data:
-            self.current_subject_id = initial_subject_data['id']
+            # Recupera dados combinados
+            initial_subject_data = result.get('initial_subject_data')
+            subjects = result['subjects']
 
-        # Popula dropdown de subjects
-        self.populate_subject_combo(subjects=subjects)
-        self.populate_report_student_combo()
-        self.populate_incident_list(incidents_data=result['incidents'])
+            # Configura o ID da disciplina atual ANTES de popular o combo.
+            # Isso impede que o populate_subject_combo dispare o evento on_change desnecessariamente.
+            self.current_subject_id = initial_subject_data['id'] if initial_subject_data else None
 
-        # Se temos dados da disciplina, populamos tudo
-        if initial_subject_data:
-            # Popula abas específicas da disciplina
-            self.populate_assessment_list(assessments_data=initial_subject_data['assessments'])
-            self.populate_lesson_list(lessons_data=initial_subject_data['lessons'])
-            self.populate_grade_grid(
-                assessments_data=initial_subject_data['assessments'],
-                grades_data=initial_subject_data['grades'],
-                enrollments_data=result['enrollments'],
-                averages_data=initial_subject_data['batch_averages']
-            )
-            # Popula lista de alunos COM FREQUÊNCIA (Attendance Stats)
-            self.populate_student_list(
-                enrollments_data=result['enrollments'],
-                attendance_stats=initial_subject_data['attendance_stats']
-            )
-            self.populate_bncc_tab(report_data=initial_subject_data['bncc_report'])
-        else:
-            # Caso sem disciplina, limpa abas dependentes e popula apenas a lista básica de alunos
-            self.current_subject_id = None
-            for frame in (
-                self.assessment_list_frame,
-                self.lesson_list_frame,
-                self.grade_grid_frame.scrollable_frame,
-                self.bncc_scroll_frame,
-            ):
-                for widget in frame.winfo_children():
-                    widget.destroy()
-            self.populate_student_list(enrollments_data=result['enrollments'])
+            # Popula dropdown de subjects
+            self.populate_subject_combo(subjects=subjects)
+            self.populate_report_student_combo()
+            self.populate_incident_list(incidents_data=result['incidents'])
 
-        # Força renderização e atrasa remoção do overlay
-        self.update_idletasks()
-        if hasattr(self, 'loading_overlay') and self.loading_overlay:
-            self.after(100, self._remove_overlay)
+            # Se temos dados da disciplina, populamos tudo
+            if initial_subject_data:
+                # Popula abas específicas da disciplina
+                self.populate_assessment_list(assessments_data=initial_subject_data['assessments'])
+                self.populate_lesson_list(lessons_data=initial_subject_data['lessons'])
+                self.populate_grade_grid(
+                    assessments_data=initial_subject_data['assessments'],
+                    grades_data=initial_subject_data['grades'],
+                    enrollments_data=result['enrollments'],
+                    averages_data=initial_subject_data['batch_averages']
+                )
+                # Popula lista de alunos COM FREQUÊNCIA (Attendance Stats)
+                self.populate_student_list(
+                    enrollments_data=result['enrollments'],
+                    attendance_stats=initial_subject_data['attendance_stats']
+                )
+                self.populate_bncc_tab(report_data=initial_subject_data['bncc_report'])
+            else:
+                # Caso sem disciplina, limpa todas as abas dependentes e exibe orientações vazias
+                for frame in self.grade_frames.values():
+                    for widget in frame.winfo_children():
+                        widget.destroy()
+                self.populate_assessment_list()
+                self.populate_lesson_list()
+                self.populate_grade_grid()
+                self.populate_bncc_tab()
+                self.populate_student_list(enrollments_data=result['enrollments'])
+
+            # Força renderização antes de remover o overlay
+            self.update_idletasks()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao exibir detalhes da turma: {e}")
+        finally:
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.after(100, self._remove_overlay)
 
     def _remove_overlay(self):
         if hasattr(self, 'loading_overlay') and self.loading_overlay:
