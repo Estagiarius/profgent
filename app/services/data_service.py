@@ -185,6 +185,9 @@ class DataService:
     def get_class_period_averages(self, *args, **kwargs):
         return self.grade_service.get_class_period_averages(*args, **kwargs)
 
+    def get_grades_for_student_in_course(self, *args, **kwargs):
+        return self.grade_service.get_grades_for_student_in_course(*args, **kwargs)
+
     def get_all_grades_with_details(self, *args, **kwargs):
         return self.grade_service.get_all_grades_with_details(*args, **kwargs)
 

@@ -114,11 +114,7 @@ def get_student_grades_by_course(student_name: str, course_name: str) -> str:
         if not course:
             return f"Disciplina '{course_name}' não encontrada."
 
-        all_grades = data_service.get_all_grades_with_details()
-        student_grades = [
-            g for g in all_grades
-            if g['student_id'] == student['id'] and g['course_id'] == course['id']
-        ]
+        student_grades = data_service.get_grades_for_student_in_course(student['id'], course['id'])
 
         if not student_grades:
             return f"Nenhuma nota encontrada para {student_name} em {course_name}."

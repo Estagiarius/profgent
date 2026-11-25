@@ -128,6 +128,52 @@ class GradeService(BaseDataService):
                 for g in grades
             ]
 
+    @classmethod
+    def _compute_period_averages(
+        cls,
+        student_id: int,
+        grades_map: dict[int, float],
+        period_assessments: dict[int, list[dict]],
+        period_weights: dict[int, float],
+        final_assessment_id: int | None,
+    ) -> dict:
+        """Calcula médias bimestrais (1 a 4), média anual calculada e override final (período 5)."""
+        results = {}
+        final_sum = 0.0
+
+        for period in range(1, 5):
+            assessments_data = period_assessments[period]
+            if not assessments_data:
+                results[period] = None
+                continue
+
+            avg = cls.calculate_weighted_average(
+                student_id,
+                grades_map,
+                assessments_data,
+                total_weight=period_weights[period],
+            )
+            results[period] = avg
+            final_sum += avg
+
+        results["final_calculated"] = final_sum / 4.0
+        results["final_override"] = (
+            grades_map[final_assessment_id]
+            if final_assessment_id and final_assessment_id in grades_map
+            else None
+        )
+        return results
+
+    @staticmethod
+    def _group_assessments_by_period(assessments) -> tuple[dict[int, list[dict]], dict[int, float], int | None]:
+        """Agrupa avaliações por período (1..5), pré-calcula pesos e identifica o override final."""
+        period_assessments: dict[int, list[dict]] = {1: [], 2: [], 3: [], 4: [], 5: []}
+        for a in assessments:
+            period_assessments.setdefault(a.grading_period, []).append({"id": a.id, "weight": a.weight})
+        period_weights = {p: sum(a['weight'] for a in period_assessments[p]) for p in range(1, 6)}
+        final_assessment_id = period_assessments[5][0]['id'] if period_assessments[5] else None
+        return period_assessments, period_weights, final_assessment_id
+
     def get_student_period_averages(self, student_id: int, class_subject_id: int) -> dict:
         with self._get_db() as db:
             assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
@@ -135,91 +181,62 @@ class GradeService(BaseDataService):
                 return {}
 
             assessment_ids = [a.id for a in assessments]
-            grades = db.query(Grade).filter(
+            grades = db.query(Grade.assessment_id, Grade.score).filter(
                 Grade.student_id == student_id,
                 Grade.assessment_id.in_(assessment_ids)
             ).all()
 
             grades_map = {g.assessment_id: g.score for g in grades}
-            results = {}
-            final_sum = 0.0
-            periods_count = 0
-
-            for period in range(1, 5):
-                period_assessments = [a for a in assessments if a.grading_period == period]
-                if not period_assessments:
-                    results[period] = None
-                    final_sum += 0.0
-                    periods_count += 1
-                else:
-                    assessments_data = [{"id": a.id, "weight": a.weight} for a in period_assessments]
-                    period_total_weight = sum(a['weight'] for a in assessments_data)
-                    avg = self.calculate_weighted_average(student_id, grades_map, assessments_data, total_weight=period_total_weight)
-                    results[period] = avg
-                    final_sum += avg
-                    periods_count += 1
-
-            calculated_final = final_sum / 4.0 if periods_count > 0 else 0.0
-            results["final_calculated"] = calculated_final
-
-            final_assessment = next((a for a in assessments if a.grading_period == 5), None)
-            if final_assessment and final_assessment.id in grades_map:
-                results["final_override"] = grades_map[final_assessment.id]
-            else:
-                results["final_override"] = None
-
-            return results
+            period_assessments, period_weights, final_assessment_id = self._group_assessments_by_period(assessments)
+            return self._compute_period_averages(
+                student_id, grades_map, period_assessments, period_weights, final_assessment_id
+            )
 
     def get_class_period_averages(self, class_subject_id: int) -> dict:
         with self._get_db() as db:
             assessments = db.query(Assessment).filter(Assessment.class_subject_id == class_subject_id).all()
-            if not assessments: return {}
+            if not assessments:
+                return {}
 
             assessment_ids = [a.id for a in assessments]
-            grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(Grade.assessment_id.in_(assessment_ids)).all()
+            grades = db.query(Grade.student_id, Grade.assessment_id, Grade.score).filter(
+                Grade.assessment_id.in_(assessment_ids)
+            ).all()
 
-            student_grades = {}
+            student_grades: dict[int, dict[int, float]] = {}
             for g in grades:
-                if g.student_id not in student_grades: student_grades[g.student_id] = {}
-                student_grades[g.student_id][g.assessment_id] = g.score
+                student_grades.setdefault(g.student_id, {})[g.assessment_id] = g.score
 
-            results = {}
-            period_assessments = {1: [], 2: [], 3: [], 4: [], 5: []}
-            for a in assessments:
-                period_assessments[a.grading_period].append({"id": a.id, "weight": a.weight})
+            period_assessments, period_weights, final_assessment_id = self._group_assessments_by_period(assessments)
+            return {
+                student_id: self._compute_period_averages(
+                    student_id, s_grades_map, period_assessments, period_weights, final_assessment_id
+                )
+                for student_id, s_grades_map in student_grades.items()
+            }
 
-            final_assessment_id = next((a.id for a in assessments if a.grading_period == 5), None)
-            period_weights = {p: sum(a['weight'] for a in period_assessments[p]) for p in range(1, 6)}
-
-            for student_id, s_grades_map in student_grades.items():
-                s_results = {}
-                final_sum = 0.0
-                periods_count = 0
-
-                for period in range(1, 5):
-                    assessments_data = period_assessments[period]
-                    if not assessments_data:
-                        s_results[period] = None
-                        final_sum += 0.0
-                        periods_count += 1
-                        continue
-
-                    total_weight = period_weights[period]
-                    avg = self.calculate_weighted_average(student_id, s_grades_map, assessments_data, total_weight=total_weight)
-                    s_results[period] = avg
-                    final_sum += avg
-                    periods_count += 1
-
-                s_results["final_calculated"] = final_sum / 4.0 if periods_count > 0 else 0.0
-
-                if final_assessment_id and final_assessment_id in s_grades_map:
-                    s_results["final_override"] = s_grades_map[final_assessment_id]
-                else:
-                    s_results["final_override"] = None
-
-                results[student_id] = s_results
-
-            return results
+    def get_grades_for_student_in_course(self, student_id: int, course_id: int) -> list[dict]:
+        """Consulta filtrada no banco pelas notas de um aluno em uma disciplina específica."""
+        with self._get_db() as db:
+            rows = (
+                db.query(
+                    Grade.id,
+                    Grade.score,
+                    Assessment.id.label("assessment_id"),
+                    Assessment.name.label("assessment_name"),
+                    Class.id.label("class_id"),
+                    Class.name.label("class_name"),
+                    Course.id.label("course_id"),
+                    Course.course_name.label("course_name"),
+                )
+                .join(Assessment, Grade.assessment_id == Assessment.id)
+                .join(ClassSubject, Assessment.class_subject_id == ClassSubject.id)
+                .join(Class, ClassSubject.class_id == Class.id)
+                .join(Course, ClassSubject.course_id == Course.id)
+                .filter(Grade.student_id == student_id, Course.id == course_id)
+                .all()
+            )
+            return [row._asdict() for row in rows]
 
     def get_all_grades_with_details(self) -> list[dict]:
         with self._get_db() as db:

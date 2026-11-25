@@ -34,9 +34,9 @@ def test_create_lesson_and_incident(data_service: DataService, db_session: Sessi
 
     # Recupera os objetos ORM reais do banco de dados de teste para verificar os relacionamentos.
     # O `data_service` retorna dicionários, mas para testar `back_populates`, precisamos dos objetos SQLAlchemy.
-    student = db_session.query(Student).get(student_dict['id'])
-    class_ = db_session.query(Class).get(class_dict['id'])
-    subject = db_session.query(ClassSubject).get(subject_dict['id'])
+    student = db_session.get(Student, student_dict['id'])
+    class_ = db_session.get(Class, class_dict['id'])
+    subject = db_session.get(ClassSubject, subject_dict['id'])
 
     # 2. Teste de Criação de Aula (Lesson)
     # Cria uma nova instância do modelo Lesson diretamente na sessão de teste.
