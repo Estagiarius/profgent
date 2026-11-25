@@ -12,11 +12,8 @@
 import json
 # Importa o decorador 'tool' que transforma uma função em uma ferramenta utilizável pela IA.
 from app.core.tools.tool_decorator import tool
-# Importa a classe DataService para interagir com o banco de dados.
-from app.services.data_service import DataService
-
-# Cria uma instância do DataService para ser usada pelas ferramentas neste módulo.
-data_service = DataService()
+# Importa a instância singleton compartilhada do DataService.
+from app.services import data_service
 
 # O decorador '@tool' registra esta função no ToolRegistry,
 # gerando um esquema JSON a partir da docstring e das anotações de tipo.

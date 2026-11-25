@@ -9,11 +9,10 @@
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 from app.core.tools.tool_decorator import tool
-from app.services.data_service import DataService
+from app.services import data_service
 from app.services.report_service import ReportService
 
-data_service = DataService()
-report_service = ReportService()
+report_service = ReportService(data_service=data_service)
 
 @tool
 def generate_grade_chart_tool(student_name: str, class_name: str) -> str:

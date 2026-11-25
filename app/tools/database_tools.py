@@ -105,61 +105,60 @@ def get_student_grades_by_course(student_name: str, course_name: str) -> str:
     :param course_name: Nome da disciplina (ex: "Matemática").
     :return: Lista de notas encontradas.
     """
-    student = data_service.get_student_by_name(student_name)
-    if not student:
-        return f"Aluno '{student_name}' não encontrado."
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student:
+            return f"Aluno '{student_name}' não encontrado."
 
-    course = data_service.get_course_by_name(course_name)
-    if not course:
-        return f"Disciplina '{course_name}' não encontrada."
+        course = data_service.get_course_by_name(course_name)
+        if not course:
+            return f"Disciplina '{course_name}' não encontrada."
 
-    # Busca todas as notas detalhadas e filtra
-    all_grades = data_service.get_all_grades_with_details()
-    student_grades = [
-        g for g in all_grades
-        if g['student_id'] == student['id'] and g['course_id'] == course['id']
-    ]
+        all_grades = data_service.get_all_grades_with_details()
+        student_grades = [
+            g for g in all_grades
+            if g['student_id'] == student['id'] and g['course_id'] == course['id']
+        ]
 
-    if not student_grades:
-        return f"Nenhuma nota encontrada para {student_name} em {course_name}."
+        if not student_grades:
+            return f"Nenhuma nota encontrada para {student_name} em {course_name}."
 
-    result = [f"Notas de {student_name} em {course_name}:"]
-    for g in student_grades:
-        result.append(f"- Turma: {g['class_name']} | Avaliação: {g['assessment_name']} | Nota: {g['score']}")
+        result = [f"Notas de {student_name} em {course_name}:"]
+        for g in student_grades:
+            result.append(f"- Turma: {g['class_name']} | Avaliação: {g['assessment_name']} | Nota: {g['score']}")
 
-    return "\n".join(result)
+        return "\n".join(result)
+    except Exception as e:
+        return f"Erro ao consultar notas do aluno: {e}"
 
 @tool
 def list_courses_for_student(student_name: str) -> str:
     """
-    Lista as disciplinas nas quais o aluno possui algum registro de nota ou atividade.
+    Lista as disciplinas nas quais o aluno possui matrícula ou registro.
 
     :param student_name: O nome do aluno.
     """
-    student = data_service.get_student_by_name(student_name)
-    if not student:
-        return f"Aluno '{student_name}' não encontrado."
+    try:
+        student = data_service.get_student_by_name(student_name)
+        if not student:
+            return f"Aluno '{student_name}' não encontrado."
 
-    # Como a matrícula é por Turma, e a Turma tem várias disciplinas,
-    # listar as disciplinas "do aluno" significa listar as disciplinas das turmas onde ele está matriculado.
+        classes = data_service.get_all_classes()
+        student_courses = set()
 
-    # Precisamos iterar todas as turmas para achar as matrículas desse aluno
-    # (Idealmente o DataService teria get_student_enrollments, mas vamos usar o que tem)
-    classes = data_service.get_all_classes()
-    student_courses = set()
+        for cls in classes:
+            class_enrollments = data_service.get_enrollments_for_class(cls['id'])
+            if any(e['student_id'] == student['id'] for e in class_enrollments):
+                subjects = data_service.get_subjects_for_class(cls['id'])
+                for s in subjects:
+                    student_courses.add(s['course_name'])
 
-    for cls in classes:
-        class_enrollments = data_service.get_enrollments_for_class(cls['id'])
-        if any(e['student_id'] == student['id'] for e in class_enrollments):
-            # O aluno está nesta turma. Pega as disciplinas da turma.
-            subjects = data_service.get_subjects_for_class(cls['id'])
-            for s in subjects:
-                student_courses.add(s['course_name'])
+        if not student_courses:
+            return f"{student_name} não está matriculado em turmas com disciplinas cadastradas."
 
-    if not student_courses:
-        return f"{student_name} não está matriculado em turmas com disciplinas cadastradas."
-
-    return f"Disciplinas de {student_name}:\n" + "\n".join(f"- {name}" for name in sorted(list(student_courses)))
+        return f"Disciplinas de {student_name}:\n" + "\n".join(f"- {name}" for name in sorted(list(student_courses)))
+    except Exception as e:
+        return f"Erro ao listar disciplinas do aluno: {e}"
 
 @tool
 def list_all_classes() -> str:
@@ -315,8 +314,11 @@ def search_students(search_term: str) -> str:
 @tool
 def import_students_csv_tool(class_name: str, csv_content: str) -> str:
     """
-    Importa uma lista de alunos a partir de um texto CSV para uma turma específica.
-    O CSV deve ter cabeçalho (ex: Full Name,Birth Date,Status) ou seguir o padrão da escola.
+    Importa uma lista de alunos a partir de um texto CSV separado por ponto e vírgula (';') para uma turma específica.
+    O CSV deve conter cabeçalho no padrão brasileiro: 'Nome do Aluno;Data de Nascimento;Situação do Aluno'.
+
+    :param class_name: Nome da turma de destino.
+    :param csv_content: Conteúdo textual do arquivo CSV.
     """
     try:
         cls = data_service.get_class_by_name(class_name)
@@ -385,14 +387,18 @@ def copy_class_structure_tool(source_class_name: str, target_class_name: str) ->
         copied_assessments = 0
 
         for subj in subjects:
-            # Add subject to target class
             new_subj = data_service.add_subject_to_class(target_cls['id'], subj['course_id'])
             copied_subjects += 1
 
-            # Get assessments from source subject and copy to new subject
             assessments = data_service.get_assessments_for_subject(subj['id'])
             for assess in assessments:
-                data_service.add_assessment(new_subj['id'], assess['name'], assess['weight'])
+                data_service.add_assessment(
+                    new_subj['id'],
+                    assess['name'],
+                    assess['weight'],
+                    grading_period=assess.get('grading_period', 1),
+                    bncc_codes=assess.get('bncc_codes'),
+                )
                 copied_assessments += 1
 
         return f"Estrutura copiada com sucesso! {copied_subjects} disciplinas e {copied_assessments} avaliações replicadas de {source_class_name} para {target_class_name}."
@@ -616,7 +622,13 @@ def update_lesson(class_name: str, subject_name: str, current_topic: str, new_to
             lesson_date = datetime.strptime(new_date_str, "%d/%m/%Y").date()
         except ValueError: return f"Data inválida."
 
-        data_service.update_lesson(target_lesson['id'], new_topic, new_content, lesson_date)
+        data_service.update_lesson(
+            target_lesson['id'],
+            new_topic,
+            new_content,
+            lesson_date,
+            bncc_codes=target_lesson.get('bncc_codes'),
+        )
         return f"Aula atualizada com sucesso."
     except Exception as e: return f"Erro: {e}"
 
@@ -671,7 +683,7 @@ def create_new_assessment(class_name: str, subject_name: str, assessment_name: s
 @tool
 def update_assessment(class_name: str, subject_name: str, current_name: str, new_name: str, new_weight: float) -> str:
     """
-    Atualiza uma avaliação (nome e peso).
+    Atualiza uma avaliação (nome e peso), preservando período e códigos BNCC existentes.
     """
     try:
         cls = data_service.get_class_by_name(class_name)
@@ -685,7 +697,13 @@ def update_assessment(class_name: str, subject_name: str, current_name: str, new
         target_assessment = next((a for a in assessments if a['name'].lower() == current_name.lower()), None)
         if not target_assessment: return f"Avaliação '{current_name}' não encontrada."
 
-        data_service.update_assessment(target_assessment['id'], new_name, new_weight)
+        data_service.update_assessment(
+            target_assessment['id'],
+            new_name,
+            new_weight,
+            grading_period=target_assessment.get('grading_period'),
+            bncc_codes=target_assessment.get('bncc_codes'),
+        )
         return f"Avaliação atualizada para '{new_name}' (Peso: {new_weight})."
     except Exception as e: return f"Erro: {e}"
 
@@ -728,7 +746,6 @@ def add_new_grade(student_name: str, class_name: str, subject_name: str, assessm
         if not target_subject:
             return f"Erro: Disciplina '{subject_name}' não encontrada na turma."
 
-        # Busca avaliações dessa disciplina
         assessments = data_service.get_assessments_for_subject(target_subject['id'])
         target_assessment = next((a for a in assessments if a['name'].lower() == assessment_name.lower()), None)
 
@@ -759,11 +776,6 @@ def update_grade_tool(student_name: str, class_name: str, subject_name: str, ass
         target_assessment = next((a for a in assessments if a['name'].lower() == assessment_name.lower()), None)
         if not target_assessment: return f"Avaliação não encontrada."
 
-        # Find existing grade
-        # We use upsert logic essentially: find if exists, then update.
-        # But DataService doesn't have `update_grade` (it uses upsert_grades_for_subject).
-        # We can implement it via upsert_grades_for_subject with a single item list.
-
         grade_data = [{
             "student_id": student['id'],
             "assessment_id": target_assessment['id'],
@@ -778,7 +790,7 @@ def update_grade_tool(student_name: str, class_name: str, subject_name: str, ass
 @tool
 def delete_grade(student_name: str, class_name: str, subject_name: str, assessment_name: str) -> str:
     """
-    Deleta uma nota de um aluno.
+    Deleta uma nota de um aluno (inclusive de alunos inativos).
     """
     try:
         student = data_service.get_student_by_name(student_name)
@@ -795,9 +807,7 @@ def delete_grade(student_name: str, class_name: str, subject_name: str, assessme
         target_assessment = next((a for a in assessments if a['name'].lower() == assessment_name.lower()), None)
         if not target_assessment: return f"Avaliação não encontrada."
 
-        # Busca nota especifica (não temos get_grade_by_... direto, então vamos iterar ou melhorar o service no futuro)
-        # Por enquanto vou usar get_grades_for_subject e filtrar
-        grades = data_service.get_grades_for_subject(target_subject['id'])
+        grades = data_service.get_all_grades()
         target_grade = next((g for g in grades if g['student_id'] == student['id'] and g['assessment_id'] == target_assessment['id']), None)
 
         if target_grade:
@@ -850,12 +860,17 @@ def add_new_course(course_name: str, course_code: str) -> str:
 @tool
 def update_course(current_name: str, new_name: str, new_code: str) -> str:
     """
-    Atualiza uma disciplina no catálogo.
+    Atualiza uma disciplina no catálogo, preservando as habilidades BNCC esperadas.
     """
     try:
         course = data_service.get_course_by_name(current_name)
         if not course: return f"Disciplina não encontrada."
-        data_service.update_course(course['id'], new_name, new_code)
+        data_service.update_course(
+            course['id'],
+            new_name,
+            new_code,
+            bncc_expected=course.get('bncc_expected'),
+        )
         return f"Disciplina atualizada para '{new_name}' ({new_code})."
     except Exception as e: return f"Erro: {e}"
 
@@ -871,19 +886,35 @@ def delete_course(course_name: str) -> str:
         return f"Disciplina '{course_name}' deletada."
     except Exception as e: return f"Erro: {e}"
 
-# --- MAINTENANCE TOOLS ---
+# --- FERRAMENTAS DE MANUTENÇÃO ---
 
 @tool
 def update_student_name(current_name: str, new_first_name: str, new_last_name: str) -> str:
+    """
+    Atualiza o nome e sobrenome de um aluno existente, preservando sua data de nascimento.
+
+    :param current_name: Nome completo atual do aluno.
+    :param new_first_name: Novo primeiro nome.
+    :param new_last_name: Novo sobrenome.
+    """
     try:
         student = data_service.get_student_by_name(current_name)
         if not student: return "Aluno não encontrado."
-        data_service.update_student(student['id'], new_first_name, new_last_name)
+        existing_birth_date = None
+        if student.get('birth_date'):
+            existing_birth_date = datetime.fromisoformat(student['birth_date']).date()
+        data_service.update_student(student['id'], new_first_name, new_last_name, birth_date=existing_birth_date)
         return f"Nome atualizado para {new_first_name} {new_last_name}."
     except Exception as e: return f"Erro: {e}"
 
 @tool
 def enroll_existing_student(student_name: str, class_name: str) -> str:
+    """
+    Matricula um aluno já cadastrado no sistema em uma turma existente.
+
+    :param student_name: Nome completo do aluno.
+    :param class_name: Nome da turma.
+    """
     try:
         student = data_service.get_student_by_name(student_name)
         if not student: return "Aluno não encontrado."

@@ -8,7 +8,8 @@
 # Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
-from openai import AsyncOpenAI
+import logging
+from openai import AsyncOpenAI, APIConnectionError
 from app.core.llm.base import LLMProvider, AssistantResponse
 from typing import List
 import httpx
@@ -17,11 +18,6 @@ import httpx
 class OllamaProvider(LLMProvider):
     """
     Representa um provedor de LLM (Large Language Model) utilizando a API Ollama.
-
-    Esta classe serve como um wrapper para a interação com a API Ollama, permitindo realizar
-    operações como obter respostas de chat, listar modelos disponíveis, e outros. A classe é
-    altamente dependente da comunicação assíncrona com a API Ollama e utiliza um cliente
-    assíncrono para realizar as requisições.
 
     :ivar client: Instância do cliente assíncrono para comunicação com a API Ollama.
     :type client: AsyncOpenAI
@@ -46,16 +42,14 @@ class OllamaProvider(LLMProvider):
     async def list_models(self) -> List[str]:
         try:
             models_response = await self.client.models.list()
-            # The ollama API returns model objects, and we need the 'id' attribute
             if models_response and hasattr(models_response, 'data'):
                 return sorted([model.id for model in models_response.data])
             return []
-        except httpx.ConnectError:
-            print(f"Could not connect to Ollama server at {self.client.base_url} to list models.")
+        except (httpx.ConnectError, APIConnectionError):
+            logging.warning(f"Não foi possível conectar ao servidor Ollama em {self.client.base_url} para listar modelos.")
             return []
         except Exception as e:
-            # This can happen if the API exists but doesn't return a valid model list (e.g., 404)
-            print(f"Error listing Ollama models (this might be normal for older versions): {e}")
+            logging.warning(f"Erro ao listar modelos Ollama: {e}")
             return []
 
     async def close(self):
