@@ -24,6 +24,9 @@ A organização do código reflete a separação de responsabilidades:
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       └── ci.yml          # Pipeline de CI (compileall, cabeçalhos MPL-2.0 e pytest)
 ├── app/
 │   ├── core/               # Núcleo da aplicação (Configuração, Segurança, Framework de IA)
 │   │   ├── llm/            # Abstração dos provedores de LLM
@@ -40,6 +43,11 @@ A organização do código reflete a separação de responsabilidades:
 │   │   ├── report_service.py    # Geração de Relatórios e Gráficos
 │   │   └── bncc_service.py      # Gestão da Base Nacional Comum Curricular
 │   ├── tools/              # Implementação concreta das ferramentas do Agente
+│   │   ├── academic_extended_tools.py # Horários, mapas de sala, BNCC e médias por período
+│   │   ├── database_tools.py          # Consultas de alunos, turmas e notas
+│   │   ├── dashboard_tools.py         # Estatísticas globais e alunos em risco
+│   │   ├── report_tools.py            # Exportação de boletins, CSVs e gráficos
+│   │   └── internet_tools.py          # Pesquisas externas seguras
 │   ├── ui/                 # Camada de Apresentação
 │   │   ├── themes/         # Temas CustomTkinter (JSON)
 │   │   ├── views/          # Telas (Dashboard, Schedule, ClassDetail, SeatingChart, etc.)
@@ -186,3 +194,4 @@ Para evitar travamentos da UI em operações longas (I/O, IA):
 ## 7. Desenvolvimento e Testes
 
 -   **Testes:** Rodam com `pytest` utilizando banco de dados SQLite **em memória** (`tests/conftest.py`) para isolamento e performance.
+-   **Integração Contínua (CI):** O workflow `.github/workflows/ci.yml` executa automaticamente a compilação estática (`compileall`), a verificação de cabeçalhos MPL-2.0 e a suíte `pytest` em cada `push` e `pull_request`.
