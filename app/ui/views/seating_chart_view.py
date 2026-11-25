@@ -15,6 +15,7 @@ from app.ui.widgets.scrollable_canvas_frame import ScrollableCanvasFrame
 from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.services.report_service import ReportService
+from app.utils.path_utils import open_file_in_os
 import os
 
 class SeatingChartView(ctk.CTkFrame):
@@ -404,11 +405,8 @@ class SeatingChartView(ctk.CTkFrame):
 
             messagebox.showinfo("Sucesso", f"Mapa exportado com sucesso para:\n{filepath}")
 
-            # Open file
-            if os.name == 'nt':
-                os.startfile(filepath)
-            else:
-                os.system(f'xdg-open "{filepath}"')
+            # Abre o arquivo de forma segura e multiplataforma
+            open_file_in_os(filepath)
 
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao exportar: {e}")

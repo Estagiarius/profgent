@@ -11,7 +11,6 @@
 # Importa componentes e utilitários do tkinter e customtkinter.
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-import csv
 from datetime import date, datetime
 # Importa o serviço de dados para interagir com o banco de dados.
 from app.services import data_service
@@ -28,6 +27,7 @@ from customtkinter import CTkInputDialog
 from app.utils.async_utils import run_async_task
 from app.utils.import_utils import async_import_students
 from app.utils.format_utils import parse_float_input, format_float_output
+from app.utils.path_utils import open_file_in_os
 # Importa widgets e utilitários de UI
 from app.ui.widgets.scrollable_canvas_frame import ScrollableCanvasFrame
 from app.ui.ui_utils import bind_global_mouse_scroll
@@ -568,11 +568,8 @@ class ClassDetailView(ctk.CTkFrame):
         try:
             filepath = self.report_service.export_class_grades_csv(self.class_id)
             messagebox.showinfo("Sucesso", f"Arquivo exportado em:\n{filepath}")
-            # Tenta abrir a pasta do arquivo
-            if os.name == 'nt':
-                os.startfile(os.path.dirname(filepath))
-            else:
-                os.system(f'xdg-open "{os.path.dirname(filepath)}"')
+            # Tenta abrir a pasta do arquivo de forma segura e multiplataforma
+            open_file_in_os(os.path.dirname(filepath))
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao exportar CSV: {e}")
 
@@ -599,11 +596,8 @@ class ClassDetailView(ctk.CTkFrame):
             if target_enrollment:
                 filepath = self.report_service.generate_student_report_card(target_enrollment['student_id'], self.class_id)
                 messagebox.showinfo("Sucesso", f"Boletim gerado em:\n{filepath}")
-                # Tenta abrir o arquivo
-                if os.name == 'nt':
-                    os.startfile(filepath)
-                else:
-                    os.system(f'xdg-open "{filepath}"')
+                # Tenta abrir o arquivo de forma segura e multiplataforma
+                open_file_in_os(filepath)
         except Exception as e:
              messagebox.showerror("Erro", f"Falha ao gerar boletim: {e}")
 
