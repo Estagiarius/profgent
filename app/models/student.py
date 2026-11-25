@@ -62,7 +62,11 @@ class Student(Base):
     # 'cascade="all, delete-orphan"' garante que as notas de um aluno sejam excluídas se o aluno for excluído.
     grades = relationship("Grade", back_populates="student", cascade="all, delete-orphan")
     # Define o relacionamento com o modelo Incident (incidentes). Um aluno pode ter vários incidentes.
-    incidents = relationship("Incident", back_populates="student")
+    incidents = relationship("Incident", back_populates="student", cascade="all, delete-orphan")
+    # Define os relacionamentos de matrícula, frequência e mapa de sala com exclusão em cascata.
+    enrollments = relationship("ClassEnrollment", back_populates="student", cascade="all, delete-orphan")
+    attendance_records = relationship("Attendance", back_populates="student", cascade="all, delete-orphan")
+    seat_assignments = relationship("SeatAssignment", back_populates="student", cascade="all, delete-orphan")
 
     # Define uma representação em string para o objeto Student, útil para depuração.
     def __repr__(self):

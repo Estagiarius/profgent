@@ -36,6 +36,7 @@ class ClassSubject(Base):
     # Objetos dependentes dessa associação
     assessments = relationship("Assessment", back_populates="class_subject", cascade="all, delete-orphan")
     lessons = relationship("Lesson", back_populates="class_subject", cascade="all, delete-orphan")
+    weekly_schedules = relationship("WeeklySchedule", back_populates="class_subject", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint('class_id', 'course_id', name='_class_course_uc'),

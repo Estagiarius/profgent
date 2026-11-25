@@ -9,7 +9,7 @@
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 # Importa os tipos de coluna necessários e a restrição de verificação (CheckConstraint) do SQLAlchemy.
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, CheckConstraint
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, CheckConstraint, UniqueConstraint
 # Importa a função 'relationship' para definir relacionamentos entre modelos.
 from sqlalchemy.orm import relationship
 # Importa a classe 'Base' declarativa da qual todos os modelos devem herdar.
@@ -60,12 +60,14 @@ class Grade(Base):
     # Define o relacionamento com o modelo Student. 'back_populates' cria a referência inversa no modelo Student.
     student = relationship("Student", back_populates="grades")
     # Define o relacionamento com o modelo Assessment. Permite acessar os dados da avaliação a partir da nota.
-    assessment = relationship("Assessment")
+    assessment = relationship("Assessment", back_populates="grades")
 
     # Define restrições a nível de tabela.
     __table_args__ = (
         # Garante que o valor da coluna 'score' seja sempre maior ou igual a 0.
         CheckConstraint('score >= 0', name='check_score_positive'),
+        # Garante que um aluno tenha no máximo uma nota por avaliação.
+        UniqueConstraint('student_id', 'assessment_id', name='_student_assessment_uc'),
     )
 
     # Define uma representação em string para o objeto Grade, útil para depuração.

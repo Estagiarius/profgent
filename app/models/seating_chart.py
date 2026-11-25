@@ -8,7 +8,7 @@
 # Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.models.base import Base
@@ -34,7 +34,7 @@ class SeatingChart(Base):
     created_at = Column(DateTime, default=datetime.now)
 
     # Relacionamentos
-    class_ = relationship("Class", backref="seating_charts")
+    class_ = relationship("Class", back_populates="seating_charts")
     assignments = relationship("SeatAssignment", back_populates="chart", cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -56,7 +56,12 @@ class SeatAssignment(Base):
 
     # Relacionamentos
     chart = relationship("SeatingChart", back_populates="assignments")
-    student = relationship("Student") # Acesso unidirecional ao aluno é suficiente
+    student = relationship("Student", back_populates="seat_assignments")
+
+    __table_args__ = (
+        UniqueConstraint('chart_id', 'student_id', name='_chart_student_uc'),
+        UniqueConstraint('chart_id', 'row_index', 'col_index', name='_chart_position_uc'),
+    )
 
     def __repr__(self):
         return f"<SeatAssignment(chart={self.chart_id}, student={self.student_id}, pos=({self.row_index},{self.col_index}))>"

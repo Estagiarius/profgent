@@ -65,6 +65,9 @@ class Class(Base):
     # Define o relacionamento com Incident (incidentes).
     incidents = relationship("Incident", back_populates="class_", cascade="all, delete-orphan")
 
+    # Define o relacionamento com SeatingChart (mapas de sala).
+    seating_charts = relationship("SeatingChart", back_populates="class_", cascade="all, delete-orphan")
+
     # Define uma representação em string para o objeto Class, útil para depuração.
     def __repr__(self):
         # Retorna uma string formatada com o id e o nome da turma.

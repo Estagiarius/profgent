@@ -16,6 +16,7 @@ from .assessment import Assessment
 from .grade import Grade
 from .class_enrollment import ClassEnrollment
 from .lesson import Lesson
+from .attendance import Attendance
 from .incident import Incident
 from .schedule import TimeSlot, WeeklySchedule
 from .seating_chart import SeatingChart, SeatAssignment
