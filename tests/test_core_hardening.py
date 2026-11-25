@@ -139,3 +139,43 @@ def test_update_student_name_tool_preserves_birth_date(data_service, monkeypatch
     updated = data_service.get_student_by_id(s["id"])
     assert updated["last_name"] == "Oliveira"
     assert updated["birth_date"] == "2010-04-15"
+
+
+def test_no_invalid_self_references_in_app():
+    import ast
+    from pathlib import Path
+
+    app_dir = Path(__file__).resolve().parent.parent / "app"
+    invalid_refs = []
+
+    for path in sorted(app_dir.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+        class _SelfChecker(ast.NodeVisitor):
+            def __init__(self):
+                self.scope_has_self = []
+
+            def _visit_func(self, node):
+                arg_names = [
+                    a.arg for a in node.args.posonlyargs + node.args.args + node.args.kwonlyargs
+                ]
+                has_self = "self" in arg_names
+                effective = has_self or (any(self.scope_has_self) if self.scope_has_self else False)
+                self.scope_has_self.append(effective)
+                self.generic_visit(node)
+                self.scope_has_self.pop()
+
+            def visit_FunctionDef(self, node):
+                self._visit_func(node)
+
+            def visit_AsyncFunctionDef(self, node):
+                self._visit_func(node)
+
+            def visit_Name(self, node):
+                if node.id == "self" and (not self.scope_has_self or not self.scope_has_self[-1]):
+                    invalid_refs.append(f"{path.relative_to(app_dir.parent)}:{node.lineno}")
+
+        _SelfChecker().visit(tree)
+
+    assert invalid_refs == [], f"Referências inválidas a 'self' detectadas: {invalid_refs}"
+

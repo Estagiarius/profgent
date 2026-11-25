@@ -375,9 +375,8 @@ class ClassDetailView(ctk.CTkFrame):
                 if name: self.subject_combo.set(name)
 
 
-    # Método estático para buscar dados do subject em background
-    @staticmethod
-    def _fetch_subject_data(subject_id, class_id):
+    # Método auxiliar para buscar dados da disciplina em background
+    def _fetch_subject_data(self, subject_id, class_id):
         return {
             "assessments": self.data_service.get_assessments_for_subject(subject_id),
             "lessons": self.data_service.get_lessons_for_subject(subject_id),
@@ -571,14 +570,14 @@ class ClassDetailView(ctk.CTkFrame):
         if not hasattr(self, 'loading_overlay') or self.loading_overlay is None:
             self.loading_overlay = LoadingOverlay(self, text=loading_text)
 
-        def _on_complete(result, error):
+        def _on_complete(result):
             if hasattr(self, 'loading_overlay') and self.loading_overlay:
                 self.loading_overlay.destroy()
                 self.loading_overlay = None
             if not self.winfo_exists():
                 return
-            if error:
-                messagebox.showerror("Erro", f"{error_prefix}: {error}")
+            if isinstance(result, Exception):
+                messagebox.showerror("Erro", f"{error_prefix}: {result}")
                 return
             on_success(result)
 
@@ -1404,9 +1403,8 @@ class ClassDetailView(ctk.CTkFrame):
         # 4. Abre dialogo
         AttendanceDialog(self, f"Chamada - {lesson_title}", lesson_id, students, attendance_map, save_attendance)
 
-    # Método estático para busca inicial de dados
-    @staticmethod
-    def _fetch_initial_details(class_id, preferred_subject_id=None):
+    # Método auxiliar para busca inicial de dados
+    def _fetch_initial_details(self, class_id, preferred_subject_id=None):
         class_data = self.data_service.get_class_by_id(class_id)
         subjects = self.data_service.get_subjects_for_class(class_id)
         enrollments = self.data_service.get_enrollments_for_class(class_id)
@@ -1425,7 +1423,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         # Se identificou uma disciplina alvo, carrega seus dados
         if target_subject_id:
-            subject_data = ClassDetailView._fetch_subject_data(target_subject_id, class_id)
+            subject_data = self._fetch_subject_data(target_subject_id, class_id)
             subject_data['id'] = target_subject_id
 
         return {

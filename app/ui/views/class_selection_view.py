@@ -45,9 +45,8 @@ class ClassSelectionView(ctk.CTkFrame):
         self.scrollable_frame.grid_columnconfigure(0, weight=1) # Permite que os cards se expandam horizontalmente.
         bind_global_mouse_scroll(self.scrollable_frame)
 
-    # Método estático para buscar dados em thread separada
-    @staticmethod
-    def _fetch_classes():
+    # Método auxiliar para buscar dados em thread separada
+    def _fetch_classes(self):
         return self.data_service.get_all_classes()
 
     # Callback executado na thread principal após buscar dados
