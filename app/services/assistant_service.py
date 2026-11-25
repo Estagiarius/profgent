@@ -60,6 +60,14 @@ from app.tools.report_tools import (
     generate_grade_chart_tool, generate_class_distribution_tool,
     export_class_grades_tool, generate_report_card_tool
 )
+# Importa as ferramentas estendidas de horário, mapa de sala, BNCC e médias bimestrais.
+from app.tools.academic_extended_tools import (
+    get_weekly_schedule_tool,
+    list_seating_charts_tool,
+    search_bncc_skills_tool,
+    get_bncc_coverage_tool,
+    get_student_period_averages_tool,
+)
 
 SYSTEM_PROMPT = (
     "Você é um assistente de gestão acadêmica especializado, integrado a um aplicativo de desktop. "
@@ -121,6 +129,12 @@ class AssistantService:
         self.tool_registry.register(get_global_dashboard_stats_tool)
         self.tool_registry.register(get_global_performance_stats_tool)
         self.tool_registry.register(get_class_incident_ranking_tool)
+        # Ferramentas de horário, mapa de sala, BNCC e médias bimestrais
+        self.tool_registry.register(get_weekly_schedule_tool)
+        self.tool_registry.register(list_seating_charts_tool)
+        self.tool_registry.register(search_bncc_skills_tool)
+        self.tool_registry.register(get_bncc_coverage_tool)
+        self.tool_registry.register(get_student_period_averages_tool)
         # Ferramentas pedagógicas
         self.tool_registry.register(suggest_lesson_activities_tool)
         # Ferramentas de relatórios
