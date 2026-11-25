@@ -9,7 +9,6 @@
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk # Importa a biblioteca 'customtkinter' para os componentes da interface.
-from app.services import data_service # Importa o serviço de dados para acessar as informações do banco.
 # Importa as janelas de diálogo personalizadas para adicionar e editar.
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
@@ -27,6 +26,7 @@ class ClassSelectionView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
+        self.data_service = main_app.data_service
         # Configura o layout de grade da view.
         self.grid_rowconfigure(1, weight=1) # A linha 1 (com a lista) se expande.
         self.grid_columnconfigure(1, weight=1) # A coluna 1 (onde está o botão de adicionar) se expande.
@@ -45,10 +45,9 @@ class ClassSelectionView(ctk.CTkFrame):
         self.scrollable_frame.grid_columnconfigure(0, weight=1) # Permite que os cards se expandam horizontalmente.
         bind_global_mouse_scroll(self.scrollable_frame)
 
-    # Método estático para buscar dados em thread separada
-    @staticmethod
-    def _fetch_classes():
-        return data_service.get_all_classes()
+    # Método auxiliar para buscar dados em thread separada
+    def _fetch_classes(self):
+        return self.data_service.get_all_classes()
 
     # Callback executado na thread principal após buscar dados
     def _on_classes_fetched(self, classes_data):
@@ -151,7 +150,7 @@ class ClassSelectionView(ctk.CTkFrame):
         # Se o usuário confirmou corretamente.
         if user_input == "DELETE":
             # Chama o serviço para deletar a turma.
-            data_service.delete_class(class_id)
+            self.data_service.delete_class(class_id)
             # Atualiza a lista de cards na tela.
             self.load_classes_async()
 
@@ -166,7 +165,7 @@ class ClassSelectionView(ctk.CTkFrame):
         def save_callback(class_id, data):
             new_name = data.get("name")
             if new_name:
-                data_service.update_class(class_id, new_name)
+                self.data_service.update_class(class_id, new_name)
                 self.load_classes_async()
 
         # Configuração dos campos para o diálogo de edição.
@@ -178,7 +177,7 @@ class ClassSelectionView(ctk.CTkFrame):
     def copy_class_popup(self, class_data):
         def save_callback(data):
             try:
-                data_service.copy_class(
+                self.data_service.copy_class(
                     source_class_id=class_data["id"],
                     new_name=data["name"],
                     copy_subjects=data["copy_subjects"],
@@ -206,7 +205,7 @@ class ClassSelectionView(ctk.CTkFrame):
 
             try:
                 # Chama o serviço para criar a nova turma (agora sem curso obrigatório).
-                data_service.create_class(name=class_name)
+                self.data_service.create_class(name=class_name)
                 # Atualiza a lista de cards.
                 self.load_classes_async()
             except ValueError as e:

@@ -44,12 +44,10 @@ def search_internet(query: str) -> str:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
         }
-        # Monta a URL de busca do DuckDuckGo com a consulta do usuário.
-        # Normaliza a query para evitar problemas com caracteres especiais
-        url = f"https://html.duckduckgo.com/html/?q={query}"
+        url = "https://html.duckduckgo.com/html/"
 
-        # Faz a requisição GET para a URL, com os cabeçalhos e um timeout de 10 segundos (aumentado para robustez).
-        response = requests.get(url, headers=headers, timeout=10)
+        # Faz a requisição GET com query devidamente codificada e timeout de 10 segundos.
+        response = requests.get(url, params={"q": query}, headers=headers, timeout=10)
         # Lança uma exceção se a resposta tiver um código de status de erro (ex: 404, 500).
         response.raise_for_status()
 

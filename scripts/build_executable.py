@@ -12,7 +12,6 @@
 
 import PyInstaller.__main__
 import sys
-import os
 import shutil
 from pathlib import Path
 
@@ -80,9 +79,11 @@ def build_executable():
     # Lista de arquivos/pastas para incluir (--add-data)
     # Formato: "origem:destino"
     add_data = [
-        f"{data_path}{sep}app/data", # Copia a pasta inteira
-        f"{themes_path}{sep}app/ui/themes", # Copia a pasta inteira
-        f"{assets_path}{sep}app/ui/assets", # Copia a pasta inteira
+        f"{data_path / 'bncc_infantil.json'}{sep}app/data",
+        f"{data_path / 'bncc_fundamental.json'}{sep}app/data",
+        f"{data_path / 'bncc_medio.json'}{sep}app/data",
+        f"{themes_path}{sep}app/ui/themes",
+        f"{assets_path}{sep}app/ui/assets",
     ]
 
     # Ícone
@@ -108,9 +109,11 @@ def build_executable():
         "app.services.data.dashboard_service",
         "app.services.data.seating_chart_service",
         "app.services.report_service",
-        # Providers de LLM (se houver import dinâmico)
+        # Provedores de LLM suportados
         "app.core.llm.openai_provider",
-        "app.core.llm.anthropic_provider",
+        "app.core.llm.maritaca_provider",
+        "app.core.llm.ollama_provider",
+        "app.core.llm.open_router_provider",
     ]
 
     # 3. Argumentos Comuns

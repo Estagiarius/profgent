@@ -18,9 +18,15 @@ from app.models.course import Course
 from datetime import date
 
 def test_bncc_service_search():
-    # Test BNCC Service search logic
-    results = BNCCService.search_skills("matematica")
+    # Valida busca real na BNCC e consulta por código via índice O(1)
+    results = BNCCService.search_skills("EF01MA01")
     assert isinstance(results, list)
+    assert len(results) >= 1
+    assert any(r["code"] == "EF01MA01" for r in results)
+
+    skill = BNCCService.get_skill_by_code("ef01ma01")
+    assert skill is not None
+    assert skill["code"] == "EF01MA01"
 
 def test_bncc_coverage_logic(db_session, mocker):
     # Setup DataService with injected session

@@ -11,7 +11,6 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from datetime import date, timedelta, datetime
-from app.services import data_service
 from app.ui.views.lesson_dialog import LessonDialog
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.base_dialog import BaseDialog
@@ -20,6 +19,7 @@ class ScheduleView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
+        self.data_service = main_app.data_service
 
         # Estado
         self.current_week_start = self.get_start_of_current_week()
@@ -71,9 +71,6 @@ class ScheduleView(ctk.CTkFrame):
         self.next_btn.pack(side="right", padx=10)
 
         # Área do Grid
-        self.grid_frame = ctk.CTkScrollableFrame(tab, orientation="horizontal") # Horizontal scroll se tiver muitos dias?
-        # Na verdade precisamos de vertical scroll se tiver muitas aulas, e horizontal se a tela for pequena.
-        # Vamos usar CTkScrollableFrame normal (vertical) e confiar no layout.
         self.grid_frame = ctk.CTkScrollableFrame(tab)
         self.grid_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
@@ -97,12 +94,9 @@ class ScheduleView(ctk.CTkFrame):
         for widget in self.grid_frame.winfo_children():
             widget.destroy()
 
-        # Busca dados
-        grid_data = data_service.get_full_schedule_grid()
+        # Busca dados via serviço injetado
+        grid_data = self.main_app.data_service.get_full_schedule_grid()
 
-        # Determina colunas (dias)
-        # Vamos assumir Seg-Sex (0-4) fixo, ou dinâmico?
-        # Melhor mostrar todos os dias que têm configuração.
         active_days = sorted(grid_data.keys())
         if not active_days:
             ctk.CTkLabel(self.grid_frame, text="Nenhum horário configurado. Vá para a aba 'Configuração'.").pack(pady=20)
@@ -111,12 +105,9 @@ class ScheduleView(ctk.CTkFrame):
         # Headers (Dias)
         for col_idx, day_code in enumerate(active_days):
             day_name = self.days_map.get(day_code, "Dia")
-            # Data específica desta semana
             current_day_date = self.current_week_start + timedelta(days=day_code)
 
             header_text = f"{day_name}\n{current_day_date.strftime('%d/%m')}"
-
-            # Highlight se for hoje
             fg_color = "green" if current_day_date == date.today() else None
 
             lbl = ctk.CTkLabel(self.grid_frame, text=header_text, font=ctk.CTkFont(weight="bold"),
@@ -127,49 +118,41 @@ class ScheduleView(ctk.CTkFrame):
             # Slots do dia
             day_slots = grid_data[day_code]
             for slot_item in day_slots:
-                row_idx = slot_item['period_index'] # Usa o índice configurado pelo usuário para a linha
+                row_idx = max(1, int(slot_item['period_index']))
 
-                # Container do Slot
                 slot_frame = ctk.CTkFrame(self.grid_frame, border_width=1, border_color="gray")
                 slot_frame.grid(row=row_idx, column=col_idx, padx=5, pady=5, sticky="nsew")
 
-                # Horário
                 time_text = f"{slot_item['start_time']} - {slot_item['end_time']}"
-                ctk.CTkLabel(slot_frame, text=time_text, font=ctk.CTkFont(size=10)).pack(pady=(5,0))
+                ctk.CTkLabel(slot_frame, text=time_text, font=ctk.CTkFont(size=10)).pack(pady=(5, 0))
 
                 assignment = slot_item['assignment']
 
                 if assignment:
-                    # Slot Ocupado
                     cls_info = f"{assignment['class_name']}\n{assignment['course_name']}"
                     btn = ctk.CTkButton(slot_frame, text=cls_info,
                                         fg_color="transparent", border_width=1,
                                         command=lambda s=slot_item, d=current_day_date: self.on_slot_click(s, d))
                     btn.pack(padx=5, pady=5, fill="both", expand=True)
-
-                    # Verifica se já tem aula registrada (indicador visual)
-                    # Isso pode ser pesado (N queries). DataService tem get_lesson_for_schedule?
-                    # Vamos fazer uma verificação rápida se possível.
-                    # Mas por enquanto, deixa sem indicador visual de "concluído" para não complicar a performance.
-
                 else:
-                    # Slot Vazio (Alocar)
                     btn = ctk.CTkButton(slot_frame, text="+ Alocar", fg_color="transparent", text_color="gray",
                                         command=lambda s=slot_item: self.open_allocation_dialog(s))
                     btn.pack(padx=5, pady=5, fill="both", expand=True)
-
 
     def on_slot_click(self, slot_item, date_val):
         """Abre o diálogo de registro de aula."""
         assignment = slot_item['assignment']
         class_subject_id = assignment['class_subject_id']
 
-        # Verifica se já existe aula
-        existing_lesson = data_service.get_lesson_for_schedule(class_subject_id, date_val)
-
-        dialog = LessonDialog(self, class_subject_id, date_val, lesson_data=existing_lesson, on_save=self.render_grid)
-        # O on_save re-renderiza o grid, mas como não temos indicador visual, talvez não mude nada.
-        # Mas é bom para garantir consistência.
+        existing_lesson = self.main_app.data_service.get_lesson_for_schedule(class_subject_id, date_val)
+        LessonDialog(
+            self,
+            class_subject_id,
+            date_val,
+            lesson_data=existing_lesson,
+            on_save=self.render_grid,
+            data_service=self.main_app.data_service,
+        )
 
     def open_allocation_dialog(self, slot_item):
         """Abre diálogo para vincular uma turma ao slot."""
@@ -177,7 +160,7 @@ class ScheduleView(ctk.CTkFrame):
         # Ou listar todas as disciplinas de todas as turmas?
         # Vamos listar "Turma - Disciplina"
 
-        classes = data_service.get_all_classes()
+        classes = self.data_service.get_all_classes()
         if not classes:
             messagebox.showwarning("Aviso", "Não há turmas cadastradas.")
             return
@@ -204,7 +187,7 @@ class ScheduleView(ctk.CTkFrame):
         subject_combo.pack(pady=5)
 
         # Dados
-        classes = data_service.get_all_classes()
+        classes = self.data_service.get_all_classes()
         class_map = {c['name']: c['id'] for c in classes}
         class_combo.configure(values=list(class_map.keys()))
 
@@ -212,7 +195,7 @@ class ScheduleView(ctk.CTkFrame):
 
         def on_class_change(choice):
             class_id = class_map[choice]
-            subjects = data_service.get_subjects_for_class(class_id)
+            subjects = self.data_service.get_subjects_for_class(class_id)
             subject_names = [s['course_name'] for s in subjects]
             subject_map.clear()
             for s in subjects:
@@ -233,7 +216,7 @@ class ScheduleView(ctk.CTkFrame):
                 return
 
             subj_id = subject_map[subj_name]
-            data_service.create_schedule_assignment(slot_id, subj_id)
+            self.data_service.create_schedule_assignment(slot_id, subj_id)
             top.destroy()
             self.render_grid()
 
@@ -272,7 +255,7 @@ class ScheduleView(ctk.CTkFrame):
                       command=lambda d=day_code: self.add_slot_popup(d)).pack(side="right")
 
         # Lista slots existentes
-        slots = data_service.get_time_slots(day_code)
+        slots = self.data_service.get_time_slots(day_code)
         if not slots:
             ctk.CTkLabel(day_frame, text="Nenhum horário configurado.", text_color="gray").pack(pady=5)
 
@@ -292,7 +275,7 @@ class ScheduleView(ctk.CTkFrame):
                 idx = int(data['index'])
                 start = data['start']
                 end = data['end']
-                data_service.create_time_slot(day_code, idx, start, end)
+                self.data_service.create_time_slot(day_code, idx, start, end)
                 self.refresh_config_list()
                 self.render_grid() # Atualiza aba visualização tb
             except ValueError as e:
@@ -306,10 +289,10 @@ class ScheduleView(ctk.CTkFrame):
 
     def delete_slot(self, slot_id):
         if messagebox.askyesno("Confirmar", "Deseja excluir este horário? A alocação será perdida."):
-            data_service.delete_time_slot(slot_id)
+            self.data_service.delete_time_slot(slot_id)
             self.refresh_config_list()
             self.render_grid()
 
-    def on_show(self):
-        # Chamado quando a view aparece
+    def on_show(self, **kwargs):
+        _ = kwargs
         self.render_grid()

@@ -127,11 +127,11 @@ def parse_student_csv(file_content: str) -> List[Dict[str, Optional[str]]]:
         student_info["first_name"] = first_name
         student_info["last_name"] = last_name
 
-        # Normaliza o status do aluno para "Active" ou "Inactive".
-        raw_status = student_info.get("status", "").upper()
+        # Normaliza o status do aluno para "Active" ou "Inactive", preservando o valor original em status_detail.
+        original_status = (student_info.get("status") or "").strip()
+        raw_status = original_status.upper()
+        student_info["status_detail"] = original_status
         student_info["status"] = "Active" if raw_status == "ATIVO" else "Inactive"
-        # Armazena o status original para referência.
-        student_info["status_detail"] = student_info.get("status", "")
 
         # Valida o formato da data de nascimento.
         raw_date = student_info.get("birth_date")

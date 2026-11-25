@@ -8,6 +8,7 @@
 # Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
+import logging
 import sys
 import os
 import subprocess
@@ -21,12 +22,15 @@ def open_file_in_os(filepath: str):
 
     :param filepath: Caminho absoluto do arquivo a ser aberto.
     """
-    if platform.system() == 'Windows':
-        os.startfile(filepath)
-    elif platform.system() == 'Darwin':  # MacOS
-        subprocess.Popen(['open', filepath])
-    else:  # Linux e outros Unix-like
-        subprocess.Popen(['xdg-open', filepath])
+    try:
+        if platform.system() == 'Windows':
+            os.startfile(filepath)
+        elif platform.system() == 'Darwin':  # MacOS
+            subprocess.Popen(['open', filepath])
+        else:  # Linux e outros Unix-like
+            subprocess.Popen(['xdg-open', filepath])
+    except OSError as e:
+        logging.warning(f"Não foi possível abrir o arquivo '{filepath}' no sistema operacional: {e}")
 
 def get_resource_path(relative_path: str | Path) -> str:
     """
@@ -57,4 +61,10 @@ def get_resource_path(relative_path: str | Path) -> str:
             relative_path = relative_path[2:]
         relative_path = Path(relative_path)
 
-    return str(base_path / relative_path)
+    resolved_path = base_path / relative_path
+    if not hasattr(sys, '_MEIPASS') and not getattr(sys, 'frozen', False) and not resolved_path.exists():
+        project_root_candidate = Path(__file__).resolve().parents[2] / relative_path
+        if project_root_candidate.exists():
+            return str(project_root_candidate)
+
+    return str(resolved_path)

@@ -10,23 +10,27 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from datetime import date, datetime
-from app.services import data_service
 from app.ui.views.bncc_selection_dialog import BNCCSelectionDialog
 from app.ui.views.base_dialog import BaseDialog
 from tkinter import messagebox
 
 class LessonDialog(BaseDialog):
-    def __init__(self, parent, class_subject_id, lesson_date, lesson_data=None, on_save=None):
+    def __init__(self, parent, class_subject_id, lesson_date, lesson_data=None, on_save=None, data_service=None):
         super().__init__(parent, "Registro de Aula")
-        self.geometry("1600x900")
+        self.geometry("960x640")
         self.class_subject_id = class_subject_id
         self.lesson_date = lesson_date
         self.lesson_data = lesson_data
         self.on_save = on_save
+        if data_service is None:
+            from app.services import data_service as default_data_service
+            self.data_service = default_data_service
+        else:
+            self.data_service = data_service
 
-        # Configurações de layout
+        # Configurações de layout (linha 3 contém o campo de conteúdo expansível)
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(3, weight=1)
 
         # Labels e Entradas
         ctk.CTkLabel(self, text="Título:").grid(row=0, column=0, padx=10, pady=10, sticky="w")
@@ -40,7 +44,7 @@ class LessonDialog(BaseDialog):
         # Preenche data automaticamente
         self.date_entry.insert(0, lesson_date.isoformat())
 
-        # BNCC Codes
+        # Códigos BNCC
         ctk.CTkLabel(self, text="BNCC:").grid(row=2, column=0, padx=10, pady=10, sticky="w")
 
         bncc_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -53,7 +57,7 @@ class LessonDialog(BaseDialog):
             BNCCSelectionDialog(self, initial_selection=self.bncc_entry.get(),
                                 callback=lambda codes: (self.bncc_entry.delete(0, "end"), self.bncc_entry.insert(0, codes)))
 
-        ctk.CTkButton(bncc_frame, text="Select", width=60, command=open_selector).pack(side="right")
+        ctk.CTkButton(bncc_frame, text="Selecionar", width=90, command=open_selector).pack(side="right")
 
         ctk.CTkLabel(self, text="Conteúdo:").grid(row=3, column=0, padx=10, pady=10, sticky="nw")
         self.content_text = ctk.CTkTextbox(self)
@@ -75,7 +79,6 @@ class LessonDialog(BaseDialog):
             self.content_text.insert("1.0", self.lesson_data['content'] or "")
             if self.lesson_data.get('bncc_codes'):
                 self.bncc_entry.insert(0, self.lesson_data.get('bncc_codes'))
-            # Data já foi inserida no init, mas garantimos que use a do lesson se fornecida (embora deva bater com o argumento)
             self.date_entry.delete(0, "end")
             self.date_entry.insert(0, self.lesson_data['date'])
 
@@ -97,11 +100,9 @@ class LessonDialog(BaseDialog):
 
         try:
             if self.lesson_data:
-                # Update
-                data_service.update_lesson(self.lesson_data['id'], title, content, final_date, bncc_codes)
+                self.data_service.update_lesson(self.lesson_data['id'], title, content, final_date, bncc_codes)
             else:
-                # Create
-                data_service.create_lesson(self.class_subject_id, title, content, final_date, bncc_codes)
+                self.data_service.create_lesson(self.class_subject_id, title, content, final_date, bncc_codes)
 
             messagebox.showinfo("Sucesso", "Aula registrada com sucesso!")
             if self.on_save:

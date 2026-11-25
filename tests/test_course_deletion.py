@@ -31,7 +31,7 @@ def test_delete_course_with_dependencies_raises_error(data_service: DataService)
 
     # Attempt to delete the course
     # This should raise ValueError per requirements
-    with pytest.raises(ValueError, match="Cannot delete course"):
+    with pytest.raises(ValueError, match="Não é possível excluir a disciplina"):
          data_service.delete_course(course_id)
 
     # Verify that the course was NOT deleted

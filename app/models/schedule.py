@@ -8,7 +8,7 @@
 # Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
-from sqlalchemy import Column, Integer, String, Time, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, Time, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 
@@ -52,10 +52,10 @@ class WeeklySchedule(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
 
     time_slot_id = Column(Integer, ForeignKey('time_slots.id'), nullable=False, unique=True)
-    class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False)
+    class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False, index=True)
 
     time_slot = relationship("TimeSlot", back_populates="schedule_assignment")
-    class_subject = relationship("ClassSubject")
+    class_subject = relationship("ClassSubject", back_populates="weekly_schedules")
 
     def __repr__(self):
         return f"<WeeklySchedule(slot={self.time_slot_id}, subject={self.class_subject_id})>"

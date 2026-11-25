@@ -11,7 +11,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List, Dict, Any
+import logging
 import httpx
+from openai import APIConnectionError, APIStatusError
 
 
 @dataclass
@@ -21,19 +23,9 @@ class AssistantResponse:
     da resposta gerada, além de possíveis chamadas de ferramentas realizadas
     pelo assistente.
 
-    A classe organiza as informações retornadas pelo assistente em dois
-    atributos principais. O atributo `content` contém a mensagem textual
-    produzida, enquanto o atributo `tool_calls` representa uma lista de
-    chamadas de ferramentas, caso tenham ocorrido durante o processo de
-    resposta. É possível que `tool_calls` seja None, caso nenhuma chamada
-    de ferramenta tenha sido feita.
-
     :ivar content: Conteúdo textual da resposta gerada pelo assistente.
-                   Contém o texto principal retornado.
     :type content: str
-    :ivar tool_calls: Lista de dicionários representando chamadas de
-                      ferramentas realizadas ou None, caso não existam
-                      chamadas de ferramenta.
+    :ivar tool_calls: Lista de dicionários representando chamadas de ferramentas ou None.
     :type tool_calls: List[Dict[str, Any]] | None
     """
     content: str
@@ -43,9 +35,6 @@ class AssistantResponse:
 class LLMProvider(ABC):
     """
     Representa uma abstração de um provedor de modelos de linguagem.
-
-    Fornece métodos e atributos necessários para interação com modelos de linguagem
-    e manipulação de respostas em aplicações baseadas em inteligência artificial.
 
     :ivar client: Cliente utilizado para realizar interações com o provedor.
     :type client: Any
@@ -58,28 +47,26 @@ class LLMProvider(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """
-        Returns the name of the provider (e.g., 'OpenAI').
-        """
+        """Retorna o nome do provedor (ex: 'OpenAI')."""
         pass
 
     async def _create_chat_completion(self, messages: list, tools: list | None = None) -> AssistantResponse:
-        """
-        A helper method to create a chat completion and handle common exceptions.
-        """
-        # Note: self.client and self.model are expected to be set by subclasses.
+        """Método auxiliar para criar uma conclusão de chat e tratar exceções comuns."""
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                tools=tools,
-                tool_choice="auto" if tools else None,
-            )
+            kwargs: Dict[str, Any] = {
+                "model": self.model,
+                "messages": messages,
+            }
+            if tools:
+                kwargs["tools"] = tools
+                kwargs["tool_choice"] = "auto"
+
+            response = await self.client.chat.completions.create(**kwargs)
 
             message = response.choices[0].message
             content = message.content or ""
 
-            # Convert tool_calls objects (Pydantic models) to dictionaries
+            # Converte objetos tool_calls (modelos Pydantic) para dicionários
             tool_calls = None
             if message.tool_calls:
                 tool_calls = []
@@ -93,16 +80,21 @@ class LLMProvider(ABC):
 
             return AssistantResponse(content=content, tool_calls=tool_calls)
 
-        except httpx.ConnectError:
+        except (httpx.ConnectError, APIConnectionError):
             error_message = (
-                f"Could not connect to {self.name} server at {getattr(self.client, 'base_url', 'unknown URL')}. "
-                f"Is the service running?"
+                f"Não foi possível conectar ao servidor {self.name} em "
+                f"{getattr(self.client, 'base_url', 'URL desconhecida')}. "
+                f"Verifique se o serviço está ativo e sua conexão com a internet."
             )
-            print(error_message)
+            logging.error(error_message)
+            return AssistantResponse(content=error_message)
+        except APIStatusError as e:
+            error_message = f"Erro de API no provedor {self.name} (HTTP {e.status_code}): {e.message}"
+            logging.error(error_message)
             return AssistantResponse(content=error_message)
         except Exception as e:
-            error_message = f"An error occurred with the {self.name} API: {e}"
-            print(error_message)
+            error_message = f"Ocorreu um erro ao comunicar com a API {self.name}: {e}"
+            logging.error(error_message)
             return AssistantResponse(content=error_message)
 
     @abstractmethod

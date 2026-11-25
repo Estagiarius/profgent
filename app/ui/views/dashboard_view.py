@@ -185,25 +185,63 @@ class DashboardView(ctk.CTkFrame):
         self.chart_image = None
 
     def on_show(self, **kwargs) -> None:
-        try:
-            _ = kwargs
-            self.update_global_stats()
-            self.load_courses()
-            self.update_chart()
-            self.update_birthdays()
-        except Exception as e:
-            messagebox.showerror("Erro no Dashboard", f"Erro ao carregar dados do dashboard: {e}")
+        _ = kwargs
+        import asyncio
+        from app.utils.async_utils import run_async_task
 
-    def update_global_stats(self) -> None:
-        """Atualiza os cards e estatísticas da aba Visão Geral."""
+        run_async_task(
+            asyncio.to_thread(self._fetch_dashboard_payload),
+            self.main_app.loop,
+            self.main_app.async_queue,
+            self._apply_dashboard_payload,
+        )
+
+    def _fetch_dashboard_payload(self) -> dict:
+        """Executa queries pesadas e geração de gráficos fora da thread principal da UI."""
+        stats = self.data_service.get_global_dashboard_stats()
+        perf = self.data_service.get_global_performance_stats()
+        approved = perf.get('approved', 0)
+        failed = perf.get('failed', 0)
+        pie_chart_path = create_approval_pie_chart(approved, failed)
+        incident_ranking = self.data_service.get_class_incident_ranking()
+        courses = self.data_service.get_all_courses()
+        birthdays = self.data_service.get_students_with_birthday_today()
+
+        course_id = self.selected_course_id
+        if not course_id and courses:
+            course_id = courses[0]['id']
+
+        chart_path = None
+        if course_id:
+            selected_course = next((c for c in courses if c['id'] == course_id), None)
+            if selected_course:
+                averages = self.data_service.get_course_averages(course_id)
+                chart_path = create_grade_distribution_chart(averages, selected_course['course_name'])
+
+        return {
+            "stats": stats,
+            "perf": perf,
+            "pie_chart_path": pie_chart_path,
+            "incident_ranking": incident_ranking,
+            "courses": courses,
+            "birthdays": birthdays,
+            "selected_course_id": course_id,
+            "chart_path": chart_path,
+        }
+
+    def _apply_dashboard_payload(self, payload) -> None:
+        if isinstance(payload, Exception):
+            messagebox.showerror("Erro no Dashboard", f"Erro ao carregar dados do dashboard: {payload}")
+            return
+
         try:
-            stats = self.data_service.get_global_dashboard_stats()
+            stats = payload["stats"]
             self.card_students.configure(text=str(stats.get('active_students', 0)))
             self.card_classes.configure(text=str(stats.get('total_classes', 0)))
             self.card_courses.configure(text=str(stats.get('total_courses', 0)))
             self.card_incidents.configure(text=str(stats.get('total_incidents', 0)))
 
-            perf = self.data_service.get_global_performance_stats()
+            perf = payload["perf"]
             approval_rate = perf.get('approval_rate', 0.0)
             approved = perf.get('approved', 0)
             failed = perf.get('failed', 0)
@@ -214,9 +252,7 @@ class DashboardView(ctk.CTkFrame):
             self.approval_label.configure(text=f"{approval_rate:.1f}%", text_color=color)
             self.approval_detail_label.configure(text=f"Aprovados: {approved} | Abaixo da Média: {failed}")
 
-            # Atualiza Honor Roll
             self.honor_count_label.configure(text=f"{len(self.honor_roll_data)} Alunos Destaque")
-
             for widget in self.honor_list_frame.winfo_children():
                 widget.destroy()
 
@@ -226,23 +262,19 @@ class DashboardView(ctk.CTkFrame):
                 for item in self.honor_roll_data:
                     row = ctk.CTkFrame(self.honor_list_frame)
                     row.pack(fill="x", pady=2)
-                    text = f"{item['student_name']} - {item['course_name']}"
-                    score_text = f"{item['average']}"
-                    ctk.CTkLabel(row, text=text, anchor="w").pack(side="left", padx=5)
-                    ctk.CTkLabel(row, text=score_text, text_color=COLOR_HONOR, font=ctk.CTkFont(weight="bold")).pack(side="right", padx=5)
+                    ctk.CTkLabel(row, text=f"{item['student_name']} - {item['course_name']}", anchor="w").pack(side="left", padx=5)
+                    ctk.CTkLabel(row, text=f"{item['average']}", text_color=COLOR_HONOR, font=ctk.CTkFont(weight="bold")).pack(side="right", padx=5)
 
-            # Atualiza Gráfico Pizza
-            pie_chart_path = create_approval_pie_chart(approved, failed)
-            if os.path.exists(pie_chart_path):
-                img = Image.open(pie_chart_path)
-                self.pie_chart_image = ctk.CTkImage(light_image=img, size=img.size)
+            pie_chart_path = payload["pie_chart_path"]
+            if pie_chart_path and os.path.exists(pie_chart_path):
+                with Image.open(pie_chart_path) as img:
+                    copied = img.copy()
+                self.pie_chart_image = ctk.CTkImage(light_image=copied, size=copied.size)
                 self.pie_chart_label.configure(image=self.pie_chart_image, text="")
             else:
                 self.pie_chart_label.configure(image=None, text="Erro no Gráfico")
 
-            # Atualiza Ranking Incidentes
-            incident_ranking = self.data_service.get_class_incident_ranking()
-
+            incident_ranking = payload["incident_ranking"]
             for widget in self.incidents_list_frame.winfo_children():
                 widget.destroy()
 
@@ -252,30 +284,25 @@ class DashboardView(ctk.CTkFrame):
                 for i, item in enumerate(incident_ranking):
                     row = ctk.CTkFrame(self.incidents_list_frame)
                     row.pack(fill="x", pady=2)
-                    ctk.CTkLabel(row, text=f"{i+1}. {item['class_name']}", anchor="w").pack(side="left", padx=5)
+                    ctk.CTkLabel(row, text=f"{i + 1}. {item['class_name']}", anchor="w").pack(side="left", padx=5)
                     ctk.CTkLabel(row, text=f"{item['count']} incidentes", font=ctk.CTkFont(weight="bold")).pack(side="right", padx=5)
 
-        except Exception as e:
-            print(f"Erro ao atualizar estatísticas globais: {e}")
-            # Non-critical, suppress UI popup to avoid spam, just log or print
-
-    def load_courses(self) -> None:
-        """Carrega os cursos no menu dropdown."""
-        try:
-            self.courses = self.data_service.get_all_courses()
+            self.courses = payload["courses"]
             course_names = [c['course_name'] for c in self.courses]
-
             if course_names:
                 self.course_menu.configure(values=course_names)
-                if not self.selected_course_id:
-                    self.course_menu.set(course_names[0])
-                    self.on_course_select(course_names[0])
+                self.selected_course_id = payload["selected_course_id"]
+                selected = next((c['course_name'] for c in self.courses if c['id'] == self.selected_course_id), course_names[0])
+                self.course_menu.set(selected)
             else:
                 self.course_menu.configure(values=["Nenhum curso disponível"])
                 self.course_menu.set("Nenhum curso disponível")
                 self.selected_course_id = None
+
+            self._render_course_chart(payload["chart_path"])
+            self._render_birthdays(payload["birthdays"])
         except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao carregar disciplinas: {e}")
+            messagebox.showerror("Erro no Dashboard", f"Erro ao renderizar dashboard: {e}")
 
     def on_course_select(self, selected_name: str) -> None:
         self.selected_course_id = None
@@ -286,49 +313,57 @@ class DashboardView(ctk.CTkFrame):
         self.update_chart()
 
     def update_chart(self) -> None:
-        """Gera e exibe o gráfico com as médias finais."""
-        try:
-            if self.selected_course_id is None:
-                self.chart_label.configure(text="Nenhum curso selecionado ou disponível.", image=None)
-                return
+        """Gera e exibe o gráfico com as médias finais de forma assíncrona."""
+        if self.selected_course_id is None:
+            self.chart_label.configure(text="Nenhum curso selecionado ou disponível.", image=None)
+            return
 
-            selected_course = self.data_service.get_course_by_id(self.selected_course_id)
+        import asyncio
+        from app.utils.async_utils import run_async_task
+
+        course_id = self.selected_course_id
+
+        def _build_chart():
+            selected_course = self.data_service.get_course_by_id(course_id)
             if not selected_course:
-                self.chart_label.configure(text=f"Não foi possível encontrar o curso com ID: {self.selected_course_id}", image=None)
-                return
+                return None
+            averages = self.data_service.get_course_averages(course_id)
+            return create_grade_distribution_chart(averages, selected_course['course_name'])
 
-            averages = self.data_service.get_course_averages(self.selected_course_id)
-            chart_path = create_grade_distribution_chart(averages, selected_course['course_name'])
+        run_async_task(
+            asyncio.to_thread(_build_chart),
+            self.main_app.loop,
+            self.main_app.async_queue,
+            self._render_course_chart,
+        )
 
-            if os.path.exists(chart_path):
-                img = Image.open(chart_path)
-                self.chart_image = ctk.CTkImage(light_image=img, size=img.size)
-                self.chart_label.configure(image=self.chart_image, text="")
-            else:
-                self.chart_label.configure(image=None, text="Não foi possível gerar o gráfico.")
-        except Exception as e:
-            self.chart_label.configure(text=f"Erro ao gerar gráfico: {e}", image=None)
+    def _render_course_chart(self, chart_path) -> None:
+        if isinstance(chart_path, Exception):
+            self.chart_label.configure(text=f"Erro ao gerar gráfico: {chart_path}", image=None)
+            return
+        if chart_path and os.path.exists(chart_path):
+            with Image.open(chart_path) as img:
+                copied = img.copy()
+            self.chart_image = ctk.CTkImage(light_image=copied, size=copied.size)
+            self.chart_label.configure(image=self.chart_image, text="")
+        else:
+            self.chart_label.configure(image=None, text="Nenhum curso selecionado ou disponível.")
 
-    def update_birthdays(self) -> None:
-        try:
-            for widget in self.birthdays_scrollable_frame.winfo_children():
-                widget.destroy()
+    def _render_birthdays(self, birthdays: list[dict]) -> None:
+        for widget in self.birthdays_scrollable_frame.winfo_children():
+            widget.destroy()
 
-            birthdays = self.data_service.get_students_with_birthday_today()
+        if not birthdays:
+            ctk.CTkLabel(self.birthdays_scrollable_frame, text="Nenhum aniversariante hoje.", text_color=COLOR_TEXT_GRAY).pack(pady=20)
+            return
 
-            if not birthdays:
-                ctk.CTkLabel(self.birthdays_scrollable_frame, text="Nenhum aniversariante hoje.", text_color=COLOR_TEXT_GRAY).pack(pady=20)
-                return
+        for student in birthdays:
+            card = ctk.CTkFrame(self.birthdays_scrollable_frame)
+            card.pack(fill="x", pady=5, padx=5)
 
-            for student in birthdays:
-                card = ctk.CTkFrame(self.birthdays_scrollable_frame)
-                card.pack(fill="x", pady=5, padx=5)
-
-                ctk.CTkLabel(card, text=student["name"], font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=(5, 0))
-                ctk.CTkLabel(card, text=f"Completando {student['age']} anos").pack(anchor="w", padx=10)
-                ctk.CTkLabel(card, text=f"{student['class_name']}", font=ctk.CTkFont(size=11), text_color=COLOR_TEXT_GRAY).pack(anchor="w", padx=10, pady=(0, 5))
-        except Exception as e:
-             ctk.CTkLabel(self.birthdays_scrollable_frame, text=f"Erro ao carregar aniversariantes: {e}", text_color=COLOR_RISK).pack(pady=20)
+            ctk.CTkLabel(card, text=student["name"], font=ctk.CTkFont(weight="bold")).pack(anchor="w", padx=10, pady=(5, 0))
+            ctk.CTkLabel(card, text=f"Completando {student['age']} anos").pack(anchor="w", padx=10)
+            ctk.CTkLabel(card, text=f"{student['class_name']}", font=ctk.CTkFont(size=11), text_color=COLOR_TEXT_GRAY).pack(anchor="w", padx=10, pady=(0, 5))
 
     def open_risk_details_dialog(self) -> None:
         """Abre um modal com a lista de alunos abaixo da média."""

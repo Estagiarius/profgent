@@ -138,9 +138,9 @@ class SettingsView(ctk.CTkFrame):
         # Frame para as chaves de API.
         self.keys_frame = ctk.CTkFrame(self); self.keys_frame.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
         self.keys_frame.grid_columnconfigure(1, weight=1)
-        ctk.CTkLabel(self.keys_frame, text="Chave OpenAI").grid(row=0, column=0, padx=10, pady=5, sticky="w"); self.openai_entry = ctk.CTkEntry(self.keys_frame); self.openai_entry.grid(row=0, column=1, padx=10, sticky="ew")
-        ctk.CTkLabel(self.keys_frame, text="Chave Maritaca").grid(row=1, column=0, padx=10, pady=5, sticky="w"); self.maritaca_entry = ctk.CTkEntry(self.keys_frame); self.maritaca_entry.grid(row=1, column=1, padx=10, sticky="ew")
-        ctk.CTkLabel(self.keys_frame, text="Chave OpenRouter").grid(row=2, column=0, padx=10, pady=5, sticky="w"); self.openrouter_entry = ctk.CTkEntry(self.keys_frame); self.openrouter_entry.grid(row=2, column=1, padx=10, sticky="ew")
+        ctk.CTkLabel(self.keys_frame, text="Chave OpenAI").grid(row=0, column=0, padx=10, pady=5, sticky="w"); self.openai_entry = ctk.CTkEntry(self.keys_frame, show="*"); self.openai_entry.grid(row=0, column=1, padx=10, sticky="ew")
+        ctk.CTkLabel(self.keys_frame, text="Chave Maritaca").grid(row=1, column=0, padx=10, pady=5, sticky="w"); self.maritaca_entry = ctk.CTkEntry(self.keys_frame, show="*"); self.maritaca_entry.grid(row=1, column=1, padx=10, sticky="ew")
+        ctk.CTkLabel(self.keys_frame, text="Chave OpenRouter").grid(row=2, column=0, padx=10, pady=5, sticky="w"); self.openrouter_entry = ctk.CTkEntry(self.keys_frame, show="*"); self.openrouter_entry.grid(row=2, column=1, padx=10, sticky="ew")
 
         # --- Controles (Botão Salvar e Feedback) ---
         self.save_button = ctk.CTkButton(self, text="Salvar Configurações", command=self.save_settings); self.save_button.grid(row=5, column=0, padx=20, pady=20, sticky="e")
@@ -176,8 +176,8 @@ class SettingsView(ctk.CTkFrame):
         provider = self.provider_var.get().lower()
         # Para Ollama, o modelo a ser salvo vem do campo de entrada; para outros, vem do dropdown.
         model_to_save = self.model_entry.get() if provider == "ollama" and self.model_entry.get() else self.model_var.get()
-        # Evita salvar valores de status como "Carregando...".
-        if "(No models" not in model_to_save and "Loading..." not in model_to_save:
+        invalid_placeholders = ("(No models", "Loading...", "Carregando...", "(Falha na listagem)", "(Atualize para carregar)")
+        if model_to_save and not any(p in model_to_save for p in invalid_placeholders):
             save_setting(f"{provider}_model", model_to_save)
             self.feedback_label.configure(text=f"Modelo de {provider} definido para: {model_to_save}", text_color="green")
 
@@ -211,45 +211,43 @@ class SettingsView(ctk.CTkFrame):
         self.refresh_button.configure(state="disabled")
 
         provider_name = self.provider_var.get()
-        # Lê os valores da UI na thread principal antes de passar para a coroutine.
         ollama_base_url = self.ollama_entry.get()
 
-        # Define a coroutine a ser executada.
         coro = self._get_models_coro(provider_name, ollama_base_url)
-
-        # Executa a coroutine em segundo plano e agenda o callback para atualizar a UI.
         run_async_task(coro, self.main_app.loop, self.main_app.async_queue, self._update_models_ui)
 
     # Coroutine que busca a lista de modelos de um provedor.
     @staticmethod
     async def _get_models_coro(provider_name, ollama_base_url=None):
         provider = None
-        # Cria a instância apropriada do provedor com base no nome.
-        if provider_name == "Ollama":
-            provider = OllamaProvider(base_url=ollama_base_url)
-        else:
-            api_key = get_api_key(provider_name)
-            if api_key:
-                if provider_name == "OpenAI": provider = OpenAIProvider(api_key)
-                elif provider_name == "Maritaca": provider = MaritacaProvider(api_key)
-                elif provider_name == "OpenRouter": provider = OpenRouterProvider(api_key)
-        # Se um provedor foi criado, chama seu método `list_models`; caso contrário, retorna uma lista vazia.
-        return await provider.list_models() if provider else []
+        try:
+            if provider_name == "Ollama":
+                provider = OllamaProvider(base_url=ollama_base_url)
+            else:
+                api_key = get_api_key(provider_name)
+                if api_key:
+                    if provider_name == "OpenAI": provider = OpenAIProvider(api_key)
+                    elif provider_name == "Maritaca": provider = MaritacaProvider(api_key)
+                    elif provider_name == "OpenRouter": provider = OpenRouterProvider(api_key)
+            return await provider.list_models() if provider else []
+        finally:
+            if provider is not None:
+                try:
+                    await provider.close()
+                except Exception:
+                    pass
 
     # Callback que atualiza a UI com a lista de modelos recebida.
     def _update_models_ui(self, models):
         provider = self.provider_var.get().lower()
-        if models:
-            self.model_menu.configure(values=models)
-            # Carrega o modelo salvo anteriormente para este provedor.
-            saved_model = load_setting(f"{provider}_model", models[0])
-            # Define o valor do menu para o modelo salvo, se ele ainda existir na lista.
-            self.model_var.set(saved_model if saved_model in models else models[0])
+        if isinstance(models, Exception) or not models:
+            self.model_menu.configure(values=["(Falha na listagem)"])
+            self.model_var.set("(Falha na listagem)")
         else:
-            self.model_menu.configure(values=["(Falha na listagem)"]); self.model_var.set("(Falha na listagem)")
-        # Para Ollama, também atualiza o campo de entrada manual.
+            self.model_menu.configure(values=models)
+            saved_model = load_setting(f"{provider}_model", models[0])
+            self.model_var.set(saved_model if saved_model in models else models[0])
         if provider == "ollama":
             self.model_entry.delete(0, "end")
             self.model_entry.insert(0, load_setting(f"{provider}_model", "llama3.1"))
-        # Reabilita o botão de atualização.
         self.refresh_button.configure(state="normal")

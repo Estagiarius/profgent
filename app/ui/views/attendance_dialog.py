@@ -9,7 +9,6 @@
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
-from tkinter import messagebox
 from app.ui.views.base_dialog import BaseDialog
 
 class AttendanceDialog(BaseDialog):
@@ -19,11 +18,9 @@ class AttendanceDialog(BaseDialog):
         self.resizable(False, True)
 
         self.lesson_id = lesson_id
-        self.students = students # List of student dicts (id, name)
-        self.attendance_map = attendance_map # Dict {student_id: status}
+        self.students = students # Lista de dicionários de alunos (id, name)
+        self.attendance_map = attendance_map # Dicionário {student_id: status}
         self.save_callback = save_callback
-
-        self.result_map = {} # To store {student_id: variable}
 
         # Layout
         self.grid_rowconfigure(0, weight=1)

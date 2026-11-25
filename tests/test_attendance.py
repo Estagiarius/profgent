@@ -12,20 +12,23 @@ import pytest
 from datetime import date
 from app.services.data_service import DataService
 from app.models.student import Student
+from app.models.class_ import Class
+from app.models.course import Course
 from app.models.lesson import Lesson
 from app.models.class_subject import ClassSubject
 from app.models.attendance import Attendance
 
 class TestAttendance:
     def test_register_attendance(self, db_session, data_service):
-        # Setup data
+        # Preparação dos dados com chaves estrangeiras válidas
         student1 = Student(first_name="John", last_name="Doe", enrollment_date="2023-01-01")
         student2 = Student(first_name="Jane", last_name="Doe", enrollment_date="2023-01-01")
-        db_session.add(student1)
-        db_session.add(student2)
+        class_ = Class(name="Turma Frequência 1")
+        course = Course(course_name="Matemática Frequência 1", course_code="MF1")
+        db_session.add_all([student1, student2, class_, course])
         db_session.flush()
 
-        class_subject = ClassSubject(class_id=1, course_id=1) # Mock IDs
+        class_subject = ClassSubject(class_id=class_.id, course_id=course.id)
         db_session.add(class_subject)
         db_session.flush()
 
@@ -62,12 +65,14 @@ class TestAttendance:
         assert r2_updated.status == 'J'
 
     def test_get_attendance_stats(self, db_session, data_service):
-        # Setup
+        # Preparação dos dados com chaves estrangeiras válidas
         student = Student(first_name="Stats", last_name="Student", enrollment_date="2023-01-01")
-        db_session.add(student)
+        class_ = Class(name="Turma Frequência 2")
+        course = Course(course_name="Matemática Frequência 2", course_code="MF2")
+        db_session.add_all([student, class_, course])
         db_session.flush()
 
-        class_subject = ClassSubject(class_id=1, course_id=1)
+        class_subject = ClassSubject(class_id=class_.id, course_id=course.id)
         db_session.add(class_subject)
         db_session.flush()
 

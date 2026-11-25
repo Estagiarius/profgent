@@ -31,7 +31,7 @@ class Attendance(Base):
     status = Column(String, nullable=False, default='P')
 
     lesson = relationship("Lesson", back_populates="attendance_records")
-    student = relationship("Student")
+    student = relationship("Student", back_populates="attendance_records")
 
     __table_args__ = (
         UniqueConstraint('lesson_id', 'student_id', name='_lesson_student_attendance_uc'),

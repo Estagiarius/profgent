@@ -133,7 +133,7 @@ Aba **"Aulas"**. O diário de classe digital.
     *   **BNCC:** Selecione os códigos trabalhados na aula.
 *   **Frequência (Chamada):**
     *   Na lista de aulas, clique no botão verde **"Chamada"**.
-    *   Uma lista de alunos aparecerá. Marque: **P** (Presente), **F** (Falta), **J** (Justificada).
+    *   Uma lista de alunos aparecerá. Marque: **P** (Presente), **F** (Falta), **J** (Justificada) ou **A** (Atraso).
     *   O sistema calcula a % de frequência automaticamente e exibe na aba de Alunos.
 
 ### 5.5 Quadro de Notas: Lançamento e Cálculo
@@ -150,15 +150,18 @@ Aba **"Incidentes"**.
 *   Use para registrar ocorrências (ex: "Aluno brigou no recreio", "Aluno sem uniforme").
 *   Isso alimenta o ranking de incidentes do Dashboard.
 
-### 5.7 BNCC e Relatórios
+### 5.7 BNCC, Relatórios e Mapa de Sala
 Aba **"BNCC"**:
 *   Mostra um "termômetro" de cobertura curricular.
 *   Compare o que foi **Planejado** (no cadastro da disciplina) com o que foi efetivamente **Trabalhado** (nas Aulas e Avaliações).
 *   Se a barra estiver vazia ou com alerta, certifique-se de configurar o **Currículo Global** clicando no botão "Editar Currículo Global".
 
 Aba **"Relatórios"**:
-*   **Boletim:** Selecione um aluno e gere um PDF/TXT com todas as notas e faltas.
+*   **Boletim:** Selecione um aluno e gere um boletim em **TXT** com todas as notas, frequência e ocorrências, além de gráficos de desempenho.
 *   **CSV:** Exporte tudo para Excel para fazer suas próprias análises.
+
+Aba **"Mapa de Sala"**:
+*   Crie layouts de sala personalizados (linhas × colunas), defina mesa do professor, porta e corredores (clique direito), aloque alunos nas carteiras e exporte em **PDF** ou **SVG**.
 
 ---
 
@@ -182,7 +185,7 @@ Aqui você preenche o conteúdo.
 
 ### Passo 3: Uso Diário
 *   Na visualização, clique em um horário já preenchido (ex: Terça, 10:00, História).
-*   O sistema abre direto o formulário de **Chamada/Registro de Aula** para aquela turma específica. Atalho essencial para professores!
+*   O sistema abre direto o formulário de **Registro de Aula** (título, data, BNCC e conteúdo) para aquela turma e disciplina específica. Atalho essencial para professores!
 
 ---
 

@@ -50,8 +50,9 @@ class Assessment(Base):
     # index=True otimiza busca de avaliações por disciplina.
     class_subject_id = Column(Integer, ForeignKey('class_subjects.id'), nullable=False, index=True)
 
-    # Relacionamento com ClassSubject
+    # Relacionamento com ClassSubject e Grade
     class_subject = relationship("ClassSubject", back_populates="assessments")
+    grades = relationship("Grade", back_populates="assessment", cascade="all, delete-orphan")
 
     # Define uma representação em string para o objeto Assessment, útil para depuração.
     def __repr__(self):

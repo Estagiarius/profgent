@@ -8,8 +8,8 @@
 # Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
-# Importa a função create_engine do SQLAlchemy para criar a conexão com o banco de dados.
-from sqlalchemy import create_engine
+# Importa a função create_engine e o sistema de eventos do SQLAlchemy.
+from sqlalchemy import create_engine, event
 # Importa a função sessionmaker para criar sessões de banco de dados.
 from sqlalchemy.orm import sessionmaker
 # Importa o contextmanager para criar gerenciadores de contexto (para a sessão do banco).
@@ -18,7 +18,6 @@ from contextlib import contextmanager
 from app.models.base import Base
 
 import sys
-from pathlib import Path
 from app.core.config import CONFIG_DIR
 
 # Define a URL de conexão para o banco de dados SQLite.
@@ -36,6 +35,17 @@ else:
 # connect_args={"check_same_thread": False} é necessário para o SQLite permitir conexões de múltiplas threads,
 # o que é comum em aplicações com interface gráfica.
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+
+def enable_sqlite_foreign_keys(dbapi_connection, _connection_record):
+    """Ativa a verificação de chaves estrangeiras (PRAGMA foreign_keys=ON) em conexões SQLite."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
+event.listen(engine, "connect", enable_sqlite_foreign_keys)
+
 # Cria uma classe 'SessionLocal' que será usada para criar novas sessões de banco de dados.
 # autocommit=False e autoflush=False garantem que as transações sejam controladas manualmente.
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

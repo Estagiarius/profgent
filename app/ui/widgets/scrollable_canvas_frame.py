@@ -50,46 +50,35 @@ class ScrollableCanvasFrame(ctk.CTkFrame):
         self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas.bind("<Configure>", self._on_canvas_configure)
 
-        # Initial background color setup to match CTk theme
-        # We need to call this manually to apply the initial theme to the canvas
-        self._apply_appearance_mode(ctk.get_appearance_mode())
+        # Configura a cor de fundo inicial do canvas para acompanhar o tema CTk
+        self._sync_canvas_bg(ctk.get_appearance_mode())
 
     def _on_frame_configure(self, event=None):
-        """Reset the scroll region to encompass the inner frame"""
+        """Atualiza a região de rolagem para englobar todo o frame interno."""
         self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def _on_canvas_configure(self, event=None):
-        """Resize the inner frame to match canvas width if desired (optional)"""
-        # For 2D scrolling, we typically DON'T want to force width.
-        # But if the content is smaller than canvas, we might want it to fill?
-        # For a grid that extends horizontally, we leave it alone.
+        """Mantém largura dinâmica para rolagem bidimensional (2D)."""
         pass
 
-    def _apply_appearance_mode(self, mode_string):
-        # Call super implementation and capture the return value (color string)
-        color = super()._apply_appearance_mode(mode_string)
+    def _sync_canvas_bg(self, mode_string: str):
+        """Sincroniza a cor de fundo do canvas com o modo de aparência atual."""
+        if not hasattr(self, "canvas"):
+            return
+        mode_lower = str(mode_string).lower()
+        try:
+            fg_color = ThemeManager.theme["CTkFrame"]["fg_color"]
+            if isinstance(fg_color, (list, tuple)):
+                bg_color = fg_color[1] if mode_lower == "dark" else fg_color[0]
+            else:
+                bg_color = fg_color
+            self.canvas.configure(bg=bg_color)
+        except Exception:
+            self.canvas.configure(bg="#2b2b2b" if mode_lower == "dark" else "#f0f0f0")
 
-        # Guard against early call from super().__init__ before self.canvas exists
-        if hasattr(self, "canvas"):
-            # Attempt to match canvas background to the frame's background
-            try:
-                # CTk themes store colors as tuples (light, dark) or single strings
-                fg_color = ThemeManager.theme["CTkFrame"]["fg_color"]
-
-                if isinstance(fg_color, (list, tuple)):
-                    bg_color = fg_color[1] if mode_string.lower() == "dark" else fg_color[0]
-                else:
-                    bg_color = fg_color
-
-                self.canvas.configure(bg=bg_color)
-            except Exception:
-                # Fallback if theme structure is unexpected
-                 if mode_string.lower() == "dark":
-                    self.canvas.configure(bg="#2b2b2b")
-                 else:
-                    self.canvas.configure(bg="#f0f0f0")
-
-        return color
+    def _set_appearance_mode(self, mode_string: str):
+        super()._set_appearance_mode(mode_string)
+        self._sync_canvas_bg(mode_string)
 
     def bind_mouse_wheel(self, widget):
         """Recursively bind mouse wheel events to a widget and its children."""

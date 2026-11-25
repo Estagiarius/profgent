@@ -10,24 +10,33 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 # Importa as bibliotecas necessárias para os testes.
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 from pytest_mock import MockerFixture
 from contextlib import contextmanager
 
 # Importa a Base e os serviços/modelos da aplicação.
 from app.models.base import Base
+from app.data.database import enable_sqlite_foreign_keys
 from app.services.data_service import DataService
 # É crucial importar todos os modelos aqui para garantir que a Base.metadata
 # conheça todas as tabelas antes de `create_all` ser chamado.
-from app.models.student import Student  # noqa: F401
-from app.models.course import Course  # noqa: F401
-from app.models.grade import Grade  # noqa: F401
-from app.models.class_ import Class  # noqa: F401
-from app.models.class_enrollment import ClassEnrollment  # noqa: F401
-from app.models.assessment import Assessment  # noqa: F401
-from app.models.lesson import Lesson  # noqa: F401
-from app.models.incident import Incident  # noqa: F401
+from app.models import (  # noqa: F401
+    Student,
+    Course,
+    Class,
+    ClassSubject,
+    Assessment,
+    Grade,
+    ClassEnrollment,
+    Lesson,
+    Attendance,
+    Incident,
+    TimeSlot,
+    WeeklySchedule,
+    SeatingChart,
+    SeatAssignment,
+)
 
 # Define uma 'fixture' do pytest. Fixtures são funções que fornecem um ambiente ou dados
 # consistentes para os testes. `scope="function"` significa que esta fixture será
@@ -40,6 +49,7 @@ def db_session() -> Session:
     """
     # Cria uma 'engine' do SQLAlchemy para um banco de dados SQLite que existe apenas na memória RAM.
     engine = create_engine("sqlite:///:memory:")
+    event.listen(engine, "connect", enable_sqlite_foreign_keys)
     # Cria todas as tabelas definidas nos modelos importados neste banco de dados em memória.
     Base.metadata.create_all(engine)
     # Cria uma fábrica de sessões ligada a este banco de dados.

@@ -56,5 +56,5 @@ def test_update_course_bncc_empty(data_service, db_session):
     # Update to empty string
     data_service.update_course_bncc(course.id, "")
 
-    updated = db_session.query(Course).get(course.id)
+    updated = db_session.get(Course, course.id)
     assert updated.bncc_expected == ""

@@ -10,15 +10,21 @@
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 import customtkinter as ctk
 from tkinter import messagebox
-from app.services import data_service
 from app.ui.views.base_dialog import BaseDialog
 
 class CopyLessonDialog(BaseDialog):
-    def __init__(self, parent, source_class_id, source_subject_id, callback=None):
+    def __init__(self, parent, source_class_id, source_subject_id, callback=None, data_service=None):
         super().__init__(parent, "Copiar Aulas")
         self.source_class_id = source_class_id
         self.source_subject_id = source_subject_id
         self.callback = callback
+        if data_service is not None:
+            self.data_service = data_service
+        elif hasattr(parent, "data_service"):
+            self.data_service = parent.data_service
+        else:
+            from app.services import data_service as default_data_service
+            self.data_service = default_data_service
 
         self.geometry("720x480")
         self.center_on_screen()
@@ -71,7 +77,7 @@ class CopyLessonDialog(BaseDialog):
         self.load_source_lessons()
 
     def load_target_classes(self):
-        all_classes = data_service.get_all_classes()
+        all_classes = self.data_service.get_all_classes()
         # Filtra a turma atual
         target_classes = [c for c in all_classes if c['id'] != self.source_class_id]
 
@@ -93,7 +99,7 @@ class CopyLessonDialog(BaseDialog):
         class_id = self.target_classes_map.get(class_name)
         if not class_id: return
 
-        subjects = data_service.get_subjects_for_class(class_id)
+        subjects = self.data_service.get_subjects_for_class(class_id)
 
         if not subjects:
             self.subject_combo.set("Nenhuma disciplina nesta turma")
@@ -111,7 +117,7 @@ class CopyLessonDialog(BaseDialog):
         # Mas `source_subject_id` é `ClassSubject.id`. Precisamos do `Course` name.
         # O `get_subjects_for_class` da origem tem isso.
 
-        source_subjects = data_service.get_subjects_for_class(self.source_class_id)
+        source_subjects = self.data_service.get_subjects_for_class(self.source_class_id)
         source_subject_name = next((s['course_name'] for s in source_subjects if s['id'] == self.source_subject_id), "")
 
         if source_subject_name and source_subject_name in self.target_subjects_map:
@@ -120,7 +126,7 @@ class CopyLessonDialog(BaseDialog):
             self.subject_combo.set(list(self.target_subjects_map.keys())[0])
 
     def load_source_lessons(self):
-        lessons = data_service.get_lessons_for_subject(self.source_subject_id)
+        lessons = self.data_service.get_lessons_for_subject(self.source_subject_id)
 
         for widget in self.lessons_frame.winfo_children(): widget.destroy()
         self.lesson_vars = {}
@@ -169,7 +175,7 @@ class CopyLessonDialog(BaseDialog):
             return
 
         try:
-            count = data_service.copy_lessons(selected_ids, target_subject_id)
+            count = self.data_service.copy_lessons(selected_ids, target_subject_id)
             messagebox.showinfo("Sucesso", f"{count} aulas copiadas com sucesso!")
 
             if self.callback:

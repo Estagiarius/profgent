@@ -86,13 +86,12 @@ class TestDatabaseTools:
     def test_get_student_grades_by_course(self, mock_data_service):
         mock_data_service.get_student_by_name.return_value = {"id": 1, "name": "John"}
         mock_data_service.get_course_by_name.return_value = {"id": 2, "course_name": "Math"}
-        mock_data_service.get_all_grades_with_details.return_value = [
+        mock_data_service.get_grades_for_student_in_course.return_value = [
             {"student_id": 1, "course_id": 2, "class_name": "1A", "assessment_name": "Test", "score": 10.0},
-            {"student_id": 1, "course_id": 3, "class_name": "1A", "assessment_name": "Geo Test", "score": 5.0} # Should filter out
         ]
 
         result = database_tools.get_student_grades_by_course("John", "Math")
 
+        mock_data_service.get_grades_for_student_in_course.assert_called_once_with(1, 2)
         assert "Test" in result
         assert "10.0" in result
-        assert "Geo Test" not in result

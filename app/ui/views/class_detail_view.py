@@ -11,10 +11,7 @@
 # Importa componentes e utilitários do tkinter e customtkinter.
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
-import csv
 from datetime import date, datetime
-# Importa o serviço de dados para interagir com o banco de dados.
-from app.services import data_service
 # Importa as janelas de diálogo personalizadas para adicionar e editar registros.
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.edit_dialog import EditDialog
@@ -28,6 +25,7 @@ from customtkinter import CTkInputDialog
 from app.utils.async_utils import run_async_task
 from app.utils.import_utils import async_import_students
 from app.utils.format_utils import parse_float_input, format_float_output
+from app.utils.path_utils import open_file_in_os
 # Importa widgets e utilitários de UI
 from app.ui.widgets.scrollable_canvas_frame import ScrollableCanvasFrame
 from app.ui.ui_utils import bind_global_mouse_scroll
@@ -44,7 +42,8 @@ class ClassDetailView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
-        self.report_service = ReportService()
+        self.data_service = main_app.data_service
+        self.report_service = main_app.report_service
         # ID da turma que está sendo visualizada. Inicialmente nulo.
         self.class_id = None
         # ID da disciplina selecionada atualmente.
@@ -335,8 +334,12 @@ class ClassDetailView(ctk.CTkFrame):
         seating_tab.grid_rowconfigure(0, weight=1)
         seating_tab.grid_columnconfigure(0, weight=1)
 
-        # O self.class_id é None no init, então precisamos configurar a view e atualizá-la depois
-        self.seating_chart_view = SeatingChartView(seating_tab, self.class_id)
+        self.seating_chart_view = SeatingChartView(
+            seating_tab,
+            self.class_id,
+            data_service=self.data_service,
+            report_service=self.report_service,
+        )
         self.seating_chart_view.grid(row=0, column=0, sticky="nsew")
 
     # --- Métodos de Gestão de Disciplinas (Subjects) ---
@@ -347,7 +350,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         if subjects is None:
             # Fallback para caso seja chamado sem dados (não deveria, se on_show usar a nova lógica)
-            subjects = data_service.get_subjects_for_class(self.class_id)
+            subjects = self.data_service.get_subjects_for_class(self.class_id)
 
         if not subjects:
             self.subject_combo.configure(values=["Nenhuma Disciplina"], state="disabled")
@@ -372,46 +375,47 @@ class ClassDetailView(ctk.CTkFrame):
                 if name: self.subject_combo.set(name)
 
 
-    # Método estático para buscar dados do subject em background
-    @staticmethod
-    def _fetch_subject_data(subject_id, class_id):
+    # Método auxiliar para buscar dados da disciplina em background
+    def _fetch_subject_data(self, subject_id, class_id):
         return {
-            "assessments": data_service.get_assessments_for_subject(subject_id),
-            "lessons": data_service.get_lessons_for_subject(subject_id),
-            "grades": data_service.get_grades_for_subject(subject_id),
-            "enrollments": data_service.get_enrollments_for_class(class_id),
-            "attendance_stats": data_service.get_class_attendance_stats(subject_id),
-            "bncc_report": data_service.get_bncc_coverage(subject_id),
-            "batch_averages": data_service.get_class_period_averages(subject_id)
+            "assessments": self.data_service.get_assessments_for_subject(subject_id),
+            "lessons": self.data_service.get_lessons_for_subject(subject_id),
+            "grades": self.data_service.get_grades_for_subject(subject_id),
+            "enrollments": self.data_service.get_enrollments_for_class(class_id),
+            "attendance_stats": self.data_service.get_class_attendance_stats(subject_id),
+            "bncc_report": self.data_service.get_bncc_coverage(subject_id),
+            "batch_averages": self.data_service.get_class_period_averages(subject_id)
         }
 
     def _on_subject_data_fetched(self, result):
         if isinstance(result, Exception):
-            if hasattr(self, 'loading_overlay') and self.loading_overlay:
-                self.loading_overlay.destroy()
-                self.loading_overlay = None
+            self._remove_overlay()
             messagebox.showerror("Erro", f"Erro ao carregar dados da disciplina: {result}")
             return
 
-        # Distribui os dados carregados para os métodos de população
-        self.populate_assessment_list(assessments_data=result['assessments'])
-        self.populate_lesson_list(lessons_data=result['lessons'])
-        self.populate_grade_grid(
-            assessments_data=result['assessments'],
-            grades_data=result['grades'],
-            enrollments_data=result['enrollments'],
-            averages_data=result['batch_averages']
-        )
-        self.populate_student_list(
-            enrollments_data=result['enrollments'],
-            attendance_stats=result['attendance_stats']
-        )
-        self.populate_bncc_tab(report_data=result['bncc_report'])
+        try:
+            # Distribui os dados carregados para os métodos de população
+            self.populate_assessment_list(assessments_data=result['assessments'])
+            self.populate_lesson_list(lessons_data=result['lessons'])
+            self.populate_grade_grid(
+                assessments_data=result['assessments'],
+                grades_data=result['grades'],
+                enrollments_data=result['enrollments'],
+                averages_data=result['batch_averages']
+            )
+            self.populate_student_list(
+                enrollments_data=result['enrollments'],
+                attendance_stats=result['attendance_stats']
+            )
+            self.populate_bncc_tab(report_data=result['bncc_report'])
 
-        # Força renderização e atrasa remoção do overlay
-        self.update_idletasks()
-        if hasattr(self, 'loading_overlay') and self.loading_overlay:
-            self.after(100, self._remove_overlay)
+            # Força renderização antes de remover o overlay
+            self.update_idletasks()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao exibir dados da disciplina: {e}")
+        finally:
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.after(100, self._remove_overlay)
 
     def on_subject_change(self, selected_subject_name):
         """Callback para quando a disciplina é trocada no dropdown."""
@@ -433,13 +437,13 @@ class ClassDetailView(ctk.CTkFrame):
         if not self.class_id: return
 
         # Pega todos os cursos disponíveis no catálogo
-        all_courses = data_service.get_all_courses()
+        all_courses = self.data_service.get_all_courses()
         if not all_courses:
              messagebox.showerror("Erro", "Não há disciplinas cadastradas no sistema.")
              return
 
         # Filtra cursos que a turma já tem
-        current_subjects = data_service.get_subjects_for_class(self.class_id)
+        current_subjects = self.data_service.get_subjects_for_class(self.class_id)
         current_course_ids = {s['course_id'] for s in current_subjects}
 
         available_courses = [c for c in all_courses if c['id'] not in current_course_ids]
@@ -454,7 +458,7 @@ class ClassDetailView(ctk.CTkFrame):
             selected_course = next((c for c in available_courses if c['course_name'] == course_name), None)
 
             if selected_course:
-                data_service.add_subject_to_class(self.class_id, selected_course['id'])
+                self.data_service.add_subject_to_class(self.class_id, selected_course['id'])
                 self.populate_subject_combo()
                 # Se for a primeira, seleciona ela automaticamente
                 if self.current_subject_id is None:
@@ -479,12 +483,12 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         course_id = subject_data['course_id']
-        course_data = data_service.get_course_by_id(course_id)
+        course_data = self.data_service.get_course_by_id(course_id)
         current_bncc = course_data.get('bncc_expected', '')
 
         def save_callback(new_codes):
             try:
-                data_service.update_course_bncc(course_id, new_codes)
+                self.data_service.update_course_bncc(course_id, new_codes)
                 messagebox.showinfo("Sucesso", "Currículo global atualizado com sucesso.")
                 self.populate_bncc_tab()
             except Exception as e:
@@ -502,7 +506,7 @@ class ClassDetailView(ctk.CTkFrame):
             ctk.CTkLabel(self.bncc_scroll_frame, text="Selecione uma disciplina.").pack(pady=20)
             return
 
-        report = report_data if report_data is not None else data_service.get_bncc_coverage(self.current_subject_id)
+        report = report_data if report_data is not None else self.data_service.get_bncc_coverage(self.current_subject_id)
 
         if not report:
              ctk.CTkLabel(self.bncc_scroll_frame, text="Dados não disponíveis.").pack(pady=20)
@@ -563,26 +567,55 @@ class ClassDetailView(ctk.CTkFrame):
         ctk.CTkLabel(details_frame, text=f"Em Aulas: {', '.join(report['covered_lessons'])}").pack(anchor="w", padx=10)
         ctk.CTkLabel(details_frame, text=f"Em Avaliações: {', '.join(report['covered_assessments'])}").pack(anchor="w", padx=10)
 
+    def _run_report_task(self, loading_text, worker_fn, on_success, error_prefix):
+        """Executa a geração de relatórios/gráficos em background sem bloquear a UI."""
+        if not hasattr(self, 'loading_overlay') or self.loading_overlay is None:
+            self.loading_overlay = LoadingOverlay(self, text=loading_text)
+
+        def _on_complete(result):
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.loading_overlay.destroy()
+                self.loading_overlay = None
+            if not self.winfo_exists():
+                return
+            if isinstance(result, Exception):
+                messagebox.showerror("Erro", f"{error_prefix}: {result}")
+                return
+            on_success(result)
+
+        run_async_task(
+            asyncio.to_thread(worker_fn),
+            self.main_app.loop,
+            self.main_app.async_queue,
+            _on_complete
+        )
+
     def export_csv(self):
         if not self.class_id: return
-        try:
-            filepath = self.report_service.export_class_grades_csv(self.class_id)
+        class_id = self.class_id
+
+        def _on_success(filepath):
             messagebox.showinfo("Sucesso", f"Arquivo exportado em:\n{filepath}")
-            # Tenta abrir a pasta do arquivo
-            if os.name == 'nt':
-                os.startfile(os.path.dirname(filepath))
-            else:
-                os.system(f'xdg-open "{os.path.dirname(filepath)}"')
-        except Exception as e:
-            messagebox.showerror("Erro", f"Falha ao exportar CSV: {e}")
+            # Tenta abrir a pasta do arquivo de forma segura e multiplataforma
+            open_file_in_os(os.path.dirname(filepath))
+
+        self._run_report_task(
+            "Exportando CSV...",
+            lambda: self.report_service.export_class_grades_csv(class_id),
+            _on_success,
+            "Falha ao exportar CSV"
+        )
 
     def show_distribution_chart(self):
         if not self.class_id: return
-        try:
-            filepath = self.report_service.generate_class_grade_distribution(self.class_id)
-            self._show_image_popup("Distribuição de Notas", filepath)
-        except Exception as e:
-            messagebox.showerror("Erro", f"Falha ao gerar gráfico: {e}")
+        class_id = self.class_id
+
+        self._run_report_task(
+            "Gerando gráfico...",
+            lambda: self.report_service.generate_class_grade_distribution(class_id),
+            lambda filepath: self._show_image_popup("Distribuição de Notas", filepath),
+            "Falha ao gerar gráfico"
+        )
 
     def generate_report_card(self):
         if not self.class_id: return
@@ -590,22 +623,32 @@ class ClassDetailView(ctk.CTkFrame):
         if not student_name:
              messagebox.showwarning("Aviso", "Selecione um aluno primeiro.")
              return
+        class_id = self.class_id
 
-        try:
-            # Recupera o ID do aluno baseado no nome selecionado
-            enrollments = data_service.get_enrollments_for_class(self.class_id)
-            target_enrollment = next((e for e in enrollments if f"{e['student_first_name']} {e['student_last_name']}" == student_name), None)
+        def _worker():
+            enrollments = self.data_service.get_enrollments_for_class(class_id)
+            target_enrollment = next(
+                (e for e in enrollments if f"{e['student_first_name']} {e['student_last_name']}" == student_name),
+                None
+            )
+            if not target_enrollment:
+                return None
+            return self.report_service.generate_student_report_card(target_enrollment['student_id'], class_id)
 
-            if target_enrollment:
-                filepath = self.report_service.generate_student_report_card(target_enrollment['student_id'], self.class_id)
-                messagebox.showinfo("Sucesso", f"Boletim gerado em:\n{filepath}")
-                # Tenta abrir o arquivo
-                if os.name == 'nt':
-                    os.startfile(filepath)
-                else:
-                    os.system(f'xdg-open "{filepath}"')
-        except Exception as e:
-             messagebox.showerror("Erro", f"Falha ao gerar boletim: {e}")
+        def _on_success(filepath):
+            if not filepath:
+                messagebox.showwarning("Aviso", "Aluno não encontrado na turma.")
+                return
+            messagebox.showinfo("Sucesso", f"Boletim gerado em:\n{filepath}")
+            # Tenta abrir o arquivo de forma segura e multiplataforma
+            open_file_in_os(filepath)
+
+        self._run_report_task(
+            "Gerando boletim...",
+            _worker,
+            _on_success,
+            "Falha ao gerar boletim"
+        )
 
     def show_student_chart(self):
         if not self.class_id: return
@@ -613,16 +656,30 @@ class ClassDetailView(ctk.CTkFrame):
         if not student_name:
              messagebox.showwarning("Aviso", "Selecione um aluno primeiro.")
              return
+        class_id = self.class_id
 
-        try:
-            enrollments = data_service.get_enrollments_for_class(self.class_id)
-            target_enrollment = next((e for e in enrollments if f"{e['student_first_name']} {e['student_last_name']}" == student_name), None)
+        def _worker():
+            enrollments = self.data_service.get_enrollments_for_class(class_id)
+            target_enrollment = next(
+                (e for e in enrollments if f"{e['student_first_name']} {e['student_last_name']}" == student_name),
+                None
+            )
+            if not target_enrollment:
+                return None
+            return self.report_service.generate_student_grade_chart(target_enrollment['student_id'], class_id)
 
-            if target_enrollment:
-                filepath = self.report_service.generate_student_grade_chart(target_enrollment['student_id'], self.class_id)
-                self._show_image_popup(f"Desempenho - {student_name}", filepath)
-        except Exception as e:
-             messagebox.showerror("Erro", f"Falha ao gerar gráfico: {e}")
+        def _on_success(filepath):
+            if not filepath:
+                messagebox.showwarning("Aviso", "Aluno não encontrado na turma.")
+                return
+            self._show_image_popup(f"Desempenho - {student_name}", filepath)
+
+        self._run_report_task(
+            "Gerando gráfico...",
+            _worker,
+            _on_success,
+            "Falha ao gerar gráfico"
+        )
 
     def _show_image_popup(self, title, filepath):
         """Exibe uma imagem em uma janela popup."""
@@ -630,8 +687,9 @@ class ClassDetailView(ctk.CTkFrame):
         top.title(title)
         top.geometry("800x600")
 
-        # Carrega a imagem usando PIL e converte para CTkImage
-        pil_image = Image.open(filepath)
+        # Carrega a imagem usando PIL com context manager para fechar o descritor de arquivo
+        with Image.open(filepath) as img:
+            pil_image = img.copy()
         ctk_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(780, 580))
 
         label = ctk.CTkLabel(top, image=ctk_image, text="")
@@ -675,14 +733,14 @@ class ClassDetailView(ctk.CTkFrame):
             messagebox.showinfo("Nenhuma Mudança", "Nenhuma nota nova ou modificada para salvar.")
             return
 
-        data_service.upsert_grades_for_subject(self.current_subject_id, grades_to_upsert)
+        self.data_service.upsert_grades_for_subject(self.current_subject_id, grades_to_upsert)
         messagebox.showinfo("Sucesso", "Notas salvas com sucesso.")
         self.populate_grade_grid() # Atualiza para refletir mudanças (médias)
 
     def save_final_grades(self):
         """Salva as notas finais sobrescritas na aba 'Resultados Finais'."""
         # Garante que a avaliação final (grading_period=5) existe
-        final_assessment = data_service.ensure_final_assessment(self.current_subject_id)
+        final_assessment = self.data_service.ensure_final_assessment(self.current_subject_id)
         final_assessment_id = final_assessment['id']
 
         grades_to_upsert = []
@@ -709,7 +767,7 @@ class ClassDetailView(ctk.CTkFrame):
                 return
 
         if grades_to_upsert:
-            data_service.upsert_grades_for_subject(self.current_subject_id, grades_to_upsert)
+            self.data_service.upsert_grades_for_subject(self.current_subject_id, grades_to_upsert)
             messagebox.showinfo("Sucesso", "Notas finais salvas com sucesso.")
             self.populate_grade_grid()
         else:
@@ -733,7 +791,7 @@ class ClassDetailView(ctk.CTkFrame):
             return
 
         # Busca alunos (usa dados passados ou busca novos)
-        enrollments = enrollments_data if enrollments_data is not None else data_service.get_enrollments_for_class(self.class_id)
+        enrollments = enrollments_data if enrollments_data is not None else self.data_service.get_enrollments_for_class(self.class_id)
         if self.show_active_only_grades_checkbox.get():
             enrollments = [e for e in enrollments if e['status'] == 'Active']
 
@@ -743,7 +801,7 @@ class ClassDetailView(ctk.CTkFrame):
             target_period = period_map.get(current_tab_name, 1)
 
             # Busca avaliações DO PERÍODO
-            all_assessments = assessments_data if assessments_data is not None else data_service.get_assessments_for_subject(self.current_subject_id)
+            all_assessments = assessments_data if assessments_data is not None else self.data_service.get_assessments_for_subject(self.current_subject_id)
             period_assessments = [a for a in all_assessments if a.get('grading_period', 1) == target_period]
 
             if not period_assessments:
@@ -757,7 +815,7 @@ class ClassDetailView(ctk.CTkFrame):
                 label.grid(row=0, column=col, padx=5, pady=5, sticky="w")
 
             # Dados
-            grades = grades_data if grades_data is not None else data_service.get_grades_for_subject(self.current_subject_id)
+            grades = grades_data if grades_data is not None else self.data_service.get_grades_for_subject(self.current_subject_id)
 
             # --- OTIMIZAÇÃO: Indexar grades em um dicionário para acesso O(1) ---
             grades_map = {(g['student_id'], g['assessment_id']): g for g in grades}
@@ -786,7 +844,7 @@ class ClassDetailView(ctk.CTkFrame):
                 period_assessments_data = [{"id": a['id'], "weight": a['weight']} for a in period_assessments]
                 period_total_weight = sum(a['weight'] for a in period_assessments_data)
 
-                avg = data_service.calculate_weighted_average(
+                avg = self.data_service.calculate_weighted_average(
                     enrollment['student_id'],
                     student_grades_for_avg,
                     period_assessments_data,
@@ -803,7 +861,7 @@ class ClassDetailView(ctk.CTkFrame):
                 label.grid(row=0, column=col, padx=10, pady=5, sticky="w")
 
             # --- OTIMIZAÇÃO: Batch fetch de médias finais ---
-            batch_averages = averages_data if averages_data is not None else data_service.get_class_period_averages(self.current_subject_id)
+            batch_averages = averages_data if averages_data is not None else self.data_service.get_class_period_averages(self.current_subject_id)
 
             for row, enrollment in enumerate(enrollments, start=1):
                 student_id = enrollment['student_id']
@@ -849,7 +907,7 @@ class ClassDetailView(ctk.CTkFrame):
         if not self.class_id: return
 
         # Busca os alunos matriculados para preencher o dropdown.
-        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        enrollments = self.data_service.get_enrollments_for_class(self.class_id)
         student_names = [f"{e['student_first_name']} {e['student_last_name']}" for e in enrollments]
 
         if not student_names:
@@ -865,7 +923,7 @@ class ClassDetailView(ctk.CTkFrame):
 
             if selected_enrollment and description:
                 # Chama o serviço para criar o incidente no banco de dados.
-                data_service.create_incident(self.class_id, selected_enrollment['student_id'], description, date.today())
+                self.data_service.create_incident(self.class_id, selected_enrollment['student_id'], description, date.today())
                 # Atualiza a lista de incidentes na tela.
                 self.populate_incident_list()
 
@@ -873,26 +931,6 @@ class ClassDetailView(ctk.CTkFrame):
         fields = {"description": "Descrição"}
         dropdowns = {"student": ("Aluno", student_names)}
         AddDialog(self, "Adicionar Novo Incidente", fields=fields, dropdowns=dropdowns, save_callback=save_callback)
-
-    # Preenche a lista de incidentes na respectiva aba.
-    def populate_incident_list(self):
-        for widget in self.incident_list_frame.winfo_children(): widget.destroy()
-        if not self.class_id: return
-
-        incidents = data_service.get_incidents_for_class(self.class_id)
-
-        # Cria cabeçalhos.
-        headers = ["Nome do Aluno", "Data", "Descrição"]
-        for i, header in enumerate(headers):
-            label = ctk.CTkLabel(self.incident_list_frame, text=header, font=ctk.CTkFont(weight="bold"))
-            label.grid(row=0, column=i, padx=10, pady=5, sticky="w")
-
-        # Cria as linhas com os dados dos incidentes.
-        for i, incident in enumerate(incidents, start=1):
-            student_name = f"{incident['student_first_name']} {incident['student_last_name']}"
-            ctk.CTkLabel(self.incident_list_frame, text=student_name).grid(row=i, column=0, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.incident_list_frame, text=incident['date']).grid(row=i, column=1, padx=10, pady=5, sticky="w")
-            ctk.CTkLabel(self.incident_list_frame, text=incident['description'], wraplength=400, justify="left").grid(row=i, column=2, padx=10, pady=5, sticky="w")
 
     # Mostra a view de edição/criação de aula.
     def show_lesson_editor(self, lesson=None):
@@ -950,9 +988,9 @@ class ClassDetailView(ctk.CTkFrame):
              return
 
         # Busca nomes para passar ao prompt
-        class_data = data_service.get_class_by_id(self.class_id)
+        class_data = self.data_service.get_class_by_id(self.class_id)
         # Precisamos buscar o nome do curso pelo ID da disciplina
-        subjects = data_service.get_subjects_for_class(self.class_id)
+        subjects = self.data_service.get_subjects_for_class(self.class_id)
         subject_data = next((s for s in subjects if s['id'] == self.current_subject_id), None)
 
         if not class_data or not subject_data:
@@ -1002,10 +1040,10 @@ class ClassDetailView(ctk.CTkFrame):
 
         # Se estiver editando, chama o método de atualização.
         if self.editing_lesson_id:
-            data_service.update_lesson(self.editing_lesson_id, title, content, lesson_date, bncc_codes)
+            self.data_service.update_lesson(self.editing_lesson_id, title, content, lesson_date, bncc_codes)
         # Caso contrário, chama o método de criação (usando a disciplina atual).
         else:
-            data_service.create_lesson(self.current_subject_id, title, content, lesson_date, bncc_codes)
+            self.data_service.create_lesson(self.current_subject_id, title, content, lesson_date, bncc_codes)
 
         # Atualiza a lista de aulas e esconde o editor.
         self.populate_lesson_list()
@@ -1030,7 +1068,7 @@ class ClassDetailView(ctk.CTkFrame):
             if name and weight_str:
                 try:
                     weight = parse_float_input(weight_str)
-                    data_service.add_assessment(self.current_subject_id, name, weight, grading_period, bncc_codes)
+                    self.data_service.add_assessment(self.current_subject_id, name, weight, grading_period, bncc_codes)
                     self.populate_assessment_list()
                     self.populate_grade_grid() # Atualiza também o quadro de notas para aparecer a nova coluna
                 except ValueError as e:
@@ -1057,7 +1095,7 @@ class ClassDetailView(ctk.CTkFrame):
              ctk.CTkLabel(frames["1º Bimestre"], text="Selecione ou adicione uma disciplina.").pack(pady=10)
              return
 
-        assessments = assessments_data if assessments_data is not None else data_service.get_assessments_for_subject(self.current_subject_id)
+        assessments = assessments_data if assessments_data is not None else self.data_service.get_assessments_for_subject(self.current_subject_id)
 
         # Filtra e popula cada aba
         for period_idx, tab_name in enumerate(tab_names, start=1):
@@ -1091,8 +1129,9 @@ class ClassDetailView(ctk.CTkFrame):
         dialog = CTkInputDialog(text="Digite 'DELETE' para confirmar a exclusão:", title="Confirmar Exclusão")
         user_input = dialog.get_input()
         if user_input == "DELETE":
-            data_service.delete_assessment(assessment_id)
+            self.data_service.delete_assessment(assessment_id)
             self.populate_assessment_list()
+            self.populate_grade_grid()
 
     # Abre o pop-up para editar uma avaliação.
     def edit_assessment_popup(self, assessment):
@@ -1108,7 +1147,7 @@ class ClassDetailView(ctk.CTkFrame):
             if name and weight_str:
                 try:
                     weight = parse_float_input(weight_str)
-                    data_service.update_assessment(assessment_id, name, weight, grading_period, bncc_codes)
+                    self.data_service.update_assessment(assessment_id, name, weight, grading_period, bncc_codes)
                     self.populate_assessment_list()
                     self.populate_grade_grid()
                 except ValueError as e:
@@ -1137,7 +1176,7 @@ class ClassDetailView(ctk.CTkFrame):
     def enroll_student_popup(self):
         if not self.class_id: return
 
-        unenrolled_students = data_service.get_unenrolled_students(self.class_id)
+        unenrolled_students = self.data_service.get_unenrolled_students(self.class_id)
 
         if not unenrolled_students:
             messagebox.showinfo("Aviso", "Nenhum aluno disponível para matricular.")
@@ -1147,7 +1186,7 @@ class ClassDetailView(ctk.CTkFrame):
             if not student_ids: return
 
             try:
-                data_service.enroll_students(self.class_id, student_ids)
+                self.data_service.enroll_students(self.class_id, student_ids)
 
                 count = len(student_ids)
                 messagebox.showinfo("Sucesso", f"{count} aluno(s) matriculado(s) com sucesso!")
@@ -1169,7 +1208,7 @@ class ClassDetailView(ctk.CTkFrame):
         for widget in self.student_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
-        enrollments = enrollments_data if enrollments_data is not None else data_service.get_enrollments_for_class(self.class_id)
+        enrollments = enrollments_data if enrollments_data is not None else self.data_service.get_enrollments_for_class(self.class_id)
 
         # Filtra por alunos ativos se o checkbox estiver marcado.
         if self.show_active_only_checkbox.get():
@@ -1178,7 +1217,7 @@ class ClassDetailView(ctk.CTkFrame):
         # Carrega estatísticas de frequência em lote para evitar N+1 queries
         batch_attendance_stats = attendance_stats
         if batch_attendance_stats is None and self.current_subject_id:
-             batch_attendance_stats = data_service.get_class_attendance_stats(self.current_subject_id)
+             batch_attendance_stats = self.data_service.get_class_attendance_stats(self.current_subject_id)
         elif batch_attendance_stats is None:
             batch_attendance_stats = {}
 
@@ -1228,14 +1267,14 @@ class ClassDetailView(ctk.CTkFrame):
     # Atualiza o status de uma matrícula (Toggle).
     def toggle_student_status(self, enrollment_id, current_status):
         new_status = "Inactive" if current_status == "Active" else "Active"
-        data_service.update_enrollment_status(enrollment_id, new_status)
+        self.data_service.update_enrollment_status(enrollment_id, new_status)
         self.populate_student_list()
 
     def populate_report_student_combo(self):
         """Atualiza o combobox de alunos na aba de relatórios."""
         if not self.class_id: return
 
-        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        enrollments = self.data_service.get_enrollments_for_class(self.class_id)
         student_names = [f"{e['student_first_name']} {e['student_last_name']}" for e in enrollments]
 
         self.report_student_combo.configure(values=student_names)
@@ -1304,7 +1343,7 @@ class ClassDetailView(ctk.CTkFrame):
              ctk.CTkLabel(self.lesson_list_frame, text="Selecione ou adicione uma disciplina.").pack(pady=10)
              return
 
-        lessons = lessons_data if lessons_data is not None else data_service.get_lessons_for_subject(self.current_subject_id)
+        lessons = lessons_data if lessons_data is not None else self.data_service.get_lessons_for_subject(self.current_subject_id)
 
         headers = ["Data", "Título", "Ações"]
         for i, header in enumerate(headers):
@@ -1334,13 +1373,13 @@ class ClassDetailView(ctk.CTkFrame):
 
         # Callback opcional se quisermos fazer algo após copiar (ex: logar ou atualizar algo)
         # Por enquanto não precisa recarregar nada na view ATUAL, pois copiamos PARA outra turma.
-        CopyLessonDialog(self, self.class_id, self.current_subject_id)
+        CopyLessonDialog(self, self.class_id, self.current_subject_id, data_service=self.data_service)
 
     def open_attendance_dialog(self, lesson_id, lesson_title):
         if not self.class_id: return
 
         # 1. Carrega alunos ativos
-        enrollments = data_service.get_enrollments_for_class(self.class_id)
+        enrollments = self.data_service.get_enrollments_for_class(self.class_id)
         active_enrollments = [e for e in enrollments if e['status'] == 'Active']
 
         if not active_enrollments:
@@ -1350,13 +1389,13 @@ class ClassDetailView(ctk.CTkFrame):
         students = [{"id": e['student_id'], "name": f"{e['student_first_name']} {e['student_last_name']}"} for e in active_enrollments]
 
         # 2. Carrega chamadas existentes
-        existing_records = data_service.get_lesson_attendance(lesson_id)
+        existing_records = self.data_service.get_lesson_attendance(lesson_id)
         attendance_map = {r['student_id']: r['status'] for r in existing_records}
 
         # 3. Callback de salvamento
         def save_attendance(lid, data):
             try:
-                data_service.register_attendance(lid, data)
+                self.data_service.register_attendance(lid, data)
                 messagebox.showinfo("Sucesso", "Chamada registrada com sucesso.")
                 # Atualiza a lista de alunos para refletir nova % de frequência
                 self.populate_student_list()
@@ -1366,13 +1405,12 @@ class ClassDetailView(ctk.CTkFrame):
         # 4. Abre dialogo
         AttendanceDialog(self, f"Chamada - {lesson_title}", lesson_id, students, attendance_map, save_attendance)
 
-    # Método estático para busca inicial de dados
-    @staticmethod
-    def _fetch_initial_details(class_id, preferred_subject_id=None):
-        class_data = data_service.get_class_by_id(class_id)
-        subjects = data_service.get_subjects_for_class(class_id)
-        enrollments = data_service.get_enrollments_for_class(class_id)
-        incidents = data_service.get_incidents_for_class(class_id)
+    # Método auxiliar para busca inicial de dados
+    def _fetch_initial_details(self, class_id, preferred_subject_id=None):
+        class_data = self.data_service.get_class_by_id(class_id)
+        subjects = self.data_service.get_subjects_for_class(class_id)
+        enrollments = self.data_service.get_enrollments_for_class(class_id)
+        incidents = self.data_service.get_incidents_for_class(class_id)
 
         subject_data = None
         target_subject_id = None
@@ -1387,7 +1425,7 @@ class ClassDetailView(ctk.CTkFrame):
 
         # Se identificou uma disciplina alvo, carrega seus dados
         if target_subject_id:
-            subject_data = ClassDetailView._fetch_subject_data(target_subject_id, class_id)
+            subject_data = self._fetch_subject_data(target_subject_id, class_id)
             subject_data['id'] = target_subject_id
 
         return {
@@ -1400,54 +1438,66 @@ class ClassDetailView(ctk.CTkFrame):
 
     def _on_initial_details_fetched(self, result):
         if isinstance(result, Exception):
-            if hasattr(self, 'loading_overlay') and self.loading_overlay:
-                self.loading_overlay.destroy()
-                self.loading_overlay = None
+            self._remove_overlay()
             messagebox.showerror("Erro", f"Erro ao carregar turma: {result}")
             return
 
-        class_data = result['class_data']
-        self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
+        try:
+            class_data = result['class_data']
+            if not class_data:
+                messagebox.showerror("Erro", "Turma não encontrada.")
+                return
 
-        # Recupera dados combinados
-        initial_subject_data = result.get('initial_subject_data')
-        subjects = result['subjects']
+            self.title_label.configure(text=f"Detalhes da Turma: {class_data['name']}")
 
-        # Configura o ID da disciplina atual ANTES de popular o combo.
-        # Isso impede que o populate_subject_combo dispare o evento on_change desnecessariamente.
-        if initial_subject_data:
-            self.current_subject_id = initial_subject_data['id']
+            # Recupera dados combinados
+            initial_subject_data = result.get('initial_subject_data')
+            subjects = result['subjects']
 
-        # Popula dropdown de subjects
-        self.populate_subject_combo(subjects=subjects)
-        self.populate_report_student_combo()
-        self.populate_incident_list(incidents_data=result['incidents'])
+            # Configura o ID da disciplina atual ANTES de popular o combo.
+            # Isso impede que o populate_subject_combo dispare o evento on_change desnecessariamente.
+            self.current_subject_id = initial_subject_data['id'] if initial_subject_data else None
 
-        # Se temos dados da disciplina, populamos tudo
-        if initial_subject_data:
-            # Popula abas específicas da disciplina
-            self.populate_assessment_list(assessments_data=initial_subject_data['assessments'])
-            self.populate_lesson_list(lessons_data=initial_subject_data['lessons'])
-            self.populate_grade_grid(
-                assessments_data=initial_subject_data['assessments'],
-                grades_data=initial_subject_data['grades'],
-                enrollments_data=result['enrollments'],
-                averages_data=initial_subject_data['batch_averages']
-            )
-            # Popula lista de alunos COM FREQUÊNCIA (Attendance Stats)
-            self.populate_student_list(
-                enrollments_data=result['enrollments'],
-                attendance_stats=initial_subject_data['attendance_stats']
-            )
-            self.populate_bncc_tab(report_data=initial_subject_data['bncc_report'])
-        else:
-            # Caso sem disciplina, popula apenas a lista básica de alunos
-            self.populate_student_list(enrollments_data=result['enrollments'])
+            # Popula dropdown de subjects
+            self.populate_subject_combo(subjects=subjects)
+            self.populate_report_student_combo()
+            self.populate_incident_list(incidents_data=result['incidents'])
 
-        # Força renderização e atrasa remoção do overlay
-        self.update_idletasks()
-        if hasattr(self, 'loading_overlay') and self.loading_overlay:
-            self.after(100, self._remove_overlay)
+            # Se temos dados da disciplina, populamos tudo
+            if initial_subject_data:
+                # Popula abas específicas da disciplina
+                self.populate_assessment_list(assessments_data=initial_subject_data['assessments'])
+                self.populate_lesson_list(lessons_data=initial_subject_data['lessons'])
+                self.populate_grade_grid(
+                    assessments_data=initial_subject_data['assessments'],
+                    grades_data=initial_subject_data['grades'],
+                    enrollments_data=result['enrollments'],
+                    averages_data=initial_subject_data['batch_averages']
+                )
+                # Popula lista de alunos COM FREQUÊNCIA (Attendance Stats)
+                self.populate_student_list(
+                    enrollments_data=result['enrollments'],
+                    attendance_stats=initial_subject_data['attendance_stats']
+                )
+                self.populate_bncc_tab(report_data=initial_subject_data['bncc_report'])
+            else:
+                # Caso sem disciplina, limpa todas as abas dependentes e exibe orientações vazias
+                for frame in self.grade_frames.values():
+                    for widget in frame.winfo_children():
+                        widget.destroy()
+                self.populate_assessment_list()
+                self.populate_lesson_list()
+                self.populate_grade_grid()
+                self.populate_bncc_tab()
+                self.populate_student_list(enrollments_data=result['enrollments'])
+
+            # Força renderização antes de remover o overlay
+            self.update_idletasks()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao exibir detalhes da turma: {e}")
+        finally:
+            if hasattr(self, 'loading_overlay') and self.loading_overlay:
+                self.after(100, self._remove_overlay)
 
     def _remove_overlay(self):
         if hasattr(self, 'loading_overlay') and self.loading_overlay:
@@ -1459,7 +1509,7 @@ class ClassDetailView(ctk.CTkFrame):
         for widget in self.incident_list_frame.winfo_children(): widget.destroy()
         if not self.class_id: return
 
-        incidents = incidents_data if incidents_data is not None else data_service.get_incidents_for_class(self.class_id)
+        incidents = incidents_data if incidents_data is not None else self.data_service.get_incidents_for_class(self.class_id)
 
         # Cria cabeçalhos.
         headers = ["Nome do Aluno", "Data", "Descrição"]
@@ -1478,9 +1528,10 @@ class ClassDetailView(ctk.CTkFrame):
     def on_show(self, class_id=None):
         self.class_id = class_id
 
-        # Atualiza a view do mapa de sala com o ID novo
+        # Atualiza a view do mapa de sala com o ID novo e reseta estado anterior
         self.seating_chart_view.class_id = class_id
-        # Reseta o estado do mapa
+        self.seating_chart_view.current_chart_id = None
+        self.seating_chart_view.chart_data = None
         self.seating_chart_view.populate_layout_combo()
 
         if class_id:

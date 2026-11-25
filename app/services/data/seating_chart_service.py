@@ -8,35 +8,14 @@
 # Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
 # License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
 # arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
 from app.models.seating_chart import SeatingChart, SeatAssignment
 from app.models.student import Student
 from app.models.class_enrollment import ClassEnrollment
-from contextlib import contextmanager
-import json
+from .base_service import BaseDataService
 
-class SeatingChartService:
-    def __init__(self, db_session: Session = None):
-        self._db_session = db_session
 
-    @contextmanager
-    def _get_db(self):
-        if self._db_session:
-            yield self._db_session
-        else:
-            from app.data.database import SessionLocal
-            db = SessionLocal()
-            try:
-                yield db
-                db.commit()
-            except Exception:
-                db.rollback()
-                raise
-            finally:
-                db.close()
-
-    def create_seating_chart(self, class_id: int, name: str, rows: int, cols: int, layout_config: str = "{}") -> SeatingChart:
+class SeatingChartService(BaseDataService):
+    def create_seating_chart(self, class_id: int, name: str, rows: int, cols: int, layout_config: str = "{}") -> dict:
         with self._get_db() as db:
             chart = SeatingChart(
                 class_id=class_id,
@@ -48,7 +27,15 @@ class SeatingChartService:
             db.add(chart)
             db.flush()
             db.refresh(chart)
-            return chart
+            return {
+                "id": chart.id,
+                "class_id": chart.class_id,
+                "name": chart.name,
+                "rows": chart.rows,
+                "columns": chart.columns,
+                "layout_config": chart.layout_config,
+                "created_at": chart.created_at,
+            }
 
     def get_seating_charts_for_class(self, class_id: int) -> list[dict]:
         with self._get_db() as db:
@@ -61,20 +48,18 @@ class SeatingChartService:
             if not chart:
                 return None
 
-            # Join to get Call Number from ClassEnrollment
-            # We assume assignments are valid only if student is enrolled in the chart's class?
-            # Ideally yes, but let's just get the call number for the chart's class.
-
-            assignments_query = (db.query(
-                                    SeatAssignment,
-                                    Student.first_name,
-                                    Student.last_name,
-                                    ClassEnrollment.call_number
-                                )
-                                .join(Student, SeatAssignment.student_id == Student.id)
-                                .outerjoin(ClassEnrollment, (ClassEnrollment.student_id == Student.id) & (ClassEnrollment.class_id == chart.class_id))
-                                .filter(SeatAssignment.chart_id == chart_id)
-                                .all())
+            assignments_query = (
+                db.query(
+                    SeatAssignment,
+                    Student.first_name,
+                    Student.last_name,
+                    ClassEnrollment.call_number
+                )
+                .join(Student, SeatAssignment.student_id == Student.id)
+                .outerjoin(ClassEnrollment, (ClassEnrollment.student_id == Student.id) & (ClassEnrollment.class_id == chart.class_id))
+                .filter(SeatAssignment.chart_id == chart_id)
+                .all()
+            )
 
             assignments_data = []
             for a, fname, lname, call_num in assignments_query:
@@ -82,7 +67,7 @@ class SeatingChartService:
                     "id": a.id,
                     "student_id": a.student_id,
                     "student_name": f"{fname} {lname}",
-                    "call_number": call_num, # May be None if not enrolled anymore
+                    "call_number": call_num,
                     "row_index": a.row_index,
                     "col_index": a.col_index
                 })
@@ -101,18 +86,17 @@ class SeatingChartService:
             chart = db.query(SeatingChart).filter(SeatingChart.id == chart_id).first()
             if chart:
                 chart.layout_config = layout_config
-                db.commit()
+                db.flush()
 
     def save_seat_assignments(self, chart_id: int, assignments: list[dict]):
         """
-        Replaces all assignments for a chart with the new list.
-        assignments: list of dicts {student_id, row_index, col_index}
+        Substitui todas as alocações de assento de um mapa de sala pela nova lista.
+        assignments: lista de dicts {student_id, row_index, col_index}
         """
         with self._get_db() as db:
-            # Clear existing
             db.query(SeatAssignment).filter(SeatAssignment.chart_id == chart_id).delete()
+            db.flush()
 
-            # Add new
             new_assignments = [
                 SeatAssignment(
                     chart_id=chart_id,
@@ -123,11 +107,11 @@ class SeatingChartService:
             ]
             if new_assignments:
                 db.bulk_save_objects(new_assignments)
-            db.commit()
+            db.flush()
 
     def delete_seating_chart(self, chart_id: int):
         with self._get_db() as db:
             chart = db.query(SeatingChart).filter(SeatingChart.id == chart_id).first()
             if chart:
                 db.delete(chart)
-                db.commit()
+                db.flush()

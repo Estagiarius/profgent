@@ -15,7 +15,7 @@ class BaseDialog(ctk.CTkToplevel):
     Classe base para diálogos modais que garante comportamento consistente
     em diferentes sistemas operacionais (Windows, Linux, macOS).
     """
-    def __init__(self, parent, title: str = "Dialog", **kwargs):
+    def __init__(self, parent, title: str = "Diálogo", **kwargs):
         super().__init__(parent, **kwargs)
         self.title(title)
 

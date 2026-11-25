@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 from datetime import date
 from sqlalchemy.orm import joinedload
 from app.models.lesson import Lesson
@@ -33,8 +43,22 @@ class LessonService(BaseDataService):
 
     def get_lessons_for_subject(self, class_subject_id: int) -> list[dict]:
         with self._get_db() as db:
-            lessons = db.query(Lesson.id, Lesson.title, Lesson.content, Lesson.date).filter(Lesson.class_subject_id == class_subject_id).order_by(Lesson.date.desc()).all()
-            return [{"id": l.id, "title": l.title, "content": l.content, "date": l.date.isoformat()} for l in lessons]
+            lessons = (
+                db.query(Lesson.id, Lesson.title, Lesson.content, Lesson.date, Lesson.bncc_codes)
+                .filter(Lesson.class_subject_id == class_subject_id)
+                .order_by(Lesson.date.desc())
+                .all()
+            )
+            return [
+                {
+                    "id": l.id,
+                    "title": l.title,
+                    "content": l.content,
+                    "date": l.date.isoformat(),
+                    "bncc_codes": l.bncc_codes,
+                }
+                for l in lessons
+            ]
 
     def copy_lessons(self, source_lesson_ids: list[int], target_class_subject_id: int) -> int:
         if not source_lesson_ids or not target_class_subject_id:
@@ -49,7 +73,8 @@ class LessonService(BaseDataService):
                     class_subject_id=target_class_subject_id,
                     title=src.title,
                     content=src.content,
-                    date=src.date
+                    date=src.date,
+                    bncc_codes=src.bncc_codes,
                 )
                 db.add(new_lesson)
                 count += 1
@@ -63,20 +88,22 @@ class LessonService(BaseDataService):
         with self._get_db() as db:
             lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
             if not lesson:
-                raise ValueError(f"Lesson with id {lesson_id} not found.")
+                raise ValueError(f"Aula com ID {lesson_id} não encontrada.")
 
             existing_records = db.query(Attendance).filter(Attendance.lesson_id == lesson_id).all()
             existing_map = {att.student_id: att for att in existing_records}
 
-            to_insert = []
-
+            # Deduplica entradas por student_id mantendo a última ocorrência válida.
+            deduped_entries = {}
             for entry in attendance_data:
                 student_id = entry.get('student_id')
                 status = entry.get('status', 'P')
-
-                if status not in valid_statuses:
+                if student_id is None or status not in valid_statuses:
                     continue
+                deduped_entries[student_id] = status
 
+            to_insert = []
+            for student_id, status in deduped_entries.items():
                 existing = existing_map.get(student_id)
                 if existing:
                     if existing.status != status:

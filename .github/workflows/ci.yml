@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master", "refactor/**"]
+  pull_request:
+    branches: ["main", "master"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Testes e Validação Estática
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar Poetry
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache do ambiente virtual Poetry
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-py3.12-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Instalar dependências
+        run: poetry install --no-root --with dev
+
+      - name: Verificar compilação dos módulos Python
+        run: poetry run python -m compileall -q app tests scripts main.py
+
+      - name: Verificar cabeçalhos de licença MPL-2.0
+        run: |
+          python3 - <<'EOF'
+          from pathlib import Path
+          import sys
+
+          missing = []
+          for root in ("app", "tests", "scripts"):
+              for path in sorted(Path(root).rglob("*.py")):
+                  head = "\n".join(path.read_text(encoding="utf-8").splitlines()[:15])
+                  if "Mozilla Public" not in head:
+                      missing.append(str(path))
+
+          main_head = "\n".join(Path("main.py").read_text(encoding="utf-8").splitlines()[:15])
+          if "Mozilla Public" not in main_head:
+              missing.append("main.py")
+
+          if missing:
+              print("Arquivos Python sem cabeçalho MPL-2.0:")
+              for item in missing:
+                  print(f" - {item}")
+              sys.exit(1)
+
+          print("Todos os arquivos Python possuem cabeçalho MPL-2.0.")
+          EOF
+
+      - name: Executar suíte de testes (Pytest)
+        run: poetry run pytest -q

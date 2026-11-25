@@ -13,11 +13,13 @@
 # Script para criar um instalador .dmg para MacOS
 # Requer 'hdiutil' (padrão no MacOS)
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 APP_NAME="Profgent"
 VERSION="1.0"
-DIST_DIR="../../dist/onedir/${APP_NAME}.app" # O PyInstaller gera .app no mac em onedir
+DIST_DIR="${ROOT_DIR}/dist/onedir/${APP_NAME}.app"
 DMG_NAME="${APP_NAME}_${VERSION}_Installer.dmg"
-OUTPUT_DIR="../../dist/installers"
+OUTPUT_DIR="${ROOT_DIR}/dist/installers"
 
 echo "=== Criação de Instalador DMG para $APP_NAME ==="
 

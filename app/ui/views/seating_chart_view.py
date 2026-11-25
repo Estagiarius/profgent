@@ -12,19 +12,24 @@ import customtkinter as ctk
 from tkinter import messagebox, Menu, filedialog
 import json
 from app.ui.widgets.scrollable_canvas_frame import ScrollableCanvasFrame
-from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.services.report_service import ReportService
+from app.utils.path_utils import open_file_in_os
 import os
 
 class SeatingChartView(ctk.CTkFrame):
-    def __init__(self, parent, class_id):
+    def __init__(self, parent, class_id, data_service=None, report_service=None):
         super().__init__(parent)
         self.class_id = class_id
-        self.report_service = ReportService()
+        if data_service is None:
+            from app.services import data_service as default_data_service
+            self.data_service = default_data_service
+        else:
+            self.data_service = data_service
+        self.report_service = report_service or ReportService(data_service=self.data_service)
 
         self.current_chart_id = None
-        self.chart_data = None # Holds current chart details {rows, cols, layout_config, assignments}
+        self.chart_data = None
 
         self.selected_student_id = None # From the sidebar list
         self.selected_cell = None # (row, col)
@@ -96,7 +101,7 @@ class SeatingChartView(ctk.CTkFrame):
         ctk.CTkLabel(f, text=text).pack(side="left")
 
     def populate_layout_combo(self):
-        charts = data_service.get_seating_charts_for_class(self.class_id)
+        charts = self.data_service.get_seating_charts_for_class(self.class_id)
         if not charts:
             self.layout_combo.configure(values=["Nenhum Layout"])
             self.layout_combo.set("Nenhum Layout")
@@ -123,7 +128,7 @@ class SeatingChartView(ctk.CTkFrame):
 
     def load_chart_data(self):
         if not self.current_chart_id: return
-        self.chart_data = data_service.get_seating_chart_details(self.current_chart_id)
+        self.chart_data = self.data_service.get_seating_chart_details(self.current_chart_id)
 
         # Parse layout_config JSON
         try:
@@ -144,7 +149,7 @@ class SeatingChartView(ctk.CTkFrame):
         for widget in self.student_list_frame.winfo_children(): widget.destroy()
 
         # Get all active students
-        all_students = data_service.get_enrollments_for_class(self.class_id)
+        all_students = self.data_service.get_enrollments_for_class(self.class_id)
         active_students = [s for s in all_students if s['status'] == 'Active']
 
         # Filter out already assigned students
@@ -185,7 +190,7 @@ class SeatingChartView(ctk.CTkFrame):
                 messagebox.showerror("Erro", "Linhas e Colunas devem ser números positivos.")
                 return
 
-            data_service.create_seating_chart(self.class_id, name, rows, cols)
+            self.data_service.create_seating_chart(self.class_id, name, rows, cols)
             self.populate_layout_combo()
             self.layout_combo.set(name)
             self.on_layout_change(name)
@@ -198,7 +203,7 @@ class SeatingChartView(ctk.CTkFrame):
         if not messagebox.askyesno("Confirmar", "Tem certeza que deseja excluir este layout?"):
             return
 
-        data_service.delete_seating_chart(self.current_chart_id)
+        self.data_service.delete_seating_chart(self.current_chart_id)
         self.current_chart_id = None
         self.populate_layout_combo()
 
@@ -308,7 +313,7 @@ class SeatingChartView(ctk.CTkFrame):
             save_list = [{'student_id': a['student_id'], 'row_index': a['row_index'], 'col_index': a['col_index']}
                          for a in new_assignments]
 
-            data_service.save_seat_assignments(self.current_chart_id, save_list)
+            self.data_service.save_seat_assignments(self.current_chart_id, save_list)
             self.load_chart_data() # Refresh
 
         elif self.selected_student_id:
@@ -327,9 +332,10 @@ class SeatingChartView(ctk.CTkFrame):
             ]
             current_assignments.append(new_assign)
 
-            data_service.save_seat_assignments(self.current_chart_id, current_assignments)
+            self.data_service.save_seat_assignments(self.current_chart_id, current_assignments)
 
-            self.selected_student_id = None # Reset selection
+            self.selected_student_id = None
+            self.configure(cursor="")
             self.load_chart_data()
 
     def on_canvas_right_click(self, event):
@@ -341,7 +347,6 @@ class SeatingChartView(ctk.CTkFrame):
         row = int((cy - self.PADDING) // self.CELL_HEIGHT)
 
         if 0 <= row < self.chart_data['rows'] and 0 <= col < self.chart_data['columns']:
-            # Show Context Menu
             menu = Menu(self, tearoff=0)
             menu.add_command(label="Carteira (Aluno)", command=lambda: self.set_cell_type(row, col, "student_seat"))
             menu.add_command(label="Mesa Professor", command=lambda: self.set_cell_type(row, col, "teacher_desk"))
@@ -355,60 +360,39 @@ class SeatingChartView(ctk.CTkFrame):
 
         if new_type == "student_seat":
             if key in config:
-                del config[key] # Default is student_seat
+                del config[key]
         else:
             config[key] = new_type
 
-        # Update DB
-        data_service.update_seating_chart_layout(self.current_chart_id, json.dumps(config))
+        self.data_service.update_seating_chart_layout(self.current_chart_id, json.dumps(config))
         self.load_chart_data()
 
     def export_chart(self):
         if not self.current_chart_id: return
 
-        # Ask user for format
         filepath = filedialog.asksaveasfilename(
             title="Exportar Mapa de Sala",
             defaultextension=".pdf",
-            filetypes=[("PDF Document", "*.pdf"), ("Scalable Vector Graphics", "*.svg")],
+            filetypes=[("Documento PDF", "*.pdf"), ("Imagem Vetorial SVG", "*.svg")],
             initialfile=f"mapa_sala_{self.current_chart_id}"
         )
 
         if not filepath: return
 
-        # Determine format from extension
         _, ext = os.path.splitext(filepath)
         fmt = ext.lower().replace('.', '')
         if fmt not in ['pdf', 'svg']:
-            fmt = 'pdf' # Default
+            fmt = 'pdf'
 
         try:
-            # We need to expose a method in report_service that accepts a path or returns content,
-            # currently it generates its own path.
-            # Ideally report service should allow overriding path.
-            # But since report_service methods return a path inside 'reports/', let's just generate it there
-            # and then move/copy it, or assume the user wants it in the reports folder if they didn't pick location?
-            # Actually, standard flow in this app seems to be auto-gen in reports/ folder.
-            # But since we are asking for a save location now (standard for "Export"), we should respect it.
-            # However, ReportService currently hardcodes path.
+            generated_path = self.report_service.generate_seating_chart(self.current_chart_id, fmt)
 
-            # Let's call the internal generator directly or update ReportService?
-            # Updating ReportService is cleaner but might touch more files.
-            # Let's just generate it using the existing method which returns a path, then rename/move it to user selection.
-
-            generated_path = self.report_service._generate_seating_chart_plot(self.current_chart_id, fmt)
-
-            # Move to selected path
             import shutil
             shutil.move(generated_path, filepath)
 
             messagebox.showinfo("Sucesso", f"Mapa exportado com sucesso para:\n{filepath}")
 
-            # Open file
-            if os.name == 'nt':
-                os.startfile(filepath)
-            else:
-                os.system(f'xdg-open "{filepath}"')
+            open_file_in_os(filepath)
 
         except Exception as e:
             messagebox.showerror("Erro", f"Falha ao exportar: {e}")

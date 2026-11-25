@@ -1,3 +1,13 @@
+# Author: Victor Hugo Garcia de Oliveira
+# Date: 2025-12-21
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#
+# Este arquivo de código-fonte está sujeito aos termos da Mozilla Public
+# License, v. 2.0. Se uma cópia da MPL não foi distribuída com este
+# arquivo, você pode obter uma em https://mozilla.org/MPL/2.0/.
 from datetime import date, datetime
 from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import Session
@@ -107,7 +117,7 @@ class StudentService(BaseDataService):
     def add_student(self, first_name: str, last_name: str, birth_date: date | None = None) -> dict | None:
         if not first_name or not last_name: return None
         if birth_date and birth_date > date.today():
-            raise ValueError("Birth date cannot be in the future.")
+            raise ValueError("A data de nascimento não pode estar no futuro.")
 
         with self._get_db() as db:
             existing = db.query(Student).filter(
@@ -177,7 +187,7 @@ class StudentService(BaseDataService):
 
     def update_student(self, student_id: int, first_name: str, last_name: str, birth_date: date | None = None):
         if birth_date and birth_date > date.today():
-            raise ValueError("Birth date cannot be in the future.")
+            raise ValueError("A data de nascimento não pode estar no futuro.")
 
         with self._get_db() as db:
             student = db.query(Student).filter(Student.id == student_id).first()
@@ -187,14 +197,20 @@ class StudentService(BaseDataService):
                 student.birth_date = birth_date
 
     def delete_student(self, student_id: int):
+        from app.models.attendance import Attendance
+        from app.models.seating_chart import SeatAssignment
+
         with self._get_db() as db:
-            db.query(Incident).filter(Incident.student_id == student_id).delete()
-            db.query(Grade).filter(Grade.student_id == student_id).delete()
-            db.query(ClassEnrollment).filter(ClassEnrollment.student_id == student_id).delete()
+            db.query(Attendance).filter(Attendance.student_id == student_id).delete(synchronize_session=False)
+            db.query(SeatAssignment).filter(SeatAssignment.student_id == student_id).delete(synchronize_session=False)
+            db.query(Incident).filter(Incident.student_id == student_id).delete(synchronize_session=False)
+            db.query(Grade).filter(Grade.student_id == student_id).delete(synchronize_session=False)
+            db.query(ClassEnrollment).filter(ClassEnrollment.student_id == student_id).delete(synchronize_session=False)
 
             student = db.query(Student).filter(Student.id == student_id).first()
             if student:
                 db.delete(student)
+                db.flush()
 
     def get_students_with_active_enrollment(self) -> list[dict]:
         with self._get_db() as db:

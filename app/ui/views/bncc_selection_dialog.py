@@ -15,16 +15,15 @@ from app.ui.views.base_dialog import BaseDialog
 class BNCCSelectionDialog(BaseDialog):
     def __init__(self, parent, title="Selecionar Habilidades BNCC", initial_selection=None, callback=None):
         super().__init__(parent, title)
-        self.geometry("1600x900")
+        self.geometry("960x640")
         self.callback = callback
         self.selected_codes = set(initial_selection.split(',')) if initial_selection else set()
-        # Clean up empty strings
         self.selected_codes = {c.strip() for c in self.selected_codes if c.strip()}
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        # Search
+        # Busca
         self.search_frame = ctk.CTkFrame(self)
         self.search_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
 
@@ -35,30 +34,26 @@ class BNCCSelectionDialog(BaseDialog):
         self.search_btn = ctk.CTkButton(self.search_frame, text="Buscar", command=self.perform_search)
         self.search_btn.pack(side="right")
 
-        # List Area
+        # Área da lista
         self.scrollable_frame = ctk.CTkScrollableFrame(self)
         self.scrollable_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
-        # Buttons & Status Frame
+        # Botões e Status
         self.btn_frame = ctk.CTkFrame(self)
         self.btn_frame.grid(row=2, column=0, padx=10, pady=10, sticky="ew")
 
-        # Status Label (Left)
         self.status_label = ctk.CTkLabel(self.btn_frame, text=f"Selecionados: {len(self.selected_codes)}")
         self.status_label.pack(side="left", padx=10)
 
-        # Buttons (Right)
         ctk.CTkButton(self.btn_frame, text="Confirmar", command=self.confirm).pack(side="right", padx=10)
         ctk.CTkButton(self.btn_frame, text="Cancelar", fg_color="transparent", border_width=1, command=self.destroy).pack(side="right")
 
-        # Initial Search (Show all or filtered)
         self.perform_search()
 
     def perform_search(self):
         query = self.search_entry.get()
         results = BNCCService.search_skills(query)
 
-        # Clear current list
         for widget in self.scrollable_frame.winfo_children():
             widget.destroy()
 
@@ -66,12 +61,15 @@ class BNCCSelectionDialog(BaseDialog):
             ctk.CTkLabel(self.scrollable_frame, text="Nenhum resultado encontrado.").pack(pady=20)
             return
 
-        # Render list (limit to 50 for performance if query is empty)
-        limit = 100 if not query else None
+        # Limita sempre a 100 itens renderizados para evitar travamento da UI em buscas amplas
+        limit = 100
 
         for i, item in enumerate(results):
-            if limit and i >= limit:
-                ctk.CTkLabel(self.scrollable_frame, text="... Refine sua busca para ver mais ...").pack(pady=10)
+            if i >= limit:
+                ctk.CTkLabel(
+                    self.scrollable_frame,
+                    text=f"... Mostrando {limit} de {len(results)} resultados. Refine sua busca para ver mais ..."
+                ).pack(pady=10)
                 break
 
             frame = ctk.CTkFrame(self.scrollable_frame)
