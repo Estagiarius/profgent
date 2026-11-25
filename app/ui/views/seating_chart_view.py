@@ -12,7 +12,6 @@ import customtkinter as ctk
 from tkinter import messagebox, Menu, filedialog
 import json
 from app.ui.widgets.scrollable_canvas_frame import ScrollableCanvasFrame
-from app.services import data_service
 from app.ui.views.add_dialog import AddDialog
 from app.services.report_service import ReportService
 from app.utils.path_utils import open_file_in_os
@@ -102,7 +101,7 @@ class SeatingChartView(ctk.CTkFrame):
         ctk.CTkLabel(f, text=text).pack(side="left")
 
     def populate_layout_combo(self):
-        charts = data_service.get_seating_charts_for_class(self.class_id)
+        charts = self.data_service.get_seating_charts_for_class(self.class_id)
         if not charts:
             self.layout_combo.configure(values=["Nenhum Layout"])
             self.layout_combo.set("Nenhum Layout")
@@ -129,7 +128,7 @@ class SeatingChartView(ctk.CTkFrame):
 
     def load_chart_data(self):
         if not self.current_chart_id: return
-        self.chart_data = data_service.get_seating_chart_details(self.current_chart_id)
+        self.chart_data = self.data_service.get_seating_chart_details(self.current_chart_id)
 
         # Parse layout_config JSON
         try:
@@ -150,7 +149,7 @@ class SeatingChartView(ctk.CTkFrame):
         for widget in self.student_list_frame.winfo_children(): widget.destroy()
 
         # Get all active students
-        all_students = data_service.get_enrollments_for_class(self.class_id)
+        all_students = self.data_service.get_enrollments_for_class(self.class_id)
         active_students = [s for s in all_students if s['status'] == 'Active']
 
         # Filter out already assigned students
@@ -191,7 +190,7 @@ class SeatingChartView(ctk.CTkFrame):
                 messagebox.showerror("Erro", "Linhas e Colunas devem ser números positivos.")
                 return
 
-            data_service.create_seating_chart(self.class_id, name, rows, cols)
+            self.data_service.create_seating_chart(self.class_id, name, rows, cols)
             self.populate_layout_combo()
             self.layout_combo.set(name)
             self.on_layout_change(name)
@@ -204,7 +203,7 @@ class SeatingChartView(ctk.CTkFrame):
         if not messagebox.askyesno("Confirmar", "Tem certeza que deseja excluir este layout?"):
             return
 
-        data_service.delete_seating_chart(self.current_chart_id)
+        self.data_service.delete_seating_chart(self.current_chart_id)
         self.current_chart_id = None
         self.populate_layout_combo()
 
@@ -314,7 +313,7 @@ class SeatingChartView(ctk.CTkFrame):
             save_list = [{'student_id': a['student_id'], 'row_index': a['row_index'], 'col_index': a['col_index']}
                          for a in new_assignments]
 
-            data_service.save_seat_assignments(self.current_chart_id, save_list)
+            self.data_service.save_seat_assignments(self.current_chart_id, save_list)
             self.load_chart_data() # Refresh
 
         elif self.selected_student_id:

@@ -11,7 +11,6 @@
 import customtkinter as ctk
 from tkinter import messagebox
 from datetime import date, timedelta, datetime
-from app.services import data_service
 from app.ui.views.lesson_dialog import LessonDialog
 from app.ui.views.add_dialog import AddDialog
 from app.ui.views.base_dialog import BaseDialog
@@ -20,6 +19,7 @@ class ScheduleView(ctk.CTkFrame):
     def __init__(self, parent, main_app):
         super().__init__(parent)
         self.main_app = main_app
+        self.data_service = main_app.data_service
 
         # Estado
         self.current_week_start = self.get_start_of_current_week()
@@ -160,7 +160,7 @@ class ScheduleView(ctk.CTkFrame):
         # Ou listar todas as disciplinas de todas as turmas?
         # Vamos listar "Turma - Disciplina"
 
-        classes = data_service.get_all_classes()
+        classes = self.data_service.get_all_classes()
         if not classes:
             messagebox.showwarning("Aviso", "Não há turmas cadastradas.")
             return
@@ -187,7 +187,7 @@ class ScheduleView(ctk.CTkFrame):
         subject_combo.pack(pady=5)
 
         # Dados
-        classes = data_service.get_all_classes()
+        classes = self.data_service.get_all_classes()
         class_map = {c['name']: c['id'] for c in classes}
         class_combo.configure(values=list(class_map.keys()))
 
@@ -195,7 +195,7 @@ class ScheduleView(ctk.CTkFrame):
 
         def on_class_change(choice):
             class_id = class_map[choice]
-            subjects = data_service.get_subjects_for_class(class_id)
+            subjects = self.data_service.get_subjects_for_class(class_id)
             subject_names = [s['course_name'] for s in subjects]
             subject_map.clear()
             for s in subjects:
@@ -216,7 +216,7 @@ class ScheduleView(ctk.CTkFrame):
                 return
 
             subj_id = subject_map[subj_name]
-            data_service.create_schedule_assignment(slot_id, subj_id)
+            self.data_service.create_schedule_assignment(slot_id, subj_id)
             top.destroy()
             self.render_grid()
 
@@ -255,7 +255,7 @@ class ScheduleView(ctk.CTkFrame):
                       command=lambda d=day_code: self.add_slot_popup(d)).pack(side="right")
 
         # Lista slots existentes
-        slots = data_service.get_time_slots(day_code)
+        slots = self.data_service.get_time_slots(day_code)
         if not slots:
             ctk.CTkLabel(day_frame, text="Nenhum horário configurado.", text_color="gray").pack(pady=5)
 
@@ -275,7 +275,7 @@ class ScheduleView(ctk.CTkFrame):
                 idx = int(data['index'])
                 start = data['start']
                 end = data['end']
-                data_service.create_time_slot(day_code, idx, start, end)
+                self.data_service.create_time_slot(day_code, idx, start, end)
                 self.refresh_config_list()
                 self.render_grid() # Atualiza aba visualização tb
             except ValueError as e:
@@ -289,7 +289,7 @@ class ScheduleView(ctk.CTkFrame):
 
     def delete_slot(self, slot_id):
         if messagebox.askyesno("Confirmar", "Deseja excluir este horário? A alocação será perdida."):
-            data_service.delete_time_slot(slot_id)
+            self.data_service.delete_time_slot(slot_id)
             self.refresh_config_list()
             self.render_grid()
 
