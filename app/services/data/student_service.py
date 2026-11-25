@@ -210,6 +210,7 @@ class StudentService(BaseDataService):
             student = db.query(Student).filter(Student.id == student_id).first()
             if student:
                 db.delete(student)
+                db.flush()
 
     def get_students_with_active_enrollment(self) -> list[dict]:
         with self._get_db() as db:

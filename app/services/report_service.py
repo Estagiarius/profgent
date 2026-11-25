@@ -36,7 +36,6 @@ class ReportService:
         else:
             self.data_service = data_service
         self.reports_dir = reports_dir or self.REPORTS_DIR
-        self._ensure_reports_dir()
 
     def _ensure_reports_dir(self):
         """Garante que o diretório de relatórios exista."""

@@ -263,3 +263,4 @@ class CourseService(BaseDataService):
             class_ = db.query(Class).filter(Class.id == class_id).first()
             if class_:
                 db.delete(class_)
+                db.flush()
